@@ -46,27 +46,64 @@ async function createWindow() {
 function setupIpcHandlers() {
   // Ping (health check)
   ipcMain.handle("vest:ping", async () => {
-    return await pythonBridge.ping();
+    try {
+      return await pythonBridge.ping();
+    } catch (error) {
+      console.error("Error in vest:ping:", error);
+      return {
+        success: false,
+        error: error.message || "Unknown error",
+      };
+    }
   });
 
   // Status
   ipcMain.handle("vest:status", async () => {
-    return await pythonBridge.getStatus();
+    try {
+      return await pythonBridge.getStatus();
+    } catch (error) {
+      console.error("Error in vest:status:", error);
+      return {
+        connected: false,
+        last_error: error.message || "Failed to get status",
+      };
+    }
   });
 
   // Effects
   ipcMain.handle("vest:effects", async () => {
-    return await pythonBridge.getEffects();
+    try {
+      return await pythonBridge.getEffects();
+    } catch (error) {
+      console.error("Error in vest:effects:", error);
+      return [];
+    }
   });
 
   // Trigger effect
   ipcMain.handle("vest:trigger", async (_, effect) => {
-    return await pythonBridge.triggerEffect(effect.cell, effect.speed);
+    try {
+      return await pythonBridge.triggerEffect(effect.cell, effect.speed);
+    } catch (error) {
+      console.error("Error in vest:trigger:", error);
+      return {
+        success: false,
+        error: error.message || "Failed to trigger effect",
+      };
+    }
   });
 
   // Stop all
   ipcMain.handle("vest:stop", async () => {
-    return await pythonBridge.stopAll();
+    try {
+      return await pythonBridge.stopAll();
+    } catch (error) {
+      console.error("Error in vest:stop:", error);
+      return {
+        success: false,
+        error: error.message || "Failed to stop all",
+      };
+    }
   });
 }
 

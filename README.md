@@ -25,27 +25,60 @@ The Electron debugger console allows you to monitor USB connectivity, trigger in
 
 - Node.js (v25.2.1 recommended — see `web/.nvmrc`)
 - Yarn (managed via Corepack)
-- Python 3.x (for the `modern-third-space` bridge)
+- Python 3.11+ (for the `modern-third-space` bridge)
 
-### Quick Start
+### Setup Steps
 
-1. **Navigate to the web workspace:**
+**Important:** You must set up the Python bridge before starting the Electron app.
+
+1. **Install the Python package:**
+
    ```bash
-   cd web
+   cd modern-third-space
+   pip install -e .
    ```
 
-2. **Install dependencies:**
+   This installs the `modern-third-space` CLI and its dependencies (including PyUSB).
+
+2. **Verify the Python bridge works:**
+
    ```bash
+   python3 -m modern_third_space.cli ping
+   ```
+
+   You should see: `{"status": "ok", "message": "Python bridge is reachable"}`
+
+3. **Optional: Test device listing:**
+
+   ```bash
+   python3 -m modern_third_space.cli list
+   ```
+
+   This will show connected USB vests (or a fake device with serial "sorry-bro" if PyUSB isn't installed).
+
+4. **Navigate to the web workspace:**
+
+   ```bash
+   cd ../web
+   ```
+
+5. **Install Node.js dependencies:**
+
+   ```bash
+   corepack enable
    yarn install
    ```
 
-3. **Start the development environment:**
+6. **Start the development environment:**
+
    ```bash
    yarn dev
    ```
+
    This launches both the Vite dev server (renderer) and the Electron window in parallel.
 
-4. **Or run components separately:**
+7. **Or run components separately:**
+
    ```bash
    # Terminal 1: Start the renderer (React UI)
    yarn dev:renderer
@@ -54,6 +87,8 @@ The Electron debugger console allows you to monitor USB connectivity, trigger in
    yarn dev:electron
    ```
 
-The debugger UI will open in an Electron window. Until the Python bridge is connected, it runs in demo mode and shows the USB status as disconnected.
+The debugger UI will open in an Electron window. The Python bridge will be automatically detected on startup.
+
+**Note:** If you see errors about PyUSB not being available, see `modern-third-space/README.md` for platform-specific installation instructions.
 
 For more details, see `web/README.md`.

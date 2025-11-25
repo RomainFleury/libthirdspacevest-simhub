@@ -1,8 +1,8 @@
-const { PythonShell } = require("python-shell");
+const { spawn } = require("child_process");
 const path = require("path");
 
-// Path to the modern-third-space CLI module
-const PYTHON_MODULE_PATH = path.resolve(
+// Path to the modern-third-space src directory (for PYTHONPATH)
+const PYTHON_SRC_PATH = path.resolve(
   __dirname,
   "..",
   "..",
@@ -15,26 +15,72 @@ const PYTHON_MODULE_PATH = path.resolve(
  */
 function runPythonCommand(command, args = []) {
   return new Promise((resolve, reject) => {
-    const options = {
-      mode: "json",
-      pythonPath: "python3", // or "python" on Windows
-      pythonOptions: ["-u"], // unbuffered output
-      scriptPath: PYTHON_MODULE_PATH,
-      args: [command, ...args],
-    };
+    try {
+      // Run as module: python3 -m modern_third_space.cli <command> <args>
+      const pythonArgs = [
+        "-u", // unbuffered output
+        "-m",
+        "modern_third_space.cli",
+        command,
+        ...args,
+      ];
 
-    PythonShell.run("modern_third_space/cli.py", options, (err, results) => {
-      if (err) {
-        reject(new Error(`Python error: ${err.message}`));
-        return;
-      }
+      const pythonProcess = spawn("python3", pythonArgs, {
+        cwd: PYTHON_SRC_PATH,
+        env: {
+          ...process.env,
+          PYTHONPATH: PYTHON_SRC_PATH,
+        },
+      });
 
-      // python-shell returns array of JSON objects
-      // For single result commands, take the first item
-      const result =
-        Array.isArray(results) && results.length > 0 ? results[0] : results;
-      resolve(result);
-    });
+      let stdout = "";
+      let stderr = "";
+
+      pythonProcess.stdout.on("data", (data) => {
+        stdout += data.toString();
+      });
+
+      pythonProcess.stderr.on("data", (data) => {
+        stderr += data.toString();
+      });
+
+      pythonProcess.on("close", (code) => {
+        const output = stdout.trim();
+
+        if (code !== 0) {
+          const errorMsg =
+            stderr || stdout || `Process exited with code ${code}`;
+          reject(new Error(`Python CLI error: ${errorMsg}`));
+          return;
+        }
+
+        if (!output) {
+          reject(new Error("Python CLI returned empty output"));
+          return;
+        }
+
+        try {
+          const parsed = JSON.parse(output);
+          resolve(parsed);
+        } catch (parseError) {
+          reject(
+            new Error(
+              `Failed to parse Python output as JSON: ${
+                parseError.message
+              }. Output: ${output.substring(0, 200)}`
+            )
+          );
+        }
+      });
+
+      pythonProcess.on("error", (err) => {
+        reject(new Error(`Failed to start Python process: ${err.message}`));
+      });
+    } catch (setupError) {
+      reject(
+        new Error(`Failed to setup Python command: ${setupError.message}`)
+      );
+    }
   });
 }
 

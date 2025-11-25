@@ -47,7 +47,10 @@
 # new API.)
 #
 # http://pyusb.berlios.de/
-import usb
+try:
+    import usb
+except ImportError:
+    usb = None  # type: ignore
 
 import sys
 import time
@@ -155,7 +158,7 @@ class ThirdSpaceVest:
         try:
             self.tsv_device.detach_kernel_driver(0)
         except usb.core.USBError:
-            print "Probably already detached, continuing"
+            print("Probably already detached, continuing")
 
         self.tsv_device.set_configuration(1)
         return True
@@ -176,13 +179,13 @@ class ThirdSpaceVest:
         """
 
         if self.DEBUG:
-            print "Sending %s" % (["0x%.2x " % (x) for x in command])
+            print("Sending %s" % (["0x%.2x " % (x) for x in command]))
 
         # Make sure command is in correct format to send
         command = [chr(x) for x in command]
 
         # Send command, return value
-        return self.tsv_device.write(self.DEVICE_EP['out'], map(ord, command), 0, 100)
+        return self.tsv_device.write(self.DEVICE_EP['out'], list(map(ord, command)), 0, 100)
 
     def read(self, size=64):
         """Reads in the requested amount of bytes
@@ -306,7 +309,7 @@ def main(argv=None):
 
     # Open the device
     if tsv_device.open() is False:
-        print "No third_space device connected"
+        print("No third_space device connected")
         return
 
     # Always print out what we're sending
@@ -319,17 +322,17 @@ def main(argv=None):
             # quickly.
             for i in range(0, 8):
                 tsv_device.send_actuator_command(i, 10, 0x5D)
-                print tsv_device.read()
+                print(tsv_device.read())
                 time.sleep(.1)
                 tsv_device.send_actuator_command(i, 0x0, 0x5D)
-                print tsv_device.read()
+                print(tsv_device.read())
                 time.sleep(.1)
-        except KeyboardInterrupt, e:
+        except KeyboardInterrupt as e:
             # On keyboard interrupt, turn all cells off. Cells staying
             # on HURTS. PHYSICALLY HURTS.
             for i in range(0, 8):
                 tsv_device.send_actuator_command(i, 0x0, 0x5D)
-                print tsv_device.read()
+                print(tsv_device.read())
                 time.sleep(.05)
             break
 

@@ -40,12 +40,20 @@ def _cmd_ping() -> int:
     return 0
 
 
+def _cmd_list(controller: VestController) -> int:
+    """List all connected USB vest devices"""
+    devices = controller.list_devices()
+    print(json.dumps(devices, indent=2))
+    return 0
+
+
 COMMANDS: Dict[str, Any] = {
     "status": _cmd_status,
     "trigger": _cmd_trigger,
     "stop": _cmd_stop,
     "effects": _cmd_effects,
     "ping": _cmd_ping,
+    "list": _cmd_list,
 }
 
 
@@ -63,6 +71,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("stop", help="Stop all actuators")
     sub.add_parser("ping", help="Health check - verify CLI is reachable")
+    sub.add_parser("list", help="List all connected USB vest devices")
     return parser
 
 
@@ -81,7 +90,10 @@ def main(argv: list[str] | None = None) -> int:
     
     controller = VestController()
     # Trigger needs args, others just need controller
-    return handler(controller, args) if command == "trigger" else handler(controller)
+    if command == "trigger":
+        return handler(controller, args)
+    else:
+        return handler(controller)
 
 
 if __name__ == "__main__":
