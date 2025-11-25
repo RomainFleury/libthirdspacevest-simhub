@@ -72,10 +72,10 @@ if ($env:PATH -notlike "*$nvmHome*") {
     $env:PATH = $nvmHome + ";" + $env:PATH
 }
 
-# Step 2: Switch to Node.js v25.2.1
-Write-Info "Switching to Node.js v25.2.1..."
+# Step 2: Switch to Node.js v24.11.1
+Write-Info "Switching to Node.js v24.11.1..."
 
-$requiredVersion = "25.2.1"
+$requiredVersion = "24.11.1"
 $nvmExe = "$nvmHome\nvm.exe"
 
 # Change to nvm directory to avoid path resolution issues

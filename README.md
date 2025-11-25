@@ -4,27 +4,81 @@ This repository is organized to keep the original `libthirdspacevest` sources in
 
 ## TLDR - Quickstart
 
-**Fastest way to get the debugger running:**
+### macOS / Linux
 
 ```bash
 # 1. Install Python package
 cd modern-third-space && pip install -e . && cd ..
 
-# 2. Install Node dependencies and start
+# 2. Start the Python daemon (in background or separate terminal)
+python3 -m modern_third_space.cli daemon start
+
+# 3. Install Node dependencies and start Electron
 cd web && yarn install && yarn dev
 ```
 
-That's it! The Electron window will open. If you see a "sorry-bro" device, install PyUSB: `pip install pyusb` (see `modern-third-space/README.md` for platform-specific notes).
+### Windows
+
+1. Install [Node.js LTS](https://nodejs.org/) and [Python 3.11+](https://python.org/)
+2. Double-click `windows/install.bat`
+3. Double-click `windows/start-all.bat`
+
+See [`windows/SETUP.md`](./windows/SETUP.md) for detailed instructions.
+
+---
+
+That's it! The Electron window will open and connect to the daemon. If you see a "sorry-bro" device, install PyUSB: `pip install pyusb` (see `modern-third-space/README.md` for platform-specific notes).
 
 **Verify setup:**
 
 ```bash
+# Check Python bridge
 cd web && yarn check:python
+
+# Check daemon status
+python3 -m modern_third_space.cli daemon status
+```
+
+### Daemon Commands
+
+```bash
+python3 -m modern_third_space.cli daemon start           # Start daemon on port 5050
+python3 -m modern_third_space.cli daemon start --port 5051  # Custom port
+python3 -m modern_third_space.cli daemon status          # Check if running + health info
+python3 -m modern_third_space.cli daemon stop            # Stop the daemon
 ```
 
 ## For AI Assistants
 
-If you're an AI assistant working on this repository, see [`AI_ONBOARDING.md`](./AI_ONBOARDING.md) for a complete onboarding guide, including project overview, setup verification steps, key commands, and development guidelines.
+If you're an AI assistant working on this repository, see [`AI_ONBOARDING.md`](./AI_ONBOARDING.md) for a complete onboarding guide.
+
+### Quick Session Starter (Cursor IDE)
+
+Paste this at the start of a new chat for instant context:
+
+```
+@.cursorrules @CHANGELOG.md
+
+I'm continuing work on the Third Space Vest project. What would you like me to help with?
+```
+
+Or for full context:
+
+```
+@AI_ONBOARDING.md @CHANGELOG.md @modern-third-space/TESTING.md
+
+I need help with [your task here].
+```
+
+### Key Files for AI Context
+
+| File | Purpose |
+|------|---------|
+| `.cursorrules` | Auto-loaded project rules, architecture, patterns |
+| `.cursorignore` | Excludes legacy code & noise from context |
+| `CHANGELOG.md` | Recent changes and project evolution |
+| `AI_ONBOARDING.md` | Full onboarding guide |
+| `modern-third-space/TESTING.md` | Test examples with curl commands |
 
 
 ## Enough time to do the slow start and introduction and shit
@@ -50,45 +104,34 @@ The Electron debugger console allows you to monitor USB connectivity, trigger in
 
 ### Prerequisites
 
-- Node.js (v25.2.1 recommended — see `web/.nvmrc`)
-- Yarn (managed via Corepack)
+- Node.js v24+ (v24.11.1 recommended — see `web/.nvmrc`)
+- Yarn (enabled via `corepack enable`)
 - Python 3.11+ (for the `modern-third-space` bridge)
 
 ### Windows Quick Setup
 
-**For Windows users**, we provide automated setup scripts in the `windows/` directory:
+**For Windows users**, we provide simple double-click scripts in the `windows/` directory:
 
-```powershell
-# Run from the project root directory
-.\windows\setup-windows.ps1
-```
+1. **Install requirements:**
+   - [Node.js LTS](https://nodejs.org/) (click the green LTS button)
+   - [Python 3.11+](https://python.org/) (check "Add to PATH" during install)
 
-This script will:
-- ✅ Check/install Node.js v25.2.1 using nvm-windows
-- ✅ Enable Corepack for Yarn
-- ✅ Install all Node.js dependencies
-- ✅ Optionally verify Python bridge setup
+2. **Install dependencies:** Double-click `windows/install.bat`
 
-**Requirements:**
-- nvm-windows must be installed first: https://github.com/coreybutler/nvm-windows/releases
-- Run PowerShell (you may need to allow script execution: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`)
+3. **Run the app:** Double-click `windows/start-all.bat`
 
-**Options:**
-```powershell
-.\windows\setup-windows.ps1 -SkipPythonCheck  # Skip Python verification
-.\windows\setup-windows.ps1 -Help              # Show help message
-```
+| Script | Purpose |
+|--------|---------|
+| `install.bat` | Install Node.js dependencies |
+| `start-all.bat` | Start daemon + app together |
+| `run.bat` | Start just the Electron app |
+| `start-daemon.bat` | Start just the Python daemon |
 
-**To start the development server:**
-```powershell
-.\windows\dev-windows.ps1
-```
-
-For more details, see [`windows/HOW_TO_RUN_DEV.md`](./windows/HOW_TO_RUN_DEV.md).
+For detailed instructions and troubleshooting, see [`windows/SETUP.md`](./windows/SETUP.md).
 
 ### Setup Steps
 
-**Important:** You must set up the Python bridge before starting the Electron app.
+**Important:** You must set up the Python package and daemon before starting the Electron app.
 
 1. **Install the Python package:**
 
@@ -107,7 +150,17 @@ For more details, see [`windows/HOW_TO_RUN_DEV.md`](./windows/HOW_TO_RUN_DEV.md)
 
    You should see: `{"status": "ok", "message": "Python bridge is reachable"}`
 
-3. **Optional: Test device listing:**
+3. **Start the daemon:**
+
+   ```bash
+   python3 -m modern_third_space.cli daemon start
+   ```
+
+   You should see: `🦺 Starting vest daemon on 127.0.0.1:5050...`
+   
+   Keep this running in the background (or use a separate terminal).
+
+4. **Optional: Test device listing:**
 
    ```bash
    python3 -m modern_third_space.cli list
@@ -115,20 +168,20 @@ For more details, see [`windows/HOW_TO_RUN_DEV.md`](./windows/HOW_TO_RUN_DEV.md)
 
    This will show connected USB vests (or a fake device with serial "sorry-bro" if PyUSB isn't installed).
 
-4. **Navigate to the web workspace:**
+5. **Navigate to the web workspace:**
 
    ```bash
    cd ../web
    ```
 
-5. **Install Node.js dependencies:**
+6. **Install Node.js dependencies:**
 
    ```bash
    corepack enable
    yarn install
    ```
 
-6. **Start the development environment:**
+7. **Start the development environment:**
 
    ```bash
    yarn dev
@@ -136,17 +189,20 @@ For more details, see [`windows/HOW_TO_RUN_DEV.md`](./windows/HOW_TO_RUN_DEV.md)
 
    This launches both the Vite dev server (renderer) and the Electron window in parallel.
 
-7. **Or run components separately:**
+8. **Or run components separately:**
 
    ```bash
-   # Terminal 1: Start the renderer (React UI)
-   yarn dev:renderer
+   # Terminal 1: Start the daemon (if not already running)
+   python3 -m modern_third_space.cli daemon start
 
-   # Terminal 2: Start Electron (waits for renderer on port 5173)
-   yarn dev:electron
+   # Terminal 2: Start the renderer (React UI)
+   cd web && yarn dev:renderer
+
+   # Terminal 3: Start Electron (waits for renderer on port 5173)
+   cd web && yarn dev:electron
    ```
 
-The debugger UI will open in an Electron window. The Python bridge will be automatically detected on startup.
+The debugger UI will open in an Electron window. It connects to the daemon automatically.
 
 **Note:** If you see errors about PyUSB not being available, see `modern-third-space/README.md` for platform-specific installation instructions.
 
@@ -181,10 +237,40 @@ python3 -m modern_third_space.cli list
 
 For more details, see `web/README.md`.
 
+## Architecture: Python Daemon
 
+The project uses a **long-running Python daemon** for vest control:
 
+```
+┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
+│   Electron UI    │     │   Game Mod 1     │     │   Game Mod 2     │
+│   (React)        │     │   (C# MelonLoader)│    │   (Python script)│
+└────────┬─────────┘     └────────┬─────────┘     └────────┬─────────┘
+         │                        │                        │
+         │         TCP Socket (localhost:5050)             │
+         └────────────────────────┼────────────────────────┘
+                                  ▼
+                    ┌──────────────────────────┐
+                    │     Python Daemon        │
+                    │     (server/)            │
+                    │                          │
+                    │  • Manages vest connection│
+                    │  • Accepts N clients     │
+                    │  • Broadcasts events     │
+                    │  • Routes commands       │
+                    └──────────────┬───────────┘
+                                   │
+                                   ▼
+                    ┌──────────────────────────┐
+                    │        vest/             │
+                    │    (hardware control)    │
+                    └──────────────────────────┘
+```
 
+**Benefits:**
+- Single vest connection (no USB conflicts)
+- Event broadcasting (UI sees game mod activity)
+- Language agnostic (C#, Python, Node.js can connect)
+- Persistent state (connection survives between UI interactions)
 
-## TODO
-
-add a callback from python when commands are triggerred so the UI can display debugging tool when integrating games
+See [`docs-external-integrations-ideas/DAEMON_ARCHITECTURE.md`](./docs-external-integrations-ideas/DAEMON_ARCHITECTURE.md) for full protocol documentation.

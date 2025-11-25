@@ -2,6 +2,7 @@ import { DeviceSelector } from "./components/DeviceSelector";
 import { EffectControls } from "./components/EffectControls";
 import { LogPanel } from "./components/LogPanel";
 import { StatusPanel } from "./components/StatusPanel";
+import { CS2IntegrationPanel } from "./components/CS2IntegrationPanel";
 import { useVestDebugger } from "./hooks/useVestDebugger";
 // @ts-ignore-next-line
 import vestLogo from "./assets/vest-logo-color.png";
@@ -13,6 +14,7 @@ function App() {
     combined,
     logs,
     loading,
+    activeCells,
     refreshStatus,
     sendEffect,
     haltAll,
@@ -51,11 +53,13 @@ function App() {
               onRefresh={refreshStatus}
               disabled={loading}
             />
+            <CS2IntegrationPanel />
           </div>
           <div className="md:col-span-3">
             <EffectControls
               actuators={actuators}
               combined={combined}
+              activeCells={activeCells}
               onSend={sendEffect}
               onStopAll={haltAll}
               disabled={loading}

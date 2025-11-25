@@ -54,7 +54,7 @@ if ($nvmHome) {
 
     # Switch Node
     Push-Location $nvmHome
-    & "$nvmHome\nvm.exe" use 25.2.1 2>&1 | Out-Null
+    & "$nvmHome\nvm.exe" use 24.11.1 2>&1 | Out-Null
     Pop-Location
 
     # Refresh PATH w/ detected symlink
@@ -71,7 +71,7 @@ $nodeExePath = Join-Path $symlinkPath "node.exe"
 if (-not (Test-Path $nodeExePath)) {
     Write-Host "ERROR! node.exe not found in $symlinkPath after nvm use!" -ForegroundColor Red
     Write-Host "Please check that Node.js is installed via nvm-windows and symlinked correctly." -ForegroundColor Red
-    Write-Host "You can run 'nvm install 25.2.1' then 'nvm use 25.2.1', or check your NVM configuration."
+    Write-Host "You can run 'nvm install 24.11.1' then 'nvm use 24.11.1', or check your NVM configuration."
     Write-Host "PATH is: $env:PATH" -ForegroundColor Yellow
     if (Test-Path $symlinkPath) { Get-ChildItem $symlinkPath | Write-Host }
     exit 1

@@ -12,6 +12,7 @@ export type VestEffect = {
   label: string;
   cell: number;
   speed: number;
+  preset?: string; // For combined effects: "front", "back", "all"
 };
 
 export type VestDevice = {

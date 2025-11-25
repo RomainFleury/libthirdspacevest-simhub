@@ -1,62 +1,72 @@
+"""
+VestController - manages connection and commands to a Third Space Vest.
+
+This module is part of the vest core package. It handles:
+- Opening/closing connections to vest hardware
+- Sending actuator commands
+- Tracking connection status
+
+This module should NOT contain:
+- Game integrations or listeners
+- UI presets or effect definitions
+- Device discovery (see discovery.py)
+"""
+
 from __future__ import annotations
 
 import contextlib
-import dataclasses
-import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
-try:
-    import usb.core
-except ImportError:
-    usb = None  # type: ignore
-
-from .legacy_adapter import LegacyLoaderError, load_vest_class
-
-
-@dataclasses.dataclass
-class VestStatus:
-    connected: bool
-    device_vendor_id: Optional[int] = None
-    device_product_id: Optional[int] = None
-    device_bus: Optional[int] = None
-    device_address: Optional[int] = None
-    device_serial_number: Optional[str] = None
-    last_error: Optional[str] = None
-
-    def to_dict(self) -> Dict[str, Any]:
-        return dataclasses.asdict(self)
-
-    def to_json(self) -> str:
-        return json.dumps(self.to_dict(), indent=2)
+from .status import VestStatus
+from .discovery import list_devices
+from ..legacy_adapter import LegacyLoaderError, load_vest_class
 
 
 class VestController:
     """
-    Thin wrapper that exposes a friendlier API on top of the legacy driver.
+    Controller for a single Third Space Vest device.
+    
+    Provides a clean API for connecting to and controlling vest hardware.
+    This class wraps the legacy driver and manages connection state.
+    
+    Usage:
+        controller = VestController()
+        status = controller.connect()  # Connect to first available device
+        if status.connected:
+            controller.trigger_effect(cell=0, speed=5)
+            controller.stop_all()
+        controller.disconnect()
     """
 
     def __init__(self) -> None:
+        """Initialize controller (no connection yet)."""
         self._vest = None
         self._status = VestStatus(connected=False)
 
     def connect(self) -> VestStatus:
-        """Connect to the first available device (default behavior)."""
+        """
+        Connect to the first available vest device.
+        
+        Returns:
+            VestStatus with connection result
+        """
         return self.connect_to_device(None)
 
     def connect_to_device(
         self, device_info: Optional[Dict[str, Any]]
     ) -> VestStatus:
         """
-        Connect to a specific device.
+        Connect to a specific vest device.
         
         Args:
-            device_info: Dictionary with device information. Can contain:
-                - bus: USB bus number (required with address)
-                - address: USB device address (required with bus)
-                - serial_number: Device serial number (optional, for matching)
-                - index: Device index in list (optional, fallback)
+            device_info: Dictionary with device selection criteria:
+                - bus + address: Connect by USB location
+                - serial_number: Connect by serial number
+                - index: Connect by position in device list
+                - None: Connect to first available device
         
-        If device_info is None, connects to the first available device.
+        Returns:
+            VestStatus with connection result
         """
         # Disconnect existing connection if switching devices
         if self._vest is not None:
@@ -93,7 +103,7 @@ class VestController:
                     error_msg = f"Device not found at index {device_info['index']}"
             elif device_info.get("serial_number"):
                 # Try to find device by serial number
-                devices = self.list_devices()
+                devices = list_devices()
                 matching_device = None
                 for dev in devices:
                     if dev.get("serial_number") == device_info["serial_number"]:
@@ -160,94 +170,72 @@ class VestController:
         return self._status
 
     def disconnect(self) -> None:
+        """
+        Disconnect from the current vest device.
+        
+        Safe to call even if not connected.
+        """
         if self._vest is not None:
             with contextlib.suppress(Exception):
                 self._vest.close()
         self._vest = None
-        self._status.connected = False
+        self._status = VestStatus(connected=False)
 
     def status(self) -> VestStatus:
+        """
+        Get current connection status.
+        
+        Returns:
+            VestStatus snapshot (does not refresh from hardware)
+        """
         return self._status
 
     def trigger_effect(self, cell_index: int, speed: int) -> bool:
+        """
+        Send an actuator command to the vest.
+        
+        Args:
+            cell_index: Actuator cell index (0-7)
+            speed: Vibration speed (0-10, where 0 = off)
+        
+        Returns:
+            True if command sent successfully, False otherwise
+        
+        Note:
+            If not connected, will attempt to auto-connect to first device.
+        """
         if self._vest is None:
             self.connect()
         if self._vest is None:
-            self._status.last_error = "Unable to connect to vest"
+            self._status = VestStatus(
+                connected=False,
+                last_error="Unable to connect to vest"
+            )
             return False
         try:
             self._vest.send_actuator_command(cell_index, speed)
             return True
-        except Exception as exc:  # pragma: no cover
-            self._status.last_error = str(exc)
+        except Exception as exc:
+            self._status = VestStatus(
+                connected=self._status.connected,
+                device_vendor_id=self._status.device_vendor_id,
+                device_product_id=self._status.device_product_id,
+                device_bus=self._status.device_bus,
+                device_address=self._status.device_address,
+                device_serial_number=self._status.device_serial_number,
+                last_error=str(exc),
+            )
             return False
 
     def stop_all(self) -> None:
+        """
+        Stop all actuators (set all cells to speed 0).
+        
+        Safe to call even if not connected (will be a no-op).
+        """
         if self._vest is None:
             return
         for idx in range(8):
             with contextlib.suppress(Exception):
                 self._vest.send_actuator_command(idx, 0)
-
-    @staticmethod
-    def list_devices() -> List[Dict[str, Any]]:
-        """
-        Enumerate all connected Third Space Vest devices.
-        Returns a list of device information dictionaries.
-        """
-        if usb is None:
-            # Return a fake device to indicate PyUSB is not available
-            return [{
-                "vendor_id": "0x0000",
-                "product_id": "0x0000",
-                "bus": 0,
-                "address": 0,
-                "serial_number": "sorry-bro",
-            }]
-        
-        try:
-            vest_cls = load_vest_class()
-            vendor_id = getattr(vest_cls, "TSV_VENDOR_ID", None)
-            product_id = getattr(vest_cls, "TSV_PRODUCT_ID", None)
-            
-            if vendor_id is None or product_id is None:
-                return []
-            
-            devices = usb.core.find(
-                find_all=True,
-                idVendor=vendor_id,
-                idProduct=product_id
-            )
-            
-            result = []
-            # find_all returns an iterator, convert to list
-            device_list = list(devices) if devices else []
-            for device in device_list:
-                try:
-                    result.append({
-                        "vendor_id": f"0x{device.idVendor:04X}",
-                        "product_id": f"0x{device.idProduct:04X}",
-                        "bus": device.bus,
-                        "address": device.address,
-                        "serial_number": getattr(device, "serial_number", None),
-                    })
-                except Exception:
-                    # Skip devices we can't read info from
-                    continue
-            
-            return result
-        except Exception:
-            # Return empty list on any error (e.g., PyUSB not available)
-            return []
-
-    @staticmethod
-    def default_effects() -> List[Dict[str, Any]]:
-        return [
-            {"label": "Front Left", "cell": 0, "speed": 5},
-            {"label": "Front Right", "cell": 1, "speed": 5},
-            {"label": "Back Left", "cell": 2, "speed": 5},
-            {"label": "Back Right", "cell": 3, "speed": 5},
-            {"label": "Full Blast", "cell": 0, "speed": 10},
-        ]
-
 

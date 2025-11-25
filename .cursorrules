@@ -1,0 +1,70 @@
+# Third Space Vest Project - Cursor Rules
+
+## Project Overview
+This is a Third Space Vest haptic device debugger. It maintains legacy driver code untouched while building modern Python tooling and an Electron UI around it.
+
+## Critical Constraints
+- **NEVER modify** `legacy-do-not-change/` - This is historical code that must remain untouched
+- **Isolation principle**: `vest/` package must stay isolated from game integrations
+- **Daemon-centric**: All vest commands should go through the daemon (TCP port 5050)
+
+## Architecture
+```
+Electron UI ──┐
+Game Mods ────┼── TCP (5050) ──► Python Daemon ──► vest/ ──► USB Hardware
+CS2 GSI ──────┘
+```
+
+## Quick Reference
+
+### Start Development
+```bash
+python3 -m modern_third_space.cli daemon start  # Required first!
+cd web && yarn dev                               # Start Electron
+```
+
+### Key Directories
+- `modern-third-space/src/modern_third_space/vest/` - Hardware control (isolated)
+- `modern-third-space/src/modern_third_space/server/` - TCP daemon
+- `modern-third-space/src/modern_third_space/integrations/` - Game integrations
+- `web/electron/` - Electron main process
+- `web/src/` - React UI
+
+### Adding Features
+- **New daemon command**: Add to `server/protocol.py` + handler in `server/daemon.py`
+- **New game integration**: Create in `integrations/`, connect to daemon as TCP client
+- **New UI feature**: Add component in `web/src/components/`
+
+### Testing
+See `modern-third-space/TESTING.md` for curl examples and test scripts.
+
+## Documentation to Read First
+1. `AI_ONBOARDING.md` - Full project context
+2. `docs-external-integrations-ideas/DAEMON_ARCHITECTURE.md` - Daemon protocol
+3. `docs-external-integrations-ideas/CS2_INTEGRATION.md` - Game integration example
+
+## Code Style
+- Python: Use type hints, dataclasses, asyncio for daemon code
+- TypeScript: Follow existing patterns in `web/src/`
+- Keep functions small and focused
+- Add docstrings to new modules
+
+## Common Patterns
+
+### Daemon Command Handler
+```python
+async def _cmd_example(self, command: Command, client_id: str) -> Response:
+    """Handle example command."""
+    # Do something
+    self._broadcast_event(EventType.EXAMPLE, {"data": "value"})
+    return response_ok(command.req_id)
+```
+
+### Game Integration Event
+```python
+async def _handle_game_event(self, event_type: str, data: dict):
+    if some_condition:
+        await self.daemon.send_trigger(cell=0, speed=5)
+        self.emit_event("event_name", {"info": "value"})
+```
+

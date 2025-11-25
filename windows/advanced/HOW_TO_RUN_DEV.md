@@ -9,7 +9,7 @@
 ```
 
 That's it! The script will:
-1. Set up Node.js v25.2.1
+1. Set up Node.js v24.11.1
 2. Enable Yarn
 3. Install dependencies (if needed)
 4. Start the dev server
@@ -60,7 +60,7 @@ That's it! The script will:
        $env:NVM_SYMLINK = "C:\Program Files\nodejs"
    }
    cd $nvmPath
-   .\nvm.exe use 25.2.1
+   .\nvm.exe use 24.11.1
    cd $PSScriptRoot\..\web
    $env:PATH = "$env:NVM_SYMLINK;" + $env:PATH
    ```

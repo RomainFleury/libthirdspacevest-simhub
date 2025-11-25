@@ -19,7 +19,7 @@ if ($Help) {
 Windows Setup Script for libthirdspacevest-simhub
 
 This script will:
-  1. Check/install Node.js v25.2.1 using nvm-windows
+  1. Check/install Node.js v24.11.1 using nvm-windows
   2. Enable Corepack for Yarn
   3. Install Node.js dependencies
   4. Optionally verify Python bridge setup
@@ -88,11 +88,11 @@ if ($env:PATH -notlike "*$nvmHome*") {
     $env:PATH = "$nvmHome;$env:PATH"
 }
 
-# Step 2: Install/Use Node.js v25.2.1
+# Step 2: Install/Use Node.js v24.11.1
 Write-Info ""
-Write-Info "📦 Step 2: Setting up Node.js v25.2.1..."
+Write-Info "📦 Step 2: Setting up Node.js v24.11.1..."
 
-$requiredVersion = "25.2.1"
+$requiredVersion = "24.11.1"
 $nvmExe = "$nvmHome\nvm.exe"
 
 # Change to nvm directory to avoid path resolution issues
@@ -221,7 +221,7 @@ Write-Info "  1. To start the debugger: cd web && yarn dev"
 Write-Info "  2. To verify Python setup: cd web && yarn check:python"
 Write-Info ""
 Write-Info "Note: If you restart PowerShell, you may need to run:"
-Write-Info "  nvm use 25.2.1"
+Write-Info "  nvm use 24.11.1"
 Write-Info "  (or add nvm to your PATH permanently)"
 Write-Info ""
 

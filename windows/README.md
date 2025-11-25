@@ -1,26 +1,53 @@
-# Windows Setup Scripts
+# Windows Setup
 
-This directory contains Windows-specific setup and development scripts for the libthirdspacevest-simhub project.
-
-## Scripts
-
-- **`setup-windows.ps1`** - Initial setup script that installs Node.js, Yarn, and dependencies
-- **`dev-windows.ps1`** - Development script that sets up the environment and starts the dev server
-- **`dev-env.ps1`** - Quick helper script to set up the environment (can be sourced from web/ directory)
+Simple setup for running the Third Space Vest Debugger on Windows.
 
 ## Quick Start
 
-From the project root directory:
+### 1. Install Requirements
 
-```powershell
-# First time setup
-.\windows\setup-windows.ps1
+You need **Node.js** and **Python**:
 
-# Start development server
-.\windows\dev-windows.ps1
-```
+| Software | How to Install |
+|----------|----------------|
+| **Node.js** | Download from [nodejs.org](https://nodejs.org/) (LTS version) |
+| **Python** | Download from [python.org](https://www.python.org/downloads/) (3.11+) |
 
-## Documentation
+> **Important**: During Python installation, check "Add to PATH"
 
-See [`HOW_TO_RUN_DEV.md`](./HOW_TO_RUN_DEV.md) for detailed instructions and troubleshooting.
+### 2. Install App Dependencies
 
+**Double-click** `install.bat`
+
+### 3. Run the App
+
+**Double-click** `start-all.bat`
+
+This opens two windows:
+- **Daemon window** - The Python backend (keep open)
+- **App window** - The debugger UI
+
+---
+
+## Scripts
+
+| Script | What it does |
+|--------|--------------|
+| `install.bat` | Installs Node.js dependencies |
+| `start-all.bat` | Starts daemon + app together |
+| `run.bat` | Starts just the Electron app |
+| `start-daemon.bat` | Starts just the Python daemon |
+
+## Detailed Instructions
+
+See [SETUP.md](./SETUP.md) for step-by-step instructions and troubleshooting.
+
+---
+
+## For Developers
+
+The `advanced/` folder contains PowerShell scripts for development setups with nvm-windows:
+
+- `setup-windows.ps1` - Full nvm-based setup
+- `dev-windows.ps1` - Development with specific Node version
+- `dev-env.ps1` - Environment helper

@@ -1,9 +1,35 @@
-const { app, BrowserWindow, ipcMain } = require("electron");
+/**
+ * Electron Main Process
+ *
+ * Initializes the application window, connects to the vest daemon,
+ * and registers IPC handlers for communication with the renderer process.
+ */
+
+const { app, BrowserWindow } = require("electron");
 const path = require("path");
-const pythonBridge = require("./pythonBridge.cjs");
-const deviceStorage = require("./deviceStorage.cjs");
+const { getDaemonBridge } = require("./daemonBridge.cjs");
+const { registerAllHandlers } = require("./ipc/index.cjs");
 
 const isDev = process.env.VITE_DEV_SERVER_URL !== undefined;
+
+let mainWindow = null;
+let daemonBridge = null;
+
+// -------------------------------------------------------------------------
+// Getter functions for IPC handlers
+// -------------------------------------------------------------------------
+
+function getMainWindow() {
+  return mainWindow;
+}
+
+function getDaemonBridgeInstance() {
+  return daemonBridge;
+}
+
+// -------------------------------------------------------------------------
+// Window Management
+// -------------------------------------------------------------------------
 
 function getIconPath() {
   return isDev
@@ -12,7 +38,7 @@ function getIconPath() {
 }
 
 async function createWindow() {
-  const window = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     backgroundColor: "#020617",
@@ -24,151 +50,62 @@ async function createWindow() {
   });
 
   if (isDev && process.env.VITE_DEV_SERVER_URL) {
-    await window.loadURL(process.env.VITE_DEV_SERVER_URL);
-    window.webContents.openDevTools();
+    await mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
+    mainWindow.webContents.openDevTools();
   } else {
-    await window.loadFile(path.join(process.cwd(), "dist", "index.html"));
+    await mainWindow.loadFile(path.join(process.cwd(), "dist", "index.html"));
   }
 
-  // Set up IPC handlers
-  setupIpcHandlers();
+  // Set up IPC handlers (using modular structure)
+  registerAllHandlers(getDaemonBridgeInstance, getMainWindow, connectToDaemon);
 
-  // Verify Python bridge is reachable on startup
-  pythonBridge
-    .ping()
-    .then(() => {
-      console.log("✓ Python bridge is reachable");
-    })
-    .catch((err) => {
-      console.error("✗ Python bridge unreachable:", err.message);
-    });
+  // Connect to daemon
+  await connectToDaemon();
 }
 
-function setupIpcHandlers() {
-  // Ping (health check)
-  ipcMain.handle("vest:ping", async () => {
-    try {
-      return await pythonBridge.ping();
-    } catch (error) {
-      console.error("Error in vest:ping:", error);
-      return {
-        success: false,
-        error: error.message || "Unknown error",
-      };
+// -------------------------------------------------------------------------
+// Daemon Connection
+// -------------------------------------------------------------------------
+
+/**
+ * Connect to the vest daemon and set up event forwarding.
+ */
+async function connectToDaemon() {
+  daemonBridge = getDaemonBridge();
+
+  // Forward daemon events to renderer
+  daemonBridge.on("daemon:event", (event) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("vest:event", event);
     }
   });
 
-  // Status
-  ipcMain.handle("vest:status", async () => {
-    try {
-      return await pythonBridge.getStatus();
-    } catch (error) {
-      console.error("Error in vest:status:", error);
-      return {
-        connected: false,
-        last_error: error.message || "Failed to get status",
-      };
+  daemonBridge.on("daemon:connected", () => {
+    console.log("✓ Connected to vest daemon");
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("vest:daemon-status", { connected: true });
     }
   });
 
-  // Effects
-  ipcMain.handle("vest:effects", async () => {
-    try {
-      return await pythonBridge.getEffects();
-    } catch (error) {
-      console.error("Error in vest:effects:", error);
-      return [];
+  daemonBridge.on("daemon:disconnected", () => {
+    console.log("✗ Disconnected from vest daemon");
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("vest:daemon-status", { connected: false });
     }
   });
 
-  // Trigger effect
-  ipcMain.handle("vest:trigger", async (_, effect) => {
-    try {
-      return await pythonBridge.triggerEffect(effect.cell, effect.speed);
-    } catch (error) {
-      console.error("Error in vest:trigger:", error);
-      return {
-        success: false,
-        error: error.message || "Failed to trigger effect",
-      };
-    }
-  });
-
-  // Stop all
-  ipcMain.handle("vest:stop", async () => {
-    try {
-      return await pythonBridge.stopAll();
-    } catch (error) {
-      console.error("Error in vest:stop:", error);
-      return {
-        success: false,
-        error: error.message || "Failed to stop all",
-      };
-    }
-  });
-
-  // List devices
-  ipcMain.handle("vest:listDevices", async () => {
-    try {
-      return await pythonBridge.listDevices();
-    } catch (error) {
-      console.error("Error in vest:listDevices:", error);
-      return [];
-    }
-  });
-
-  // Connect to device
-  ipcMain.handle("vest:connectToDevice", async (_, deviceInfo) => {
-    try {
-      const result = await pythonBridge.connectToDevice(deviceInfo);
-      // If connection successful, save the preference
-      if (result.connected && deviceInfo) {
-        try {
-          deviceStorage.saveDevicePreference(deviceInfo);
-        } catch (saveError) {
-          console.warn("Failed to save device preference:", saveError.message);
-        }
-      }
-      return result;
-    } catch (error) {
-      console.error("Error in vest:connectToDevice:", error);
-      return {
-        connected: false,
-        last_error: error.message || "Failed to connect to device",
-      };
-    }
-  });
-
-  // Device preference management
-  ipcMain.handle("vest:getDevicePreference", async () => {
-    try {
-      return deviceStorage.loadDevicePreference();
-    } catch (error) {
-      console.error("Error in vest:getDevicePreference:", error);
-      return null;
-    }
-  });
-
-  ipcMain.handle("vest:saveDevicePreference", async (_, deviceInfo) => {
-    try {
-      deviceStorage.saveDevicePreference(deviceInfo);
-      return { success: true };
-    } catch (error) {
-      console.error("Error in vest:saveDevicePreference:", error);
-      return { success: false, error: error.message };
-    }
-  });
-
-  ipcMain.handle("vest:clearDevicePreference", async () => {
-    try {
-      deviceStorage.clearDevicePreference();
-      return { success: true };
-    } catch (error) {
-      console.error("Error in vest:clearDevicePreference:", error);
-      return { success: false, error: error.message };
-    }
-  });
+  try {
+    // Connect to daemon (will auto-start if not running)
+    await daemonBridge.connect(true);
+    console.log("✓ Daemon bridge initialized");
+  } catch (err) {
+    console.error("✗ Failed to connect to daemon:", err.message);
+  }
 }
+
+// -------------------------------------------------------------------------
+// App Lifecycle
+// -------------------------------------------------------------------------
 
 app.on("ready", () => {
   // Set dock icon on macOS
@@ -179,6 +116,10 @@ app.on("ready", () => {
 });
 
 app.on("window-all-closed", () => {
+  // Disconnect from daemon
+  if (daemonBridge) {
+    daemonBridge.disconnect();
+  }
   if (process.platform !== "darwin") {
     app.quit();
   }
