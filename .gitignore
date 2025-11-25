@@ -6,3 +6,8 @@ web/repomix-output.*
 web/dist
 web/.vite
 modern-third-space/.venv
+/modern-third-space/src/modern_third_space/__pycache__
+/modern-third-space/src/modern_third_space/legacy_port/__pycache__
+*.gz
+web/.yarn/install-state.gz
+*.gz
