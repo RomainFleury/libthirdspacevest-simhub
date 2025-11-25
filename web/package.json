@@ -1,0 +1,30 @@
+{
+  "name": "libthirdspacevest-simhub",
+  "version": "1.0.0",
+  "description": "Developer tooling metadata for libthirdspacevest-simhub",
+  "private": true,
+  "main": "index.js",
+  "directories": {
+    "doc": "doc",
+    "example": "examples"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "repomix": "repomix .. --config repomix.config.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RomainFleury/libthirdspacevest-simhub.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "BSD-3-Clause",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/RomainFleury/libthirdspacevest-simhub/issues"
+  },
+  "homepage": "https://github.com/RomainFleury/libthirdspacevest-simhub#readme",
+  "devDependencies": {
+    "repomix": "^1.9.1"
+  }
+}

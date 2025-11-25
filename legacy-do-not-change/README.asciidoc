@@ -104,3 +104,15 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 ---------------------
+
+== Developer Tooling
+
+=== Repomix snapshots
+
+The repository now ships with a small Node.js toolchain (in the `web/` folder) that runs https://github.com/yamadashy/repomix[Repomix] to bundle the codebase into a single AI-friendly file for reviews or assistant hand-offs.
+
+. Run `cd web && npm install` the first time to install tooling dependencies (Node metadata lives entirely inside `web/`).
+. Use `cd web && npm run repomix` whenever you need a fresh snapshot. The bundled configuration lives at `web/repomix.config.json` and produces `web/repomix-output.md`.
+. Adjust include/exclude behavior via `web/repomix.config.json` or a repo-level `.repomixignore` if new binary assets or build trees appear.
+
+`web/repomix-output.*` and `web/node_modules/` are already listed in `.gitignore`, so the generated artifacts will not pollute commits.
