@@ -1,5 +1,6 @@
-const { app, BrowserWindow } = require("electron");
+const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
+const pythonBridge = require("./pythonBridge.cjs");
 
 const isDev = process.env.VITE_DEV_SERVER_URL !== undefined;
 
@@ -17,6 +18,7 @@ async function createWindow() {
     icon: getIconPath(),
     webPreferences: {
       contextIsolation: true,
+      preload: path.join(__dirname, "preload.cjs"),
     },
   });
 
@@ -26,6 +28,46 @@ async function createWindow() {
   } else {
     await window.loadFile(path.join(process.cwd(), "dist", "index.html"));
   }
+
+  // Set up IPC handlers
+  setupIpcHandlers();
+
+  // Verify Python bridge is reachable on startup
+  pythonBridge
+    .ping()
+    .then(() => {
+      console.log("✓ Python bridge is reachable");
+    })
+    .catch((err) => {
+      console.error("✗ Python bridge unreachable:", err.message);
+    });
+}
+
+function setupIpcHandlers() {
+  // Ping (health check)
+  ipcMain.handle("vest:ping", async () => {
+    return await pythonBridge.ping();
+  });
+
+  // Status
+  ipcMain.handle("vest:status", async () => {
+    return await pythonBridge.getStatus();
+  });
+
+  // Effects
+  ipcMain.handle("vest:effects", async () => {
+    return await pythonBridge.getEffects();
+  });
+
+  // Trigger effect
+  ipcMain.handle("vest:trigger", async (_, effect) => {
+    return await pythonBridge.triggerEffect(effect.cell, effect.speed);
+  });
+
+  // Stop all
+  ipcMain.handle("vest:stop", async () => {
+    return await pythonBridge.stopAll();
+  });
 }
 
 app.on("ready", () => {

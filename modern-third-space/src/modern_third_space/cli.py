@@ -34,11 +34,18 @@ def _cmd_effects(controller: VestController) -> int:
     return 0
 
 
+def _cmd_ping() -> int:
+    """Health check command - verifies CLI is reachable"""
+    print(json.dumps({"status": "ok", "message": "Python bridge is reachable"}))
+    return 0
+
+
 COMMANDS: Dict[str, Any] = {
     "status": _cmd_status,
     "trigger": _cmd_trigger,
     "stop": _cmd_stop,
     "effects": _cmd_effects,
+    "ping": _cmd_ping,
 }
 
 
@@ -55,18 +62,25 @@ def build_parser() -> argparse.ArgumentParser:
     trigger.add_argument("--speed", type=int, required=True, help="Speed (0-10)")
 
     sub.add_parser("stop", help="Stop all actuators")
+    sub.add_parser("ping", help="Health check - verify CLI is reachable")
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    controller = VestController()
     command = args.command
     handler = COMMANDS.get(command)
     if handler is None:
         parser.print_help()
         return 1
+    
+    # Ping doesn't need a controller
+    if command == "ping":
+        return handler()
+    
+    controller = VestController()
+    # Trigger needs args, others just need controller
     return handler(controller, args) if command == "trigger" else handler(controller)
 
 
