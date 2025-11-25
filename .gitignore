@@ -1,1 +1,5 @@
 build
+node_modules
+repomix-output.*
+web/node_modules
+web/repomix-output.*
