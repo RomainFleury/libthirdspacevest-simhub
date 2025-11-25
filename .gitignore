@@ -1,16 +1,26 @@
 build
 node_modules
 repomix-output.*
+
+# Web workspace
 web/node_modules
 web/repomix-output.*
 web/dist
 web/.vite
-modern-third-space/.venv
-/modern-third-space/src/modern_third_space/__pycache__
-/modern-third-space/src/modern_third_space/legacy_port/__pycache__
-*.gz
 web/.yarn/install-state.gz
-*.gz
 web/src/.DS_Store
-web/.yarn/install-state.gz
-/modern-third-space/src/modern_third_space/__pycache__
+
+# Python
+modern-third-space/.venv
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Yarn
+*.gz
+.yarn/install-state.gz
+
+# macOS
+.DS_Store
