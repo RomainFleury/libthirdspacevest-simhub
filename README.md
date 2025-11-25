@@ -54,6 +54,38 @@ The Electron debugger console allows you to monitor USB connectivity, trigger in
 - Yarn (managed via Corepack)
 - Python 3.11+ (for the `modern-third-space` bridge)
 
+### Windows Quick Setup
+
+**For Windows users**, we provide automated setup scripts in the `windows/` directory:
+
+```powershell
+# Run from the project root directory
+.\windows\setup-windows.ps1
+```
+
+This script will:
+- ✅ Check/install Node.js v25.2.1 using nvm-windows
+- ✅ Enable Corepack for Yarn
+- ✅ Install all Node.js dependencies
+- ✅ Optionally verify Python bridge setup
+
+**Requirements:**
+- nvm-windows must be installed first: https://github.com/coreybutler/nvm-windows/releases
+- Run PowerShell (you may need to allow script execution: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`)
+
+**Options:**
+```powershell
+.\windows\setup-windows.ps1 -SkipPythonCheck  # Skip Python verification
+.\windows\setup-windows.ps1 -Help              # Show help message
+```
+
+**To start the development server:**
+```powershell
+.\windows\dev-windows.ps1
+```
+
+For more details, see [`windows/HOW_TO_RUN_DEV.md`](./windows/HOW_TO_RUN_DEV.md).
+
 ### Setup Steps
 
 **Important:** You must set up the Python bridge before starting the Electron app.
@@ -148,3 +180,11 @@ python3 -m modern_third_space.cli list
 ```
 
 For more details, see `web/README.md`.
+
+
+
+
+
+## TODO
+
+add a callback from python when commands are triggerred so the UI can display debugging tool when integrating games

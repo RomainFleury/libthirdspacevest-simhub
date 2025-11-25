@@ -1,0 +1,14 @@
+README.md
+pyproject.toml
+src/modern_third_space/__init__.py
+src/modern_third_space/cli.py
+src/modern_third_space/controller.py
+src/modern_third_space/legacy_adapter.py
+src/modern_third_space.egg-info/PKG-INFO
+src/modern_third_space.egg-info/SOURCES.txt
+src/modern_third_space.egg-info/dependency_links.txt
+src/modern_third_space.egg-info/entry_points.txt
+src/modern_third_space.egg-info/requires.txt
+src/modern_third_space.egg-info/top_level.txt
+src/modern_third_space/legacy_port/__init__.py
+src/modern_third_space/legacy_port/thirdspace.py
