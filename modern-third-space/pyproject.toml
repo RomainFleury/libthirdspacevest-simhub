@@ -1,0 +1,25 @@
+[project]
+name = "modern-third-space"
+version = "0.1.0"
+description = "Modern Python bridge APIs for the Third Space Vest"
+readme = "README.md"
+authors = [
+  { name = "SimHub Contributors", email = "contact@simhub.dev" }
+]
+requires-python = ">=3.11"
+dependencies = [
+  "pyusb>=1.2.1"
+]
+
+[project.optional-dependencies]
+dev = [
+  "ruff>=0.7.0"
+]
+
+[project.scripts]
+modern-third-space = "modern_third_space.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+
