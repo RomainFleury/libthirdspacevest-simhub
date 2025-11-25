@@ -1066,6 +1066,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/electron@npm:^1.6.12":
+  version: 1.6.12
+  resolution: "@types/electron@npm:1.6.12"
+  dependencies:
+    electron: "npm:*"
+  checksum: 10c0/0cc0a2d3cf31afd3d0a6db0f35d37c44532db2211813540c6888d389db113f044b4f923ef7d0624f105b0d937b715b59c92ad53fcffa83b3070d79e07f73101b
+  languageName: node
+  linkType: hard
+
 "@types/estree@npm:1.0.8":
   version: 1.0.8
   resolution: "@types/estree@npm:1.0.8"
@@ -1104,6 +1113,15 @@ __metadata:
   dependencies:
     undici-types: "npm:~6.21.0"
   checksum: 10c0/992f18cb03264e8dc2fd3cb64f428ee4997cb6d928dad68bf4b752eacac73062697ce7ce6a0e71a6d15af510814397a20597a72332dfec638e02fb3a382ad014
+  languageName: node
+  linkType: hard
+
+"@types/node@npm:^22.7.7":
+  version: 22.19.1
+  resolution: "@types/node@npm:22.19.1"
+  dependencies:
+    undici-types: "npm:~6.21.0"
+  checksum: 10c0/6edd93aea86da740cb7872626839cd6f4a67a049d3a3a6639cb592c620ec591408a30989ab7410008d1a0b2d4985ce50f1e488e79c033e4476d3bec6833b0a2f
   languageName: node
   linkType: hard
 
@@ -1839,6 +1857,19 @@ __metadata:
   version: 1.5.260
   resolution: "electron-to-chromium@npm:1.5.260"
   checksum: 10c0/5be308adbe7f9b370f628eb3ae35528bccc8e8592ee4848f9dfa308af658deaa87e915dd6929b6993e712929e7e6828f40434814506476ae11051381ee423fdf
+  languageName: node
+  linkType: hard
+
+"electron@npm:*":
+  version: 39.2.3
+  resolution: "electron@npm:39.2.3"
+  dependencies:
+    "@electron/get": "npm:^2.0.0"
+    "@types/node": "npm:^22.7.7"
+    extract-zip: "npm:^2.0.1"
+  bin:
+    electron: cli.js
+  checksum: 10c0/4ebfd932cabaf2b49859b1437661941e1a4475ac5b8a7f8e7be02276ea6ba0f901889b02a39cdaab7803c41f87afa46216e626397687140df5eb7978caade595
   languageName: node
   linkType: hard
 
@@ -3103,6 +3134,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "libthirdspacevest-simhub@workspace:."
   dependencies:
+    "@types/electron": "npm:^1.6.12"
     "@types/react": "npm:^18.3.3"
     "@types/react-dom": "npm:^18.3.3"
     "@vitejs/plugin-react": "npm:^4.3.1"
