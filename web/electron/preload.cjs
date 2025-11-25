@@ -52,4 +52,10 @@ contextBridge.exposeInMainWorld("vestBridge", {
   cs2AutoDetectPath: () => ipcRenderer.invoke("cs2:autoDetectPath"),
   cs2BrowseConfigPath: () => ipcRenderer.invoke("cs2:browseConfigPath"),
   cs2SaveConfigToCS2: (gsiPort) => ipcRenderer.invoke("cs2:saveConfigToCS2", gsiPort),
+
+  // Half-Life: Alyx Integration API
+  alyxStart: (logPath) => ipcRenderer.invoke("alyx:start", logPath),
+  alyxStop: () => ipcRenderer.invoke("alyx:stop"),
+  alyxStatus: () => ipcRenderer.invoke("alyx:status"),
+  alyxGetModInfo: () => ipcRenderer.invoke("alyx:getModInfo"),
 });

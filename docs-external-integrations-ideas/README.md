@@ -24,6 +24,26 @@ These documents outline approaches, patterns, and implementation strategies for 
 
 ### Game Integration Strategies
 
+- **`CS2_INTEGRATION.md`** - Counter-Strike 2 integration via Game State Integration (GSI)
+  - Uses Valve's official HTTP-based GSI API
+  - No mods required - config file only
+  - Embedded in daemon for real-time event broadcasting
+  - ✅ **IMPLEMENTED**
+
+- **`CS2_UI_INTEGRATION.md`** - Electron UI for managing CS2 GSI
+  - Start/stop GSI server from UI
+  - Config file generation and path management
+  - Live event display
+  - ✅ **IMPLEMENTED**
+
+- **`ALYX_INTEGRATION.md`** - Half-Life: Alyx integration via console log parsing
+  - No official API - requires Lua script mods (download links provided)
+  - Parses [Tactsuit] events from console.log
+  - Directional damage support (angle-based)
+  - 50+ game events available
+  - Embedded in daemon with UI panel
+  - ✅ **IMPLEMENTED**
+
 - **`MELONLOADER_INTEGRATION_STRATEGY.md`** - Comprehensive strategy for integrating MelonLoader-based game mods (Unity games like SUPERHOT VR, Drunkn Bar Fight, etc.)
   - Multiple integration approaches (file logging, HTTP/WebSocket, IPC)
   - Event mapping strategies

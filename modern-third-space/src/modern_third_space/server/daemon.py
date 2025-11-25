@@ -48,6 +48,16 @@ from .protocol import (
     response_cs2_generate_config,
 )
 from .cs2_manager import CS2Manager, generate_cs2_config
+from .alyx_manager import AlyxManager, get_mod_info as get_alyx_mod_info
+from .protocol import (
+    event_alyx_started,
+    event_alyx_stopped,
+    event_alyx_game_event,
+    response_alyx_start,
+    response_alyx_stop,
+    response_alyx_status,
+    response_alyx_get_mod_info,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +92,13 @@ class VestDaemon:
             on_game_event=self._on_cs2_game_event,
             on_trigger=self._on_cs2_trigger,
         )
+        
+        # Half-Life: Alyx manager
+        self._alyx_manager = AlyxManager(
+            on_game_event=self._on_alyx_game_event,
+            on_trigger=self._on_alyx_trigger,
+        )
+        
         self._loop: Optional[asyncio.AbstractEventLoop] = None
     
     @property
@@ -120,6 +137,10 @@ class VestDaemon:
         # Stop CS2 GSI if running
         if self._cs2_manager.is_running:
             self._cs2_manager.stop()
+        
+        # Stop Alyx integration if running
+        if self._alyx_manager.is_running:
+            self._alyx_manager.stop()
         
         # Disconnect from vest
         if self._controller is not None:
@@ -250,6 +271,19 @@ class VestDaemon:
         
         if cmd_type == CommandType.CS2_GENERATE_CONFIG:
             return await self._cmd_cs2_generate_config(command)
+        
+        # Half-Life: Alyx commands
+        if cmd_type == CommandType.ALYX_START:
+            return await self._cmd_alyx_start(command)
+        
+        if cmd_type == CommandType.ALYX_STOP:
+            return await self._cmd_alyx_stop(command)
+        
+        if cmd_type == CommandType.ALYX_STATUS:
+            return await self._cmd_alyx_status(command)
+        
+        if cmd_type == CommandType.ALYX_GET_MOD_INFO:
+            return await self._cmd_alyx_get_mod_info(command)
         
         return response_error(f"Command not implemented: {command.cmd}", command.req_id)
     
@@ -523,6 +557,107 @@ class VestDaemon:
         
         if self._controller is not None:
             self._controller.trigger_effect(cell, speed)
+    
+    # -------------------------------------------------------------------------
+    # Half-Life: Alyx command handlers
+    # -------------------------------------------------------------------------
+    
+    async def _cmd_alyx_start(self, command: Command) -> Response:
+        """Start the Alyx console log watcher."""
+        log_path = command.log_path  # Can be None for auto-detect
+        
+        success, error = self._alyx_manager.start(log_path)
+        
+        if success:
+            actual_path = str(self._alyx_manager.log_path) if self._alyx_manager.log_path else None
+            # Broadcast Alyx started event
+            await self._clients.broadcast(event_alyx_started(actual_path or ""))
+            print(f"🎮 Half-Life: Alyx integration started, watching: {actual_path}")
+        
+        return response_alyx_start(
+            success=success,
+            log_path=str(self._alyx_manager.log_path) if self._alyx_manager.log_path else None,
+            error=error,
+            req_id=command.req_id,
+        )
+    
+    async def _cmd_alyx_stop(self, command: Command) -> Response:
+        """Stop the Alyx console log watcher."""
+        success = self._alyx_manager.stop()
+        
+        if success:
+            # Broadcast Alyx stopped event
+            await self._clients.broadcast(event_alyx_stopped())
+            print("🎮 Half-Life: Alyx integration stopped")
+        
+        return response_alyx_stop(success=success, req_id=command.req_id)
+    
+    async def _cmd_alyx_status(self, command: Command) -> Response:
+        """Get Alyx integration status."""
+        return response_alyx_status(
+            running=self._alyx_manager.is_running,
+            log_path=str(self._alyx_manager.log_path) if self._alyx_manager.log_path else None,
+            events_received=self._alyx_manager.events_received,
+            last_event_ts=self._alyx_manager.last_event_ts,
+            req_id=command.req_id,
+        )
+    
+    async def _cmd_alyx_get_mod_info(self, command: Command) -> Response:
+        """Get Alyx mod info (download URLs, install instructions)."""
+        mod_info = get_alyx_mod_info()
+        return response_alyx_get_mod_info(
+            mod_info=mod_info,
+            req_id=command.req_id,
+        )
+    
+    # -------------------------------------------------------------------------
+    # Alyx callbacks (called from watcher thread)
+    # -------------------------------------------------------------------------
+    
+    def _on_alyx_game_event(self, event_type: str, params: dict):
+        """
+        Called when Alyx detects a game event.
+        
+        This is called from the file watcher thread, so we need to schedule
+        the broadcast on the event loop.
+        """
+        if self._loop is None:
+            return
+        
+        event = event_alyx_game_event(event_type, params)
+        asyncio.run_coroutine_threadsafe(
+            self._clients.broadcast(event),
+            self._loop,
+        )
+    
+    def _on_alyx_trigger(self, cell: int, speed: int):
+        """
+        Called when Alyx wants to trigger a haptic effect.
+        
+        This performs the actual vest trigger synchronously since
+        the vest controller is thread-safe for simple operations.
+        """
+        if self._selected_device is None:
+            return
+        
+        # Auto-connect if needed
+        if self._controller is None or not self._controller.status().connected:
+            self._controller = VestController()
+            self._controller.connect_to_device({
+                "bus": self._selected_device.get("bus"),
+                "address": self._selected_device.get("address"),
+            })
+        
+        if self._controller is not None:
+            self._controller.trigger_effect(cell, speed)
+            
+        # Broadcast effect triggered event
+        if self._loop is not None:
+            event = event_effect_triggered(cell, speed)
+            asyncio.run_coroutine_threadsafe(
+                self._clients.broadcast(event),
+                self._loop,
+            )
 
 
 def run_daemon(

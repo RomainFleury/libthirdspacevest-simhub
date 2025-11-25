@@ -7,8 +7,9 @@ This document provides examples for testing all components of the `modern-third-
 1. [Quick Health Check](#quick-health-check)
 2. [Testing the Daemon](#testing-the-daemon)
 3. [Testing CS2 GSI Integration](#testing-cs2-gsi-integration)
-4. [Testing with Python Scripts](#testing-with-python-scripts)
-5. [Simulated Game Payloads](#simulated-game-payloads)
+4. [Testing Half-Life: Alyx Integration](#testing-half-life-alyx-integration)
+5. [Testing with Python Scripts](#testing-with-python-scripts)
+6. [Simulated Game Payloads](#simulated-game-payloads)
 
 ---
 
@@ -617,6 +618,125 @@ Events visible in UI:
 - 🔥 **Bomb Exploded**
 - 🎯 **Round Start**
 - 🎖️ **Kill**
+
+---
+
+## Testing Half-Life: Alyx Integration
+
+### Check Alyx Integration Status
+
+```python
+import socket
+import json
+
+def send_cmd(cmd, host="127.0.0.1", port=5050):
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect((host, port))
+    s.send((json.dumps(cmd) + '\n').encode())
+    data = b''
+    while True:
+        try:
+            s.settimeout(0.5)
+            chunk = s.recv(4096)
+            if not chunk:
+                break
+            data += chunk
+        except socket.timeout:
+            break
+    s.close()
+    return data.decode()
+
+# Check Alyx status
+print(send_cmd({"cmd": "alyx_status"}))
+# Response: {"response": "alyx_status", "running": false, ...}
+
+# Get mod info (download URLs, install instructions)
+print(send_cmd({"cmd": "alyx_get_mod_info"}))
+# Response: {"response": "alyx_get_mod_info", "mod_info": {...}}
+```
+
+### Start Alyx Integration
+
+```python
+# Start with auto-detect (finds console.log automatically)
+print(send_cmd({"cmd": "alyx_start"}))
+# Response: {"event": "alyx_started", "log_path": "/path/to/console.log"}
+#           {"response": "alyx_start", "success": true, "log_path": "..."}
+
+# Start with custom log path
+print(send_cmd({"cmd": "alyx_start", "log_path": "/custom/path/console.log"}))
+```
+
+### Simulate Alyx Console Log Events
+
+Since Alyx integration reads from `console.log`, you can test by writing directly to a test log file:
+
+```bash
+# Create a test log file
+TEST_LOG="/tmp/alyx_test_console.log"
+touch "$TEST_LOG"
+
+# Start Alyx integration with custom path (via daemon)
+python3 -c "
+import socket
+import json
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.connect(('127.0.0.1', 5050))
+s.send(b'{\"cmd\": \"alyx_start\", \"log_path\": \"$TEST_LOG\"}\n')
+print(s.recv(4096).decode())
+s.close()
+"
+
+# Simulate game events by writing to the log
+echo '[Tactsuit] {PlayerHurt|75|zombie|180|Zombie|zombie_1}' >> "$TEST_LOG"
+echo '[Tactsuit] {PlayerShootWeapon|pistol}' >> "$TEST_LOG"
+echo '[Tactsuit] {PlayerDeath|2}' >> "$TEST_LOG"
+echo '[Tactsuit] {Reset}' >> "$TEST_LOG"
+echo '[Tactsuit] {PlayerGrabbityPull|true}' >> "$TEST_LOG"
+echo '[Tactsuit] {GrabbityGloveCatch|false}' >> "$TEST_LOG"
+```
+
+### Test Event Format Reference
+
+| Event | Format | Description |
+|-------|--------|-------------|
+| Player Damage | `{PlayerHurt\|health\|enemy_class\|angle\|enemy_name\|debug_name}` | Angle 0-360° |
+| Weapon Fire | `{PlayerShootWeapon\|weapon_class}` | e.g., pistol, shotgun |
+| Death | `{PlayerDeath\|damagebits}` | 2=bullet, 8=burn, etc. |
+| Spawn | `{Reset}` | Player respawned |
+| Gravity Pull | `{PlayerGrabbityPull\|is_primary_hand}` | true/false |
+| Gravity Catch | `{GrabbityGloveCatch\|is_primary_hand}` | true/false |
+| Barnacle Grab | `{PlayerGrabbedByBarnacle}` | No params |
+| Heal | `{PlayerHeal\|angle}` | Health pen used |
+| Low Health | `{PlayerHealth\|health}` | Triggers heartbeat |
+| Cough | `{PlayerCoughStart}` / `{PlayerCoughEnd}` | Poison gas |
+
+### Stop Alyx Integration
+
+```python
+print(send_cmd({"cmd": "alyx_stop"}))
+# Response: {"event": "alyx_stopped"}
+#           {"response": "alyx_stop", "success": true}
+```
+
+### Test Alyx Events in UI
+
+1. Start daemon: `python3 -m modern_third_space.cli daemon start`
+2. Start Electron: `cd web && yarn dev`
+3. In the UI, find the "Half-Life: Alyx" panel and click "Start Watching"
+4. Write test events to the log file (see examples above)
+5. Watch live events appear in the UI panel!
+
+Events visible in UI:
+- 💥 **Damage Taken** - Shows remaining HP
+- 💀 **Death**
+- 🔫 **Weapon Fire** - Shows weapon type
+- ❤️ **Low Health** - Heartbeat effect
+- 💚 **Healing** - Health pen used
+- 🧲 **Gravity Pull**
+- 🤚 **Gravity Catch**
+- 🦑 **Barnacle Grab/Release**
+- 🔄 **Player Spawn**
 
 ---
 

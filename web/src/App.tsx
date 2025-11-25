@@ -3,6 +3,7 @@ import { EffectControls } from "./components/EffectControls";
 import { LogPanel } from "./components/LogPanel";
 import { StatusPanel } from "./components/StatusPanel";
 import { CS2IntegrationPanel } from "./components/CS2IntegrationPanel";
+import { AlyxIntegrationPanel } from "./components/AlyxIntegrationPanel";
 import { useVestDebugger } from "./hooks/useVestDebugger";
 // @ts-ignore-next-line
 import vestLogo from "./assets/vest-logo-color.png";
@@ -53,7 +54,6 @@ function App() {
               onRefresh={refreshStatus}
               disabled={loading}
             />
-            <CS2IntegrationPanel />
           </div>
           <div className="md:col-span-3">
             <EffectControls
@@ -65,6 +65,12 @@ function App() {
               disabled={loading}
             />
           </div>
+        </div>
+
+        {/* Game Integrations */}
+        <div className="grid gap-6 md:grid-cols-2">
+          <CS2IntegrationPanel />
+          <AlyxIntegrationPanel />
         </div>
 
         <LogPanel logs={logs} />

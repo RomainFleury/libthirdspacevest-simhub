@@ -90,6 +90,7 @@ modern_third_space/
 ### Isolation Principle
 
 The `vest/` package contains **only hardware interaction code**. It must remain isolated from:
+
 - Game integrations and listeners
 - External interfaces (WebSocket, HTTP, etc.)
 - UI-specific code
@@ -139,6 +140,7 @@ The package dynamically loads the legacy `ThirdSpaceVest` class via `importlib` 
 ## Testing
 
 See `TESTING.md` for comprehensive testing examples including:
+
 - Daemon commands via netcat/Python
 - Simulated CS2 payloads
 - End-to-end integration tests

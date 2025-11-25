@@ -39,6 +39,11 @@ class CommandType(Enum):
     CS2_STOP = "cs2_stop"
     CS2_STATUS = "cs2_status"
     CS2_GENERATE_CONFIG = "cs2_generate_config"
+    # Half-Life: Alyx integration
+    ALYX_START = "alyx_start"
+    ALYX_STOP = "alyx_stop"
+    ALYX_STATUS = "alyx_status"
+    ALYX_GET_MOD_INFO = "alyx_get_mod_info"
 
 
 class EventType(Enum):
@@ -62,6 +67,10 @@ class EventType(Enum):
     CS2_STARTED = "cs2_started"
     CS2_STOPPED = "cs2_stopped"
     CS2_GAME_EVENT = "cs2_game_event"
+    # Half-Life: Alyx integration
+    ALYX_STARTED = "alyx_started"
+    ALYX_STOPPED = "alyx_stopped"
+    ALYX_GAME_EVENT = "alyx_game_event"
 
 
 @dataclass
@@ -78,6 +87,8 @@ class Command:
     speed: Optional[int] = None
     # CS2 GSI params
     gsi_port: Optional[int] = None
+    # Half-Life: Alyx params
+    log_path: Optional[str] = None
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Command":
@@ -91,6 +102,7 @@ class Command:
             cell=data.get("cell"),
             speed=data.get("speed"),
             gsi_port=data.get("gsi_port"),
+            log_path=data.get("log_path"),
         )
     
     @classmethod
@@ -129,6 +141,9 @@ class Event:
     event_type: Optional[str] = None  # For cs2_game_event: "damage", "death", etc.
     amount: Optional[int] = None      # For damage amount
     intensity: Optional[int] = None   # For flash intensity
+    # Half-Life: Alyx info
+    log_path: Optional[str] = None
+    params: Optional[Dict[str, Any]] = None  # For alyx_game_event params
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary, excluding None values."""
@@ -169,6 +184,9 @@ class Response:
     last_event_ts: Optional[float] = None
     config_content: Optional[str] = None
     filename: Optional[str] = None
+    # Half-Life: Alyx response
+    log_path: Optional[str] = None
+    mod_info: Optional[Dict[str, Any]] = None
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary, excluding None values."""
@@ -333,5 +351,86 @@ def response_cs2_generate_config(
         req_id=req_id,
         config_content=config_content,
         filename=filename,
+    )
+
+
+# -------------------------------------------------------------------------
+# Half-Life: Alyx events and responses
+# -------------------------------------------------------------------------
+
+def event_alyx_started(log_path: str) -> Event:
+    """Alyx integration started watching console.log."""
+    return Event(event=EventType.ALYX_STARTED.value, log_path=log_path)
+
+def event_alyx_stopped() -> Event:
+    """Alyx integration stopped."""
+    return Event(event=EventType.ALYX_STOPPED.value)
+
+def event_alyx_game_event(
+    event_type: str,
+    params: Optional[Dict[str, Any]] = None,
+) -> Event:
+    """
+    Alyx game event (damage, shoot, death, etc.).
+    
+    Args:
+        event_type: Type of event ("PlayerHurt", "PlayerShootWeapon", "PlayerDeath", etc.)
+        params: Event-specific parameters (angle, health, weapon, etc.)
+    """
+    return Event(
+        event=EventType.ALYX_GAME_EVENT.value,
+        event_type=event_type,
+        params=params,
+    )
+
+def response_alyx_start(
+    success: bool,
+    log_path: Optional[str] = None,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to alyx_start command."""
+    return Response(
+        response="alyx_start",
+        req_id=req_id,
+        success=success,
+        log_path=log_path,
+        message=error,
+    )
+
+def response_alyx_stop(success: bool, req_id: Optional[str] = None) -> Response:
+    """Response to alyx_stop command."""
+    return Response(
+        response="alyx_stop",
+        req_id=req_id,
+        success=success,
+    )
+
+def response_alyx_status(
+    running: bool,
+    log_path: Optional[str] = None,
+    events_received: int = 0,
+    last_event_ts: Optional[float] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to alyx_status command."""
+    return Response(
+        response="alyx_status",
+        req_id=req_id,
+        running=running,
+        log_path=log_path,
+        events_received=events_received,
+        last_event_ts=last_event_ts,
+    )
+
+def response_alyx_get_mod_info(
+    mod_info: Dict[str, Any],
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to alyx_get_mod_info command with mod download/install info."""
+    return Response(
+        response="alyx_get_mod_info",
+        req_id=req_id,
+        mod_info=mod_info,
     )
 

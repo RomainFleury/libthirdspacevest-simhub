@@ -35,6 +35,7 @@ from .lifecycle import (
     get_pid_file_path,
 )
 from .cs2_manager import CS2Manager, generate_cs2_config
+from .alyx_manager import AlyxManager, get_mod_info as get_alyx_mod_info
 
 __all__ = [
     "VestDaemon",
@@ -55,5 +56,8 @@ __all__ = [
     # CS2 GSI
     "CS2Manager",
     "generate_cs2_config",
+    # Half-Life: Alyx
+    "AlyxManager",
+    "get_alyx_mod_info",
 ]
 

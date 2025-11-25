@@ -570,6 +570,86 @@ class DaemonBridge extends EventEmitter {
       };
     }
   }
+
+  // -------------------------------------------------------------------------
+  // Half-Life: Alyx Integration API
+  // -------------------------------------------------------------------------
+
+  /**
+   * Start Alyx console log watcher.
+   * @param {string} [logPath] - Optional path to console.log (auto-detect if not provided)
+   */
+  async alyxStart(logPath) {
+    try {
+      const params = logPath ? { log_path: logPath } : {};
+      const response = await this.sendCommand("alyx_start", params);
+      return {
+        success: response.success ?? false,
+        log_path: response.log_path,
+        error: response.message,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Stop Alyx console log watcher.
+   */
+  async alyxStop() {
+    try {
+      const response = await this.sendCommand("alyx_stop");
+      return {
+        success: response.success ?? false,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Get Alyx integration status.
+   */
+  async alyxStatus() {
+    try {
+      const response = await this.sendCommand("alyx_status");
+      return {
+        running: response.running ?? false,
+        log_path: response.log_path ?? null,
+        events_received: response.events_received ?? 0,
+        last_event_ts: response.last_event_ts ?? null,
+      };
+    } catch (error) {
+      return {
+        running: false,
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Get Alyx mod info (download URLs, install instructions).
+   */
+  async alyxGetModInfo() {
+    try {
+      const response = await this.sendCommand("alyx_get_mod_info");
+      return {
+        success: true,
+        mod_info: response.mod_info,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
 }
 
 // Singleton instance

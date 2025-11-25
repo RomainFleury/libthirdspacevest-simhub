@@ -32,6 +32,9 @@ export type DaemonEvent = {
   event_type?: string; // For cs2_game_event: "damage", "death", "flash", etc.
   amount?: number; // For damage events
   intensity?: number; // For flash events
+  // Half-Life: Alyx events
+  log_path?: string;
+  params?: Record<string, unknown>; // For alyx_game_event params
 };
 
 export type DaemonStatus = {
@@ -89,6 +92,41 @@ export type CS2SaveToCS2Result = {
   error?: string;
 };
 
+// Half-Life: Alyx types
+export type AlyxStatus = {
+  running: boolean;
+  log_path?: string | null;
+  events_received?: number;
+  last_event_ts?: number | null;
+  error?: string;
+};
+
+export type AlyxStartResult = {
+  success: boolean;
+  log_path?: string;
+  error?: string;
+};
+
+export type AlyxStopResult = {
+  success: boolean;
+  error?: string;
+};
+
+export type AlyxModInfo = {
+  name: string;
+  description: string;
+  download_url: string;
+  github_url: string;
+  install_instructions: string[];
+  skill_manifest_addition: string;
+};
+
+export type AlyxModInfoResult = {
+  success: boolean;
+  mod_info?: AlyxModInfo;
+  error?: string;
+};
+
 // Type definition for the Electron bridge API
 declare global {
   interface Window {
@@ -135,6 +173,11 @@ declare global {
       cs2AutoDetectPath: () => Promise<CS2AutoDetectResult>;
       cs2BrowseConfigPath: () => Promise<CS2BrowseResult>;
       cs2SaveConfigToCS2: (gsiPort?: number) => Promise<CS2SaveToCS2Result>;
+      // Half-Life: Alyx API
+      alyxStart: (logPath?: string) => Promise<AlyxStartResult>;
+      alyxStop: () => Promise<AlyxStopResult>;
+      alyxStatus: () => Promise<AlyxStatus>;
+      alyxGetModInfo: () => Promise<AlyxModInfoResult>;
     };
   }
 }
@@ -319,4 +362,37 @@ export async function cs2SaveConfigToCS2(
   gsiPort = 3000
 ): Promise<CS2SaveToCS2Result> {
   return await ensureBridge().cs2SaveConfigToCS2(gsiPort);
+}
+
+// -------------------------------------------------------------------------
+// Half-Life: Alyx Integration
+// -------------------------------------------------------------------------
+
+/**
+ * Start the Alyx console log watcher.
+ * @param logPath Optional path to console.log (auto-detect if not provided)
+ */
+export async function alyxStart(logPath?: string): Promise<AlyxStartResult> {
+  return await ensureBridge().alyxStart(logPath);
+}
+
+/**
+ * Stop the Alyx console log watcher.
+ */
+export async function alyxStop(): Promise<AlyxStopResult> {
+  return await ensureBridge().alyxStop();
+}
+
+/**
+ * Get Alyx integration status.
+ */
+export async function alyxStatus(): Promise<AlyxStatus> {
+  return await ensureBridge().alyxStatus();
+}
+
+/**
+ * Get Alyx mod info (download URLs, install instructions).
+ */
+export async function alyxGetModInfo(): Promise<AlyxModInfoResult> {
+  return await ensureBridge().alyxGetModInfo();
 }

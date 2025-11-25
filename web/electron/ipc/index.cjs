@@ -9,6 +9,7 @@
 const { registerVestHandlers } = require("./vestHandlers.cjs");
 const { registerDaemonHandlers } = require("./daemonHandlers.cjs");
 const { registerCS2Handlers } = require("./cs2Handlers.cjs");
+const { registerAlyxHandlers } = require("./alyxHandlers.cjs");
 
 /**
  * Register all IPC handlers.
@@ -26,6 +27,9 @@ function registerAllHandlers(getDaemonBridge, getMainWindow, reconnectToDaemon) 
   // CS2 / Game integration handlers
   registerCS2Handlers(getDaemonBridge, getMainWindow);
 
+  // Half-Life: Alyx integration handlers
+  registerAlyxHandlers();
+
   console.log("✓ IPC handlers registered");
 }
 
@@ -34,5 +38,6 @@ module.exports = {
   registerVestHandlers,
   registerDaemonHandlers,
   registerCS2Handlers,
+  registerAlyxHandlers,
 };
 

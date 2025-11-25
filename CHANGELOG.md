@@ -6,9 +6,39 @@ This file helps AI assistants quickly understand recent project evolution.
 
 ---
 
-## 2025-11-25
+## 2025-11-25 (Latest)
 
 ### Added
+
+- **Half-Life: Alyx Integration** (`server/alyx_manager.py`)
+  - Console log file watcher (50ms polling)
+  - Event parser for `[Tactsuit] {EventType|params}` format
+  - Haptic mapper with directional damage support
+  - Daemon commands: `alyx_start`, `alyx_stop`, `alyx_status`, `alyx_get_mod_info`
+  - Events: `alyx_started`, `alyx_stopped`, `alyx_game_event`
+  - UI panel with mod setup guide and download links
+  - React hook: `useAlyxIntegration`
+
+- **Modular IPC Handlers** (`web/electron/ipc/`)
+  - Split handlers into `vestHandlers.cjs`, `daemonHandlers.cjs`, `cs2Handlers.cjs`, `alyxHandlers.cjs`
+  - Centralized registration in `index.cjs`
+
+- **All 8 Vest Actuators in UI**
+  - Individual controls for cells 0-7 (front and back)
+  - Preset buttons: All Front, All Back, Full Blast
+  - Visual feedback (flashing) when actuator triggered
+
+- **Alyx Integration Docs** (`docs-external-integrations-ideas/ALYX_INTEGRATION.md`)
+  - Setup instructions with mod download links
+  - Event-to-haptic mapping reference
+  - Architecture comparison with CS2 GSI
+
+---
+
+## 2025-11-25 (Earlier)
+
+### Added
+
 - **CS2 GSI Integration** (`integrations/cs2_gsi.py`)
   - HTTP server receives Counter-Strike 2 game state
   - Event detection: damage, death, flash, bomb, kills, round start
@@ -39,6 +69,7 @@ This file helps AI assistants quickly understand recent project evolution.
   - Architecture overview and code patterns
 
 ### Changed
+
 - Updated `AI_ONBOARDING.md` with daemon commands and integrations package
 - Updated `README.md` with daemon architecture diagram
 
@@ -46,7 +77,8 @@ This file helps AI assistants quickly understand recent project evolution.
 
 ## 2025-11-24 (Earlier Work)
 
-### Added
+### Added 2025-11-24
+
 - **Python Vest Daemon** (`server/`)
   - TCP server on port 5050
   - JSON protocol for commands/events/responses
@@ -68,7 +100,8 @@ This file helps AI assistants quickly understand recent project evolution.
   - TCP client for daemon communication
   - Event forwarding to React UI via IPC
 
-### Changed
+### Changed 2025-11-24
+
 - Replaced CLI-based Python communication with daemon
 - Updated `preload.cjs` with `onDaemonEvent`, `onDaemonStatus`
 
@@ -76,7 +109,7 @@ This file helps AI assistants quickly understand recent project evolution.
 
 ## Architecture Evolution
 
-```
+```text
 Before (CLI-based):
   Electron → spawn Python CLI → Vest
 
@@ -91,7 +124,7 @@ After (Daemon-based):
 ## Upcoming / Ideas
 
 - [ ] Configurable effect mapping (YAML/JSON)
-- [ ] More game integrations (Superhot VR, Half-Life: Alyx)
+- [ ] More game integrations (Superhot VR, etc.)
+- [x] ~~Half-Life: Alyx integration~~ ✅ Done
 - [ ] Effect patterns/presets system
 - [ ] Daemon auto-start from Electron
-

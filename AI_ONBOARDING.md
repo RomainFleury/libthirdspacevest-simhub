@@ -7,24 +7,29 @@ If you're an AI assistant working on this repository, follow these steps to get 
 If you're using **Cursor IDE**, these features will help you get context faster:
 
 ### Quick Context Loading
+
 Use `@` references to load files directly into context:
+
 ```
 @AI_ONBOARDING.md @.cursorrules @CHANGELOG.md
 ```
 
 ### Key Files to Reference
+
 - `@.cursorrules` - Auto-loaded project rules (architecture, constraints, patterns)
 - `@CHANGELOG.md` - Recent changes and what was modified
 - `@modern-third-space/TESTING.md` - Test examples and curl commands
 - `@docs-external-integrations-ideas/DAEMON_ARCHITECTURE.md` - Daemon protocol
 
 ### Generate Full Codebase Snapshot
+
 ```bash
 cd web && yarn repomix
 # Creates repomix-output.md with full codebase context
 ```
 
 ### Files Excluded from Context
+
 See `.cursorignore` - excludes `legacy-do-not-change/`, `node_modules/`, cache files.
 
 ## Project Overview
@@ -41,6 +46,7 @@ This is a **Third Space Vest** haptic device debugger and development tool. The 
 ## Critical Architecture: Python Daemon
 
 The vest is controlled via a **long-running Python daemon** that:
+
 - Maintains a single USB connection to the vest
 - Accepts multiple TCP clients (Electron, game mods, scripts)
 - Broadcasts all events to all connected clients
@@ -53,6 +59,7 @@ Game Mod 2 ───┘
 ```
 
 **Key files:**
+
 - `server/daemon.py` - Main daemon loop
 - `server/protocol.py` - JSON protocol (commands, events, responses)
 - `server/client_manager.py` - Track connected clients
@@ -155,12 +162,19 @@ echo '{"cmd": "list"}' | nc localhost 5050
 echo '{"cmd": "select_device", "bus": 1, "address": 5}' | nc localhost 5050
 ```
 
-**Game integrations (CS2):**
+**Game integrations:**
 
 ```bash
-python3 -m modern_third_space.cli cs2 start           # Start CS2 GSI listener
-python3 -m modern_third_space.cli cs2 status          # Check integration status
-python3 -m modern_third_space.cli cs2 generate-config # Generate CS2 config file
+# Counter-Strike 2 (via daemon)
+echo '{"cmd":"cs2_start","gsi_port":3000}' | nc localhost 5050
+echo '{"cmd":"cs2_status"}' | nc localhost 5050
+echo '{"cmd":"cs2_stop"}' | nc localhost 5050
+
+# Half-Life: Alyx (via daemon)
+echo '{"cmd":"alyx_start"}' | nc localhost 5050
+echo '{"cmd":"alyx_status"}' | nc localhost 5050
+echo '{"cmd":"alyx_stop"}' | nc localhost 5050
+echo '{"cmd":"alyx_get_mod_info"}' | nc localhost 5050
 ```
 
 ## Important Constraints
@@ -174,7 +188,7 @@ python3 -m modern_third_space.cli cs2 generate-config # Generate CS2 config file
 
 The `modern-third-space` package has a clear separation of concerns:
 
-```
+```text
 modern_third_space/
 ├── vest/                    # 🔒 CORE VEST HARDWARE (isolated)
 │   ├── controller.py        # VestController - connection + commands
@@ -187,7 +201,10 @@ modern_third_space/
 │   └── lifecycle.py         # Start/stop/status management
 ├── integrations/            # 🎮 GAME INTEGRATIONS (daemon clients)
 │   ├── base.py              # Base class for game integrations
-│   └── cs2_gsi.py           # Counter-Strike 2 GSI integration
+│   └── cs2_gsi.py           # Counter-Strike 2 GSI (standalone)
+├── server/
+│   ├── cs2_manager.py       # CS2 GSI (embedded in daemon)
+│   └── alyx_manager.py      # Half-Life: Alyx (embedded in daemon)
 ├── presets.py               # UI effect presets (NOT hardware code)
 ├── cli.py                   # CLI interface (daemon, cs2 subcommands)
 ├── legacy_adapter.py        # Legacy driver loader
@@ -197,11 +214,13 @@ modern_third_space/
 ### ⚠️ Isolation Principle
 
 **The `vest/` package must remain isolated from:**
+
 - Game integrations and listeners
 - External interfaces (WebSocket, HTTP, etc.)
 - UI-specific code or presets
 
 **The `server/` package:**
+
 - Imports from `vest/` to control hardware
 - Provides TCP interface for external clients
 - Broadcasts events to all connected clients
@@ -215,8 +234,8 @@ modern_third_space/
 - **Adding a UI component**: Create in `web/src/components/`, import in `web/src/App.tsx`
 - **Debugging Python daemon**: `daemon status`, check logs, test with `echo '{"cmd":"ping"}' | nc localhost 5050`
 - **Updating device info**: Modify `VestStatus` in `vest/status.py`, update TypeScript types, update UI components
-- **Adding game integrations**: Create in `integrations/` (see `cs2_gsi.py` as example), integrate with daemon as TCP client
-- **Reviewing integration strategies**: Check `docs-external-integrations-ideas/`, especially `DAEMON_ARCHITECTURE.md`, `CS2_INTEGRATION.md`, and `MELONLOADER_INTEGRATION_STRATEGY.md`
+- **Adding game integrations**: Create manager in `server/` (see `cs2_manager.py` and `alyx_manager.py` as examples), add daemon commands in `daemon.py`, update protocol in `protocol.py`
+- **Reviewing integration strategies**: Check `docs-external-integrations-ideas/`, especially `DAEMON_ARCHITECTURE.md`, `CS2_INTEGRATION.md`, `ALYX_INTEGRATION.md`, and `MELONLOADER_INTEGRATION_STRATEGY.md`
 
 ## Before Making Changes
 
@@ -246,4 +265,3 @@ Events are broadcast to ALL clients: `effect_triggered`, `connected`, `disconnec
 See `docs-external-integrations-ideas/DAEMON_ARCHITECTURE.md` for full protocol documentation.
 
 **Ready to proceed?** Start the daemon, review the repomix output, then wait for specific instructions from the user.
-
