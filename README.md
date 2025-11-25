@@ -91,4 +91,33 @@ The debugger UI will open in an Electron window. The Python bridge will be autom
 
 **Note:** If you see errors about PyUSB not being available, see `modern-third-space/README.md` for platform-specific installation instructions.
 
+### Debugging and Verification
+
+After setting up the Python bridge, you can verify your environment is correctly configured:
+
+**From the `web/` directory:**
+
+```bash
+yarn check:python
+```
+
+This script will:
+
+- ✅ Test the `ping` command to verify the Python CLI is reachable
+- ✅ Test the `list` command to check USB device enumeration
+- ⚠️  Warn if PyUSB is not installed (shows fake device with serial "sorry-bro")
+- 📋 Display connected USB vest devices if any are found
+
+**Manual verification:**
+
+You can also test the Python CLI directly:
+
+```bash
+# Test ping
+python3 -m modern_third_space.cli ping
+
+# List devices
+python3 -m modern_third_space.cli list
+```
+
 For more details, see `web/README.md`.

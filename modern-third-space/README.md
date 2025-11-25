@@ -22,6 +22,7 @@ pip install pyusb
 
 - **macOS**: PyUSB should work out of the box after `pip install pyusb`.
 - **Linux**: You may need to install system libraries first:
+
   ```bash
   # Debian/Ubuntu
   sudo apt-get install libusb-1.0-0-dev
@@ -32,9 +33,37 @@ pip install pyusb
   # Then install PyUSB
   pip install pyusb
   ```
+
 - **Windows**: PyUSB should work, but you may need to install [libusb-win32](http://libusb-win32.sourceforge.net/) or [Zadig](https://zadig.akeo.ie/) drivers for your USB device.
 
 If PyUSB is not installed, the `list` command will return a fake device with serial number `"sorry-bro"` to indicate the missing dependency.
+
+## Verifying Setup
+
+After installing the package, you can verify your setup is working correctly:
+
+**Option 1: Use the Node.js diagnostic script (recommended):**
+
+From the `web/` directory:
+
+```bash
+cd ../web
+yarn check:python
+```
+
+This will test both `ping` and `list` commands and provide helpful diagnostics.
+
+**Option 2: Test manually:**
+
+```bash
+# Test ping command
+python3 -m modern_third_space.cli ping
+# Should output: {"status": "ok", "message": "Python bridge is reachable"}
+
+# Test list command
+python3 -m modern_third_space.cli list
+# Should show connected devices, or a fake device with serial "sorry-bro" if PyUSB isn't installed
+```
 
 ## Development
 
@@ -48,5 +77,3 @@ modern-third-space status
 ```
 
 The package dynamically loads the legacy `ThirdSpaceVest` class via `importlib` and never modifies the historical files. Any enhancements should go through the wrapper or new modules here.
-
-
