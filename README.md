@@ -2,6 +2,26 @@
 
 This repository is organized to keep the original `libthirdspacevest` sources intact while adding modern tooling and new documentation archives around them.
 
+## TLDR - Quickstart
+
+**Fastest way to get the debugger running:**
+
+```bash
+# 1. Install Python package
+cd modern-third-space && pip install -e . && cd ..
+
+# 2. Install Node dependencies and start
+cd web && yarn install && yarn dev
+```
+
+That's it! The Electron window will open. If you see a "sorry-bro" device, install PyUSB: `pip install pyusb` (see `modern-third-space/README.md` for platform-specific notes).
+
+**Verify setup:**
+
+```bash
+cd web && yarn check:python
+```
+
 - `legacy-do-not-change/` — verbatim copy of the historical driver/library. Treat as read-only and layer patches elsewhere.
 - `modern-third-space/` — Python package that dynamically loads the legacy `thirdspace.py` driver and exposes a modern API plus CLI endpoints for other tooling (Electron debugger, scripts, etc.).
 - `web/` — Electron + React + Tailwind workspace (plus Repomix tooling). All Node dependencies, UI code, and yarn-based workflows live here so they stay isolated from the legacy tree.
