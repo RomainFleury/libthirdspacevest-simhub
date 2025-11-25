@@ -22,6 +22,13 @@ That's it! The Electron window will open. If you see a "sorry-bro" device, insta
 cd web && yarn check:python
 ```
 
+## For AI Assistants
+
+If you're an AI assistant working on this repository, see [`AI_ONBOARDING.md`](./AI_ONBOARDING.md) for a complete onboarding guide, including project overview, setup verification steps, key commands, and development guidelines.
+
+
+## Enough time to do the slow start and introduction and shit
+
 - `legacy-do-not-change/` — verbatim copy of the historical driver/library. Treat as read-only and layer patches elsewhere.
 - `modern-third-space/` — Python package that dynamically loads the legacy `thirdspace.py` driver and exposes a modern API plus CLI endpoints for other tooling (Electron debugger, scripts, etc.).
 - `web/` — Electron + React + Tailwind workspace (plus Repomix tooling). All Node dependencies, UI code, and yarn-based workflows live here so they stay isolated from the legacy tree.
