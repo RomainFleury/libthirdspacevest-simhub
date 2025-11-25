@@ -11,3 +11,5 @@ modern-third-space/.venv
 *.gz
 web/.yarn/install-state.gz
 *.gz
+web/src/.DS_Store
+web/.yarn/install-state.gz
