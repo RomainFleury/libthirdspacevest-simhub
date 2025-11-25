@@ -94,7 +94,10 @@ async function getStatus() {
       connected: result?.connected ?? false,
       device_vendor_id: result?.device_vendor_id ?? null,
       device_product_id: result?.device_product_id ?? null,
-      last_error: result?.error ?? null,
+      device_bus: result?.device_bus ?? null,
+      device_address: result?.device_address ?? null,
+      device_serial_number: result?.device_serial_number ?? null,
+      last_error: result?.last_error ?? null,
     };
   } catch (error) {
     return {
@@ -152,10 +155,59 @@ async function ping() {
   }
 }
 
+/**
+ * List all available USB vest devices
+ */
+async function listDevices() {
+  try {
+    const result = await runPythonCommand("list");
+    return Array.isArray(result) ? result : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+/**
+ * Connect to a specific device
+ * @param {Object} deviceInfo - Device information (bus, address, serial_number, or index)
+ */
+async function connectToDevice(deviceInfo) {
+  try {
+    const args = [];
+
+    if (deviceInfo?.bus !== undefined && deviceInfo?.address !== undefined) {
+      args.push(`--bus=${deviceInfo.bus}`, `--address=${deviceInfo.address}`);
+    } else if (deviceInfo?.serial_number) {
+      args.push(`--serial=${deviceInfo.serial_number}`);
+    } else if (deviceInfo?.index !== undefined) {
+      args.push(`--index=${deviceInfo.index}`);
+    }
+    // If no deviceInfo provided, connects to first device
+
+    const result = await runPythonCommand("connect", args);
+    return {
+      connected: result?.connected ?? false,
+      device_vendor_id: result?.device_vendor_id ?? null,
+      device_product_id: result?.device_product_id ?? null,
+      device_bus: result?.device_bus ?? null,
+      device_address: result?.device_address ?? null,
+      device_serial_number: result?.device_serial_number ?? null,
+      last_error: result?.last_error ?? null,
+    };
+  } catch (error) {
+    return {
+      connected: false,
+      last_error: error.message,
+    };
+  }
+}
+
 module.exports = {
   getStatus,
   getEffects,
   triggerEffect,
   stopAll,
   ping,
+  listDevices,
+  connectToDevice,
 };

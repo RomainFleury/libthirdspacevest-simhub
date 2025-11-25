@@ -1,4 +1,4 @@
-import { VestEffect, VestStatus } from "../types";
+import { VestDevice, VestEffect, VestStatus } from "../types";
 
 // Type definition for the Electron bridge API
 declare global {
@@ -15,6 +15,16 @@ declare global {
         effect: VestEffect
       ) => Promise<{ success: boolean; error?: string } | void>;
       stopAll: () => Promise<{ success: boolean; error?: string } | void>;
+      listDevices: () => Promise<VestDevice[]>;
+      connectToDevice: (deviceInfo: Partial<VestDevice>) => Promise<VestStatus>;
+      getDevicePreference: () => Promise<Partial<VestDevice> | null>;
+      saveDevicePreference: (
+        deviceInfo: Partial<VestDevice>
+      ) => Promise<{ success: boolean; error?: string }>;
+      clearDevicePreference: () => Promise<{
+        success: boolean;
+        error?: string;
+      }>;
     };
   }
 }
@@ -66,3 +76,32 @@ export async function ping(): Promise<{ success: boolean; message?: string }> {
   return await ensureBridge().ping();
 }
 
+export async function listDevices(): Promise<VestDevice[]> {
+  return await ensureBridge().listDevices();
+}
+
+export async function connectToDevice(
+  deviceInfo: Partial<VestDevice>
+): Promise<VestStatus> {
+  return await ensureBridge().connectToDevice(deviceInfo);
+}
+
+export async function getDevicePreference(): Promise<Partial<VestDevice> | null> {
+  return await ensureBridge().getDevicePreference();
+}
+
+export async function saveDevicePreference(
+  deviceInfo: Partial<VestDevice>
+): Promise<void> {
+  const result = await ensureBridge().saveDevicePreference(deviceInfo);
+  if (!result.success) {
+    throw new Error(result.error || "Failed to save device preference");
+  }
+}
+
+export async function clearDevicePreference(): Promise<void> {
+  const result = await ensureBridge().clearDevicePreference();
+  if (!result.success) {
+    throw new Error(result.error || "Failed to clear device preference");
+  }
+}

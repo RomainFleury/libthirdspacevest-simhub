@@ -1,3 +1,4 @@
+import { DeviceSelector } from "./components/DeviceSelector";
 import { EffectControls } from "./components/EffectControls";
 import { LogPanel } from "./components/LogPanel";
 import { StatusPanel } from "./components/StatusPanel";
@@ -43,7 +44,8 @@ function App() {
         </header>
 
         <div className="grid gap-6 md:grid-cols-5">
-          <div className="md:col-span-2">
+          <div className="md:col-span-2 space-y-6">
+            <DeviceSelector disabled={loading} />
             <StatusPanel
               status={status}
               onRefresh={refreshStatus}
@@ -68,4 +70,3 @@ function App() {
 }
 
 export default App;
-

@@ -18,6 +18,9 @@ class VestStatus:
     connected: bool
     device_vendor_id: Optional[int] = None
     device_product_id: Optional[int] = None
+    device_bus: Optional[int] = None
+    device_address: Optional[int] = None
+    device_serial_number: Optional[str] = None
     last_error: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
@@ -37,8 +40,27 @@ class VestController:
         self._status = VestStatus(connected=False)
 
     def connect(self) -> VestStatus:
+        """Connect to the first available device (default behavior)."""
+        return self.connect_to_device(None)
+
+    def connect_to_device(
+        self, device_info: Optional[Dict[str, Any]]
+    ) -> VestStatus:
+        """
+        Connect to a specific device.
+        
+        Args:
+            device_info: Dictionary with device information. Can contain:
+                - bus: USB bus number (required with address)
+                - address: USB device address (required with bus)
+                - serial_number: Device serial number (optional, for matching)
+                - index: Device index in list (optional, fallback)
+        
+        If device_info is None, connects to the first available device.
+        """
+        # Disconnect existing connection if switching devices
         if self._vest is not None:
-            return self._status
+            self.disconnect()
 
         try:
             vest_cls = load_vest_class()
@@ -48,14 +70,89 @@ class VestController:
 
         self._vest = vest_cls()
         opened = False
+        error_msg = None
+
         with contextlib.suppress(Exception):
-            opened = bool(self._vest.open())
+            if device_info is None:
+                # Default: connect to first device
+                opened = bool(self._vest.open())
+            elif device_info.get("bus") is not None and device_info.get("address") is not None:
+                # Connect by bus + address
+                opened = bool(
+                    self._vest.open(
+                        bus=device_info["bus"],
+                        address=device_info["address"]
+                    )
+                )
+                if not opened:
+                    error_msg = f"Device not found at bus {device_info['bus']}, address {device_info['address']}"
+            elif device_info.get("index") is not None:
+                # Connect by index
+                opened = bool(self._vest.open(index=device_info["index"]))
+                if not opened:
+                    error_msg = f"Device not found at index {device_info['index']}"
+            elif device_info.get("serial_number"):
+                # Try to find device by serial number
+                devices = self.list_devices()
+                matching_device = None
+                for dev in devices:
+                    if dev.get("serial_number") == device_info["serial_number"]:
+                        matching_device = dev
+                        break
+                
+                if matching_device:
+                    opened = bool(
+                        self._vest.open(
+                            bus=matching_device["bus"],
+                            address=matching_device["address"]
+                        )
+                    )
+                    if not opened:
+                        error_msg = f"Failed to open device with serial {device_info['serial_number']}"
+                else:
+                    error_msg = f"Device with serial {device_info['serial_number']} not found"
+            else:
+                # Invalid device_info, fall back to first device
+                opened = bool(self._vest.open())
+                if not opened:
+                    error_msg = "Invalid device info, tried first device but failed"
+
+        # Extract device information if connected
+        device_bus = None
+        device_address = None
+        device_serial = None
+        device_vendor_id = None
+        device_product_id = None
+        
+        if opened and self._vest and self._vest.tsv_device:
+            try:
+                device = self._vest.tsv_device
+                device_bus = device.bus
+                device_address = device.address
+                device_vendor_id = device.idVendor
+                device_product_id = device.idProduct
+                # Try to get serial number (may not always be available)
+                try:
+                    device_serial = getattr(device, "serial_number", None)
+                except Exception:
+                    device_serial = None
+            except Exception:
+                # Fallback to class constants if device info unavailable
+                device_vendor_id = getattr(vest_cls, "TSV_VENDOR_ID", None)
+                device_product_id = getattr(vest_cls, "TSV_PRODUCT_ID", None)
+        else:
+            # Not connected, use class constants
+            device_vendor_id = getattr(vest_cls, "TSV_VENDOR_ID", None)
+            device_product_id = getattr(vest_cls, "TSV_PRODUCT_ID", None)
 
         self._status = VestStatus(
             connected=opened,
-            device_vendor_id=getattr(vest_cls, "TSV_VENDOR_ID", None),
-            device_product_id=getattr(vest_cls, "TSV_PRODUCT_ID", None),
-            last_error=None if opened else "Device not detected",
+            device_vendor_id=device_vendor_id,
+            device_product_id=device_product_id,
+            device_bus=device_bus,
+            device_address=device_address,
+            device_serial_number=device_serial,
+            last_error=error_msg if not opened else None,
         )
 
         if not opened:

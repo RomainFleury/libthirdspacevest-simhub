@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
 const pythonBridge = require("./pythonBridge.cjs");
+const deviceStorage = require("./deviceStorage.cjs");
 
 const isDev = process.env.VITE_DEV_SERVER_URL !== undefined;
 
@@ -103,6 +104,68 @@ function setupIpcHandlers() {
         success: false,
         error: error.message || "Failed to stop all",
       };
+    }
+  });
+
+  // List devices
+  ipcMain.handle("vest:listDevices", async () => {
+    try {
+      return await pythonBridge.listDevices();
+    } catch (error) {
+      console.error("Error in vest:listDevices:", error);
+      return [];
+    }
+  });
+
+  // Connect to device
+  ipcMain.handle("vest:connectToDevice", async (_, deviceInfo) => {
+    try {
+      const result = await pythonBridge.connectToDevice(deviceInfo);
+      // If connection successful, save the preference
+      if (result.connected && deviceInfo) {
+        try {
+          deviceStorage.saveDevicePreference(deviceInfo);
+        } catch (saveError) {
+          console.warn("Failed to save device preference:", saveError.message);
+        }
+      }
+      return result;
+    } catch (error) {
+      console.error("Error in vest:connectToDevice:", error);
+      return {
+        connected: false,
+        last_error: error.message || "Failed to connect to device",
+      };
+    }
+  });
+
+  // Device preference management
+  ipcMain.handle("vest:getDevicePreference", async () => {
+    try {
+      return deviceStorage.loadDevicePreference();
+    } catch (error) {
+      console.error("Error in vest:getDevicePreference:", error);
+      return null;
+    }
+  });
+
+  ipcMain.handle("vest:saveDevicePreference", async (_, deviceInfo) => {
+    try {
+      deviceStorage.saveDevicePreference(deviceInfo);
+      return { success: true };
+    } catch (error) {
+      console.error("Error in vest:saveDevicePreference:", error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle("vest:clearDevicePreference", async () => {
+    try {
+      deviceStorage.clearDevicePreference();
+      return { success: true };
+    } catch (error) {
+      console.error("Error in vest:clearDevicePreference:", error);
+      return { success: false, error: error.message };
     }
   });
 }

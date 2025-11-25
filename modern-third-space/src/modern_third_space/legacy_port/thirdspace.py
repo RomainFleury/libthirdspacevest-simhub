@@ -137,17 +137,61 @@ class ThirdSpaceVest:
         # Device as retreived from the bus listing
         self.tsv_device = None
 
-    def open(self, index = 0):
-        """ Given an index, opens the related third space vest
-        device. The index refers to the position of the device on the
-        USB bus. Index 0 is default, and will open the first device
-        found.
-
+    def open(self, index=0, bus=None, address=None):
+        """ Opens a third space vest device.
+        
+        Args:
+            index: Position in the list of matching devices (0 = first device, default)
+            bus: USB bus number (if specified, address must also be specified)
+            address: USB device address (if specified, bus must also be specified)
+        
+        If bus and address are provided, opens that specific device.
+        Otherwise, opens the device at the given index (default 0 = first device).
+        
         Returns True if open successful, False otherwise.
         """
 
-        self.tsv_device = usb.core.find(idVendor = self.TSV_VENDOR_ID,
-                                        idProduct = self.TSV_PRODUCT_ID)
+        if bus is not None and address is not None:
+            # Open specific device by bus and address
+            devices = usb.core.find(
+                find_all=True,
+                idVendor=self.TSV_VENDOR_ID,
+                idProduct=self.TSV_PRODUCT_ID
+            )
+            if devices is None:
+                return False
+            
+            device_list = list(devices)
+            for device in device_list:
+                if device.bus == bus and device.address == address:
+                    self.tsv_device = device
+                    break
+            else:
+                # Device not found
+                return False
+        else:
+            # Open by index (original behavior)
+            if index == 0:
+                # Fast path: just get first device
+                self.tsv_device = usb.core.find(
+                    idVendor=self.TSV_VENDOR_ID,
+                    idProduct=self.TSV_PRODUCT_ID
+                )
+            else:
+                # Get device at specific index
+                devices = usb.core.find(
+                    find_all=True,
+                    idVendor=self.TSV_VENDOR_ID,
+                    idProduct=self.TSV_PRODUCT_ID
+                )
+                if devices is None:
+                    return False
+                
+                device_list = list(devices)
+                if index >= len(device_list):
+                    return False
+                self.tsv_device = device_list[index]
+        
         if self.tsv_device is None:
             return False
 
