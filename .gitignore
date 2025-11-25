@@ -3,3 +3,6 @@ node_modules
 repomix-output.*
 web/node_modules
 web/repomix-output.*
+web/dist
+web/.vite
+modern-third-space/.venv
