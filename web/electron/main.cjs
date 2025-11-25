@@ -3,11 +3,18 @@ const path = require("path");
 
 const isDev = process.env.VITE_DEV_SERVER_URL !== undefined;
 
+function getIconPath() {
+  return isDev
+    ? path.join(__dirname, "..", "src", "assets", "vest-logo-color.png")
+    : path.join(process.cwd(), "dist", "vest-logo-color.png");
+}
+
 async function createWindow() {
   const window = new BrowserWindow({
     width: 1200,
     height: 800,
     backgroundColor: "#020617",
+    icon: getIconPath(),
     webPreferences: {
       contextIsolation: true,
     },
@@ -21,7 +28,13 @@ async function createWindow() {
   }
 }
 
-app.on("ready", createWindow);
+app.on("ready", () => {
+  // Set dock icon on macOS
+  if (process.platform === "darwin" && app.dock) {
+    app.dock.setIcon(getIconPath());
+  }
+  createWindow();
+});
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {

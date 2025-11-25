@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchEffects, fetchStatus, stopAll, triggerEffect } from "../lib/bridgeApi";
-import { defaultEffects } from "../data/effects";
+import {
+  actuatorEffects,
+  combinedEffects,
+  defaultEffects,
+} from "../data/effects";
 import { LogEntry, VestEffect, VestStatus } from "../types";
 
 const FALLBACK_STATUS: VestStatus = {
@@ -14,17 +18,20 @@ export function useVestDebugger() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const pushLog = useCallback((message: string, level: LogEntry["level"] = "info") => {
-    setLogs((prev) => [
-      {
-        id: crypto.randomUUID(),
-        message,
-        level,
-        ts: Date.now(),
-      },
-      ...prev,
-    ]);
-  }, []);
+  const pushLog = useCallback(
+    (message: string, level: LogEntry["level"] = "info") => {
+      setLogs((prev) => [
+        {
+          id: crypto.randomUUID(),
+          message,
+          level,
+          ts: Date.now(),
+        },
+        ...prev,
+      ]);
+    },
+    []
+  );
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -35,7 +42,7 @@ export function useVestDebugger() {
       setStatus(FALLBACK_STATUS);
       pushLog(
         error instanceof Error ? error.message : "Failed to reach bridge",
-        "error",
+        "error"
       );
     }
   }, [pushLog]);
@@ -58,13 +65,13 @@ export function useVestDebugger() {
       } catch (error) {
         pushLog(
           error instanceof Error ? error.message : "Failed to trigger effect",
-          "error",
+          "error"
         );
       } finally {
         setLoading(false);
       }
     },
-    [pushLog],
+    [pushLog]
   );
 
   const haltAll = useCallback(async () => {
@@ -75,7 +82,7 @@ export function useVestDebugger() {
     } catch (error) {
       pushLog(
         error instanceof Error ? error.message : "Failed to stop all",
-        "error",
+        "error"
       );
     } finally {
       setLoading(false);
@@ -87,17 +94,43 @@ export function useVestDebugger() {
     refreshEffects();
   }, [refreshStatus, refreshEffects]);
 
+  // Separate actuators from combined effects
+  const actuators = useMemo(
+    () =>
+      effects.filter((e) => e.cell < 4).length
+        ? effects.filter((e) => e.cell < 4)
+        : actuatorEffects,
+    [effects]
+  );
+  const combined = useMemo(
+    () =>
+      effects.filter((e) => e.cell >= 4).length
+        ? effects.filter((e) => e.cell >= 4)
+        : combinedEffects,
+    [effects]
+  );
+
   const derived = useMemo(
     () => ({
       status,
-      effects,
+      actuators,
+      combined,
       logs,
       loading,
       refreshStatus,
       sendEffect,
       haltAll,
     }),
-    [status, effects, logs, loading, refreshStatus, sendEffect, haltAll],
+    [
+      status,
+      actuators,
+      combined,
+      logs,
+      loading,
+      refreshStatus,
+      sendEffect,
+      haltAll,
+    ]
   );
 
   return derived;
