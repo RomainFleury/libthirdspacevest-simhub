@@ -13,3 +13,4 @@ web/.yarn/install-state.gz
 *.gz
 web/src/.DS_Store
 web/.yarn/install-state.gz
+/modern-third-space/src/modern_third_space/__pycache__
