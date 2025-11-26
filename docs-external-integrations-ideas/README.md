@@ -59,6 +59,13 @@ These documents outline approaches, patterns, and implementation strategies for 
   - Direct TCP connection to daemon (lower latency than OWO)
   - ✅ **IMPLEMENTED** - See `superhot-mod/`
 
+- **`PISTOLWHIP_INTEGRATION.md`** - Pistol Whip integration via MelonLoader mod
+  - Rhythm-based VR shooter by Cloudhead Games
+  - ~10 events: gun fire, shotgun, melee, reload (3 types), hit, death, healing
+  - Hand-specific haptics with dual-wield support
+  - Source available: bHaptics and OWO GitHub repos
+  - 📋 **PLANNED** - Ready for implementation
+
 - **`MELONLOADER_INTEGRATION_STRATEGY.md`** - Comprehensive strategy for integrating MelonLoader-based game mods (Unity games like SUPERHOT VR, Drunkn Bar Fight, etc.)
   - Multiple integration approaches (file logging, HTTP/WebSocket, IPC)
   - Event mapping strategies
