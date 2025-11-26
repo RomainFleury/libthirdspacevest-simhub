@@ -6,7 +6,27 @@ This file helps AI assistants quickly understand recent project evolution.
 
 ---
 
-## 2025-11-25 (Latest)
+## 2025-11-26 (Latest)
+
+### Added
+
+- **SimHub Plugin** (`simhub-plugin/`)
+  - C# plugin for SimHub telemetry platform
+  - Supports 90+ sim racing games (iRacing, Assetto Corsa, F1, etc.)
+  - TCP client connects to Python daemon (port 5050)
+  - Effects: braking, acceleration, G-forces, impacts, gear shifts, rumble, ABS/TC
+  - WPF settings UI with per-effect enable/intensity controls
+  - Auto-reconnect and per-cell throttling
+
+- **SimHub Integration Docs** (`docs-external-integrations-ideas/SIMHUB_IRACING_INTEGRATION.md`)
+  - Research on SimHub plugin architecture
+  - Telemetry data reference (GameData properties)
+  - Effect-to-cell mapping design
+  - Build and installation instructions
+
+---
+
+## 2025-11-25
 
 ### Added
 

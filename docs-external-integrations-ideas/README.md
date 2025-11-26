@@ -44,6 +44,14 @@ These documents outline approaches, patterns, and implementation strategies for 
   - Embedded in daemon with UI panel
   - ✅ **IMPLEMENTED**
 
+- **`SIMHUB_IRACING_INTEGRATION.md`** - SimHub integration for 90+ sim racing games
+  - C# plugin using SimHub SDK (IDataPlugin interface)
+  - Supports iRacing, Assetto Corsa, F1, Forza, BeamNG, etc.
+  - TCP connection to Python daemon (port 5050)
+  - Effects: braking, acceleration, G-forces, impacts, gear shifts, rumble
+  - WPF settings UI with intensity controls
+  - ✅ **IMPLEMENTED** - See `simhub-plugin/`
+
 - **`MELONLOADER_INTEGRATION_STRATEGY.md`** - Comprehensive strategy for integrating MelonLoader-based game mods (Unity games like SUPERHOT VR, Drunkn Bar Fight, etc.)
   - Multiple integration approaches (file logging, HTTP/WebSocket, IPC)
   - Event mapping strategies
