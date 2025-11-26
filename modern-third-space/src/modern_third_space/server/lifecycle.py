@@ -80,14 +80,29 @@ def is_process_running(pid: int) -> bool:
         return False
     
     try:
-        # Send signal 0 - doesn't kill, just checks if process exists
-        os.kill(pid, 0)
-        return True
+        # On Windows, os.kill(pid, 0) doesn't work reliably
+        # Use a cross-platform approach
+        if os.name == 'nt':
+            # Windows: use ctypes to check process
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+            process = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+            if process:
+                kernel32.CloseHandle(process)
+                return True
+            return False
+        else:
+            # Unix: send signal 0 - doesn't kill, just checks if process exists
+            os.kill(pid, 0)
+            return True
     except ProcessLookupError:
         return False
     except PermissionError:
         # Process exists but we don't have permission
         return True
+    except OSError:
+        return False
 
 
 def is_port_in_use(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> bool:
