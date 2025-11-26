@@ -76,6 +76,66 @@ python3 -m modern_third_space.cli list
 # Should show connected devices, or a fake device with serial "sorry-bro" if PyUSB isn't installed
 ```
 
+## Package Structure
+
+```
+modern_third_space/
+├── vest/                    # 🔒 Core vest hardware (isolated)
+│   ├── controller.py        # VestController - connection + commands
+│   ├── status.py            # VestStatus dataclass
+│   └── discovery.py         # list_devices() - USB scanning
+├── server/                  # 🌐 TCP Daemon
+│   ├── daemon.py            # Main daemon loop, command handlers
+│   ├── protocol.py          # JSON protocol (Command, Event, Response)
+│   ├── client_manager.py    # Track connected TCP clients
+│   └── lifecycle.py         # Start/stop/status management
+├── integrations/            # 🎮 Game integrations (daemon clients)
+│   ├── base.py              # DaemonConnection, BaseGameIntegration
+│   └── cs2_gsi.py           # Counter-Strike 2 GSI integration
+├── presets.py               # UI effect presets (not hardware code)
+├── cli.py                   # CLI interface (daemon, cs2 subcommands)
+├── legacy_adapter.py        # Legacy driver loader
+└── legacy_port/             # Ported legacy driver
+```
+
+### Isolation Principle
+
+The `vest/` package contains **only hardware interaction code**. It must remain isolated from:
+
+- Game integrations and listeners
+- External interfaces (WebSocket, HTTP, etc.)
+- UI-specific code
+
+The `server/` package provides a TCP daemon that imports from `vest/` and exposes commands to external clients.
+
+Game integrations (in `integrations/`) connect to the daemon as TCP clients - they don't import `vest/` directly.
+
+## CLI Commands
+
+### Daemon Commands
+
+```bash
+python3 -m modern_third_space.cli daemon start      # Start on port 5050
+python3 -m modern_third_space.cli daemon status     # Check status + health
+python3 -m modern_third_space.cli daemon stop       # Stop the daemon
+```
+
+### CS2 Integration Commands
+
+```bash
+python3 -m modern_third_space.cli cs2 start           # Start CS2 GSI listener
+python3 -m modern_third_space.cli cs2 status          # Check integration status
+python3 -m modern_third_space.cli cs2 generate-config # Generate CS2 config file
+```
+
+### Direct CLI Commands (no daemon)
+
+```bash
+python3 -m modern_third_space.cli ping      # Health check
+python3 -m modern_third_space.cli list      # List USB devices
+python3 -m modern_third_space.cli status    # Connection status
+```
+
 ## Development
 
 ```bash
@@ -84,7 +144,14 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -e .[dev]
 pip install pyusb  # Don't forget PyUSB!
-modern-third-space status
 ```
 
 The package dynamically loads the legacy `ThirdSpaceVest` class via `importlib` and never modifies the historical files. Any enhancements should go through the wrapper or new modules here.
+
+## Testing
+
+See `TESTING.md` for comprehensive testing examples including:
+
+- Daemon commands via netcat/Python
+- Simulated CS2 payloads
+- End-to-end integration tests

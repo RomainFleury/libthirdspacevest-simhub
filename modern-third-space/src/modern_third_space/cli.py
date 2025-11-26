@@ -128,7 +128,7 @@ def _daemon_start(args: argparse.Namespace) -> int:
     host = args.host
     port = args.port
     
-    print(f"🦺 Starting vest daemon on {host}:{port}...")
+    print(f"[VEST] Starting vest daemon on {host}:{port}...")
     run_daemon(host=host, port=port)
     return 0
 
@@ -144,10 +144,10 @@ def _daemon_stop(args: argparse.Namespace) -> int:
     success, message = stop_daemon(host=host, port=port, force=force)
     
     if success:
-        print(f"✅ {message}")
+        print(f"[OK] {message}")
         return 0
     else:
-        print(f"❌ {message}")
+        print(f"[ERROR] {message}")
         return 1
 
 
@@ -207,7 +207,7 @@ def _cs2_start(args: argparse.Namespace) -> int:
     daemon_host = getattr(args, "daemon_host", "127.0.0.1")
     daemon_port = getattr(args, "daemon_port", None)
     
-    print(f"🎮 Starting CS2 GSI integration...")
+    print(f"[CS2] Starting CS2 GSI integration...")
     print(f"   GSI server: http://{gsi_host}:{gsi_port}")
     if daemon_port:
         print(f"   Daemon: {daemon_host}:{daemon_port}")
@@ -246,7 +246,7 @@ def _cs2_generate_config(args: argparse.Namespace) -> int:
         # Write to specified path
         with open(output_path, "w") as f:
             f.write(config_content)
-        print(f"✅ Config written to: {output_path}")
+        print(f"[OK] Config written to: {output_path}")
         return 0
     
     # Try to find CS2 directory
@@ -272,18 +272,18 @@ def _cs2_generate_config(args: argparse.Namespace) -> int:
         if response == "y":
             with open(config_file, "w") as f:
                 f.write(config_content)
-            print(f"✅ Config written!")
+            print(f"[OK] Config written!")
             print()
-            print("🎮 Restart CS2 for changes to take effect.")
+            print("[CS2] Restart CS2 for changes to take effect.")
             return 0
         else:
-            print("❌ Cancelled")
+            print("[CANCELLED]")
             return 1
     else:
         # Print config and manual instructions
-        print("📂 Could not find CS2 config directory automatically.")
+        print("[INFO] Could not find CS2 config directory automatically.")
         print()
-        print("📋 Manually create this file:")
+        print("[INFO] Manually create this file:")
         print("   <CS2_DIR>/game/csgo/cfg/gamestate_integration_thirdspace.cfg")
         print()
         print("Config content:")
@@ -301,7 +301,7 @@ def _cs2_status(args: argparse.Namespace) -> int:
     gsi_port = getattr(args, "gsi_port", 3000)
     daemon_host = getattr(args, "daemon_host", "127.0.0.1")
     
-    print("🎮 CS2 GSI Integration Status")
+    print("[CS2] CS2 GSI Integration Status")
     print("=" * 40)
     
     # Check if GSI port is in use (integration running)
@@ -331,11 +331,11 @@ def _cs2_status(args: argparse.Namespace) -> int:
         import os
         config_file = os.path.join(cs2_cfg_path, "gamestate_integration_thirdspace.cfg")
         if os.path.exists(config_file):
-            print(f"GSI Config: 🟢 Found at {config_file}")
+            print(f"GSI Config: [OK] Found at {config_file}")
         else:
-            print(f"GSI Config: 🟡 Not found (run: cs2 generate-config)")
+            print(f"GSI Config: [MISSING] Not found (run: cs2 generate-config)")
     else:
-        print(f"GSI Config: ⚠️  CS2 directory not found")
+        print(f"GSI Config: [WARN] CS2 directory not found")
     
     print()
     return 0

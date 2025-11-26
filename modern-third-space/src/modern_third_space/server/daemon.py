@@ -125,7 +125,7 @@ class VestDaemon:
         
         addr = self._server.sockets[0].getsockname()
         logger.info(f"Vest daemon listening on {addr[0]}:{addr[1]}")
-        print(f"🦺 Vest daemon started on {addr[0]}:{addr[1]}")
+        print(f"[VEST] Daemon started on {addr[0]}:{addr[1]}")
         
         async with self._server:
             await self._server.serve_forever()
@@ -477,7 +477,7 @@ class VestDaemon:
         if success:
             # Broadcast CS2 started event
             await self._clients.broadcast(event_cs2_started(gsi_port))
-            print(f"🎮 CS2 GSI started on port {gsi_port}")
+            print(f"[CS2] GSI started on port {gsi_port}")
         
         return response_cs2_start(
             success=success,
@@ -493,7 +493,7 @@ class VestDaemon:
         if success:
             # Broadcast CS2 stopped event
             await self._clients.broadcast(event_cs2_stopped())
-            print("🎮 CS2 GSI stopped")
+            print("[CS2] GSI stopped")
         
         return response_cs2_stop(success=success, req_id=command.req_id)
     
@@ -572,7 +572,7 @@ class VestDaemon:
             actual_path = str(self._alyx_manager.log_path) if self._alyx_manager.log_path else None
             # Broadcast Alyx started event
             await self._clients.broadcast(event_alyx_started(actual_path or ""))
-            print(f"🎮 Half-Life: Alyx integration started, watching: {actual_path}")
+            print(f"[ALYX] Integration started, watching: {actual_path}")
         
         return response_alyx_start(
             success=success,
@@ -588,7 +588,7 @@ class VestDaemon:
         if success:
             # Broadcast Alyx stopped event
             await self._clients.broadcast(event_alyx_stopped())
-            print("🎮 Half-Life: Alyx integration stopped")
+            print("[ALYX] Integration stopped")
         
         return response_alyx_stop(success=success, req_id=command.req_id)
     
@@ -690,7 +690,7 @@ def run_daemon(
     if check_existing:
         is_running, pid, msg = get_daemon_status(host, port)
         if is_running:
-            print(f"❌ {msg}")
+            print(f"[ERROR] {msg}")
             print("Use 'daemon stop' to stop it first, or use a different port.")
             return
     
