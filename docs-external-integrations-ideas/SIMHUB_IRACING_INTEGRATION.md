@@ -277,7 +277,7 @@ Right turn → 1,3,5,7 (right side)
 2. Implement `IPlugin`, `IDataPlugin` interfaces
 3. Create TCP client for daemon communication
 4. Basic effect mapping (brake, accel, impact)
-5. Test with iRacing/Assetto Corsa
+5. Test with iRacing/Assetto Corsacan yo
 
 ### Phase 2: Effect Refinement (1-2 days)
 

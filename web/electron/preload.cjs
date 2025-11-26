@@ -58,4 +58,9 @@ contextBridge.exposeInMainWorld("vestBridge", {
   alyxStop: () => ipcRenderer.invoke("alyx:stop"),
   alyxStatus: () => ipcRenderer.invoke("alyx:status"),
   alyxGetModInfo: () => ipcRenderer.invoke("alyx:getModInfo"),
+
+  // SUPERHOT VR Integration API
+  superhotStart: () => ipcRenderer.invoke("superhot:start"),
+  superhotStop: () => ipcRenderer.invoke("superhot:stop"),
+  superhotStatus: () => ipcRenderer.invoke("superhot:status"),
 });

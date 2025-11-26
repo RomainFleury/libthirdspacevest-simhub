@@ -44,6 +44,11 @@ class CommandType(Enum):
     ALYX_STOP = "alyx_stop"
     ALYX_STATUS = "alyx_status"
     ALYX_GET_MOD_INFO = "alyx_get_mod_info"
+    # SUPERHOT VR integration
+    SUPERHOT_EVENT = "superhot_event"
+    SUPERHOT_START = "superhot_start"
+    SUPERHOT_STOP = "superhot_stop"
+    SUPERHOT_STATUS = "superhot_status"
 
 
 class EventType(Enum):
@@ -71,6 +76,10 @@ class EventType(Enum):
     ALYX_STARTED = "alyx_started"
     ALYX_STOPPED = "alyx_stopped"
     ALYX_GAME_EVENT = "alyx_game_event"
+    # SUPERHOT VR integration
+    SUPERHOT_STARTED = "superhot_started"
+    SUPERHOT_STOPPED = "superhot_stopped"
+    SUPERHOT_GAME_EVENT = "superhot_game_event"
 
 
 @dataclass
@@ -89,6 +98,10 @@ class Command:
     gsi_port: Optional[int] = None
     # Half-Life: Alyx params
     log_path: Optional[str] = None
+    # SUPERHOT VR params
+    event: Optional[str] = None  # Event name (death, pistol_recoil, etc.)
+    hand: Optional[str] = None   # "left" or "right"
+    priority: Optional[int] = None
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Command":
@@ -103,6 +116,9 @@ class Command:
             speed=data.get("speed"),
             gsi_port=data.get("gsi_port"),
             log_path=data.get("log_path"),
+            event=data.get("event"),
+            hand=data.get("hand"),
+            priority=data.get("priority"),
         )
     
     @classmethod
@@ -144,6 +160,8 @@ class Event:
     # Half-Life: Alyx info
     log_path: Optional[str] = None
     params: Optional[Dict[str, Any]] = None  # For alyx_game_event params
+    # SUPERHOT VR info
+    hand: Optional[str] = None  # "left" or "right" for hand-specific events
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary, excluding None values."""
@@ -432,5 +450,50 @@ def response_alyx_get_mod_info(
         response="alyx_get_mod_info",
         req_id=req_id,
         mod_info=mod_info,
+    )
+
+
+# -------------------------------------------------------------------------
+# SUPERHOT VR events and responses
+# -------------------------------------------------------------------------
+
+def event_superhot_started() -> Event:
+    """SUPERHOT VR integration started (mod connected)."""
+    return Event(event=EventType.SUPERHOT_STARTED.value)
+
+def event_superhot_stopped() -> Event:
+    """SUPERHOT VR integration stopped (mod disconnected)."""
+    return Event(event=EventType.SUPERHOT_STOPPED.value)
+
+def event_superhot_game_event(
+    event_type: str,
+    hand: Optional[str] = None,
+) -> Event:
+    """
+    SUPERHOT VR game event (death, recoil, punch, etc.).
+    
+    Args:
+        event_type: Type of event ("death", "pistol_recoil", "punch_hit", etc.)
+        hand: "left" or "right" for hand-specific events, None otherwise
+    """
+    return Event(
+        event=EventType.SUPERHOT_GAME_EVENT.value,
+        event_type=event_type,
+        hand=hand,
+    )
+
+def response_superhot_status(
+    enabled: bool,
+    events_received: int = 0,
+    last_event_ts: Optional[float] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to superhot_status command."""
+    return Response(
+        response="superhot_status",
+        req_id=req_id,
+        running=enabled,
+        events_received=events_received,
+        last_event_ts=last_event_ts,
     )
 

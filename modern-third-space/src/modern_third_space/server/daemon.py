@@ -49,6 +49,7 @@ from .protocol import (
 )
 from .cs2_manager import CS2Manager, generate_cs2_config
 from .alyx_manager import AlyxManager, get_mod_info as get_alyx_mod_info
+from .superhot_manager import SuperHotManager
 from .protocol import (
     event_alyx_started,
     event_alyx_stopped,
@@ -57,6 +58,10 @@ from .protocol import (
     response_alyx_stop,
     response_alyx_status,
     response_alyx_get_mod_info,
+    event_superhot_started,
+    event_superhot_stopped,
+    event_superhot_game_event,
+    response_superhot_status,
 )
 
 logger = logging.getLogger(__name__)
@@ -98,6 +103,11 @@ class VestDaemon:
             on_game_event=self._on_alyx_game_event,
             on_trigger=self._on_alyx_trigger,
         )
+        
+        # SUPERHOT VR manager
+        self._superhot_manager = SuperHotManager()
+        self._superhot_manager.set_event_callback(self._on_superhot_game_event)
+        self._superhot_manager.set_trigger_callback(self._on_superhot_trigger)
         
         self._loop: Optional[asyncio.AbstractEventLoop] = None
     
@@ -284,6 +294,19 @@ class VestDaemon:
         
         if cmd_type == CommandType.ALYX_GET_MOD_INFO:
             return await self._cmd_alyx_get_mod_info(command)
+        
+        # SUPERHOT VR commands
+        if cmd_type == CommandType.SUPERHOT_EVENT:
+            return await self._cmd_superhot_event(command)
+        
+        if cmd_type == CommandType.SUPERHOT_START:
+            return await self._cmd_superhot_start(command)
+        
+        if cmd_type == CommandType.SUPERHOT_STOP:
+            return await self._cmd_superhot_stop(command)
+        
+        if cmd_type == CommandType.SUPERHOT_STATUS:
+            return await self._cmd_superhot_status(command)
         
         return response_error(f"Command not implemented: {command.cmd}", command.req_id)
     
@@ -636,6 +659,99 @@ class VestDaemon:
         
         This performs the actual vest trigger synchronously since
         the vest controller is thread-safe for simple operations.
+        """
+        if self._selected_device is None:
+            return
+        
+        # Auto-connect if needed
+        if self._controller is None or not self._controller.status().connected:
+            self._controller = VestController()
+            self._controller.connect_to_device({
+                "bus": self._selected_device.get("bus"),
+                "address": self._selected_device.get("address"),
+            })
+        
+        if self._controller is not None:
+            self._controller.trigger_effect(cell, speed)
+            
+        # Broadcast effect triggered event
+        if self._loop is not None:
+            event = event_effect_triggered(cell, speed)
+            asyncio.run_coroutine_threadsafe(
+                self._clients.broadcast(event),
+                self._loop,
+            )
+    
+    # -------------------------------------------------------------------------
+    # SUPERHOT VR command handlers
+    # -------------------------------------------------------------------------
+    
+    async def _cmd_superhot_event(self, command: Command) -> Response:
+        """
+        Process a SUPERHOT VR game event from the MelonLoader mod.
+        
+        This is the main entry point for events from the game.
+        """
+        if not command.event:
+            return response_error("Missing event name", command.req_id)
+        
+        success = self._superhot_manager.process_event(
+            event_name=command.event,
+            hand=command.hand,
+            priority=command.priority or 0,
+        )
+        
+        if success:
+            return response_ok(command.req_id)
+        else:
+            return response_error(f"Failed to process event: {command.event}", command.req_id)
+    
+    async def _cmd_superhot_start(self, command: Command) -> Response:
+        """Enable SUPERHOT VR event processing."""
+        self._superhot_manager.enable()
+        await self._clients.broadcast(event_superhot_started())
+        return response_ok(command.req_id)
+    
+    async def _cmd_superhot_stop(self, command: Command) -> Response:
+        """Disable SUPERHOT VR event processing."""
+        self._superhot_manager.disable()
+        await self._clients.broadcast(event_superhot_stopped())
+        return response_ok(command.req_id)
+    
+    async def _cmd_superhot_status(self, command: Command) -> Response:
+        """Get SUPERHOT VR integration status."""
+        status = self._superhot_manager.get_status()
+        return response_superhot_status(
+            enabled=status["enabled"],
+            events_received=status["events_received"],
+            last_event_ts=status["last_event_ts"],
+            req_id=command.req_id,
+        )
+    
+    # -------------------------------------------------------------------------
+    # SUPERHOT VR callbacks
+    # -------------------------------------------------------------------------
+    
+    def _on_superhot_game_event(self, event_type: str, event_name: str, hand: Optional[str]):
+        """
+        Called when SUPERHOT manager processes a game event.
+        
+        Broadcasts the event to all connected clients for UI display.
+        """
+        if self._loop is None:
+            return
+        
+        event = event_superhot_game_event(event_name, hand)
+        asyncio.run_coroutine_threadsafe(
+            self._clients.broadcast(event),
+            self._loop,
+        )
+    
+    def _on_superhot_trigger(self, cell: int, speed: int):
+        """
+        Called when SUPERHOT manager wants to trigger a haptic effect.
+        
+        This performs the actual vest trigger.
         """
         if self._selected_device is None:
             return

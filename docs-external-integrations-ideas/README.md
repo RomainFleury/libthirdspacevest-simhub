@@ -57,7 +57,7 @@ These documents outline approaches, patterns, and implementation strategies for 
   - 12 events: death, gunfire (pistol/shotgun/uzi), punch, throw, parry, mindwave
   - Hand-specific haptics (left/right)
   - Direct TCP connection to daemon (lower latency than OWO)
-  - 📋 **PLANNED** - Ready for implementation
+  - ✅ **IMPLEMENTED** - See `superhot-mod/`
 
 - **`MELONLOADER_INTEGRATION_STRATEGY.md`** - Comprehensive strategy for integrating MelonLoader-based game mods (Unity games like SUPERHOT VR, Drunkn Bar Fight, etc.)
   - Multiple integration approaches (file logging, HTTP/WebSocket, IPC)

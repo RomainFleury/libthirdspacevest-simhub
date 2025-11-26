@@ -10,6 +10,15 @@ This file helps AI assistants quickly understand recent project evolution.
 
 ### Added
 
+- **SUPERHOT VR Integration** (`superhot-mod/`, `server/superhot_manager.py`)
+  - C# MelonLoader mod with TCP client to daemon
+  - 12 events: death, pistol/shotgun/uzi recoil, punch, throw, parry, mindwave
+  - Hand-specific haptics (left/right side cells)
+  - Python manager with event-to-haptic mapping
+  - Daemon commands: `superhot_event`, `superhot_start`, `superhot_stop`, `superhot_status`
+  - React UI panel with live event log
+  - IPC handlers: `superhotHandlers.cjs`
+
 - **SimHub Plugin** (`simhub-plugin/`)
   - C# plugin for SimHub telemetry platform
   - Supports 90+ sim racing games (iRacing, Assetto Corsa, F1, etc.)

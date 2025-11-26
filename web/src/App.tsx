@@ -4,6 +4,7 @@ import { LogPanel } from "./components/LogPanel";
 import { StatusPanel } from "./components/StatusPanel";
 import { CS2IntegrationPanel } from "./components/CS2IntegrationPanel";
 import { AlyxIntegrationPanel } from "./components/AlyxIntegrationPanel";
+import { SuperHotIntegrationPanel } from "./components/SuperHotIntegrationPanel";
 import { useVestDebugger } from "./hooks/useVestDebugger";
 // @ts-ignore-next-line
 import vestLogo from "./assets/vest-logo-color.png";
@@ -68,9 +69,10 @@ function App() {
         </div>
 
         {/* Game Integrations */}
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           <CS2IntegrationPanel />
           <AlyxIntegrationPanel />
+          <SuperHotIntegrationPanel />
         </div>
 
         <LogPanel logs={logs} />

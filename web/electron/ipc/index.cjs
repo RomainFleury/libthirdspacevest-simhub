@@ -10,6 +10,7 @@ const { registerVestHandlers } = require("./vestHandlers.cjs");
 const { registerDaemonHandlers } = require("./daemonHandlers.cjs");
 const { registerCS2Handlers } = require("./cs2Handlers.cjs");
 const { registerAlyxHandlers } = require("./alyxHandlers.cjs");
+const { registerSuperHotHandlers } = require("./superhotHandlers.cjs");
 
 /**
  * Register all IPC handlers.
@@ -30,6 +31,9 @@ function registerAllHandlers(getDaemonBridge, getMainWindow, reconnectToDaemon) 
   // Half-Life: Alyx integration handlers
   registerAlyxHandlers();
 
+  // SUPERHOT VR integration handlers
+  registerSuperHotHandlers();
+
   console.log("✓ IPC handlers registered");
 }
 
@@ -39,5 +43,6 @@ module.exports = {
   registerDaemonHandlers,
   registerCS2Handlers,
   registerAlyxHandlers,
+  registerSuperHotHandlers,
 };
 

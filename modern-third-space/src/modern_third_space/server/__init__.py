@@ -36,6 +36,7 @@ from .lifecycle import (
 )
 from .cs2_manager import CS2Manager, generate_cs2_config
 from .alyx_manager import AlyxManager, get_mod_info as get_alyx_mod_info
+from .superhot_manager import SuperHotManager
 
 __all__ = [
     "VestDaemon",
@@ -59,5 +60,7 @@ __all__ = [
     # Half-Life: Alyx
     "AlyxManager",
     "get_alyx_mod_info",
+    # SUPERHOT VR
+    "SuperHotManager",
 ]
 
