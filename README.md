@@ -4,6 +4,18 @@ This repository is organized to keep the original `libthirdspacevest` sources in
 
 ## TLDR - Quickstart
 
+When starting a chat, just type:
+
+`@.cursor/prompts/onboard.md`
+
+Integrate a new game: 
+
+```text
+@.cursor/prompts/new-game-integration.md
+
+I want to add haptic support for Superhot VR
+```
+
 ### macOS / Linux
 
 ```bash
