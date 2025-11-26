@@ -52,6 +52,13 @@ These documents outline approaches, patterns, and implementation strategies for 
   - WPF settings UI with intensity controls
   - ✅ **IMPLEMENTED** - See `simhub-plugin/`
 
+- **`SUPERHOTVR_INTEGRATION.md`** - SUPERHOT VR integration via MelonLoader mod
+  - Fork of OWO_SuperhotVR mod with TCP client instead of OWO SDK
+  - 12 events: death, gunfire (pistol/shotgun/uzi), punch, throw, parry, mindwave
+  - Hand-specific haptics (left/right)
+  - Direct TCP connection to daemon (lower latency than OWO)
+  - 📋 **PLANNED** - Ready for implementation
+
 - **`MELONLOADER_INTEGRATION_STRATEGY.md`** - Comprehensive strategy for integrating MelonLoader-based game mods (Unity games like SUPERHOT VR, Drunkn Bar Fight, etc.)
   - Multiple integration approaches (file logging, HTTP/WebSocket, IPC)
   - Event mapping strategies
