@@ -1,5 +1,6 @@
 import { DeviceSelector } from "./components/DeviceSelector";
 import { EffectControls } from "./components/EffectControls";
+import { CustomEffectPanel } from "./components/CustomEffectPanel";
 import { LogPanel } from "./components/LogPanel";
 import { StatusPanel } from "./components/StatusPanel";
 import { CS2IntegrationPanel } from "./components/CS2IntegrationPanel";
@@ -19,6 +20,7 @@ function App() {
     activeCells,
     refreshStatus,
     sendEffect,
+    sendCustomCommand,
     haltAll,
   } = useVestDebugger();
 
@@ -56,13 +58,17 @@ function App() {
               disabled={loading}
             />
           </div>
-          <div className="md:col-span-3">
+          <div className="md:col-span-3 space-y-6">
             <EffectControls
               actuators={actuators}
               combined={combined}
               activeCells={activeCells}
               onSend={sendEffect}
               onStopAll={haltAll}
+              disabled={loading}
+            />
+            <CustomEffectPanel
+              onSend={sendCustomCommand}
               disabled={loading}
             />
           </div>

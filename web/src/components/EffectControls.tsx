@@ -11,25 +11,30 @@ type Props = {
 
 /**
  * Third Space Vest Actuator Layout:
- *
+ * 
+ * Physical cell mapping (hardware IDs):
  *     FRONT                    BACK
  *   ┌─────────┐            ┌─────────┐
- *   │ 0     1 │            │ 4     5 │
+ *   │ 2     5 │            │ 1     6 │
  *   │  Upper  │            │  Upper  │
  *   ├─────────┤            ├─────────┤
- *   │ 2     3 │            │ 6     7 │
+ *   │ 3     4 │            │ 0     7 │
  *   │  Lower  │            │  Lower  │
  *   └─────────┘            └─────────┘
+ *     Left  Right           Left  Right
  */
 
-// Get short label for grid display
-function getShortLabel(label: string): string {
-  return label
-    .replace("Front ", "")
-    .replace("Back ", "")
-    .replace("Upper ", "↑ ")
-    .replace("Lower ", "↓ ");
-}
+// Hardware cell IDs for front and back
+const FRONT_CELLS = [2, 5, 3, 4]; // Upper Left, Upper Right, Lower Left, Lower Right
+const BACK_CELLS = [1, 6, 0, 7];  // Upper Left, Upper Right, Lower Left, Lower Right
+
+// Position labels for grid display (indexed by grid position: 0=UL, 1=UR, 2=LL, 3=LR)
+const POSITION_LABELS = [
+  "↖ Upper Left",
+  "↗ Upper Right", 
+  "↙ Lower Left",
+  "↘ Lower Right",
+];
 
 export function EffectControls({
   actuators,
@@ -39,23 +44,23 @@ export function EffectControls({
   onStopAll,
   disabled,
 }: Props) {
-  // Separate front and back actuators
-  const frontActuators = actuators.filter((a) => a.cell >= 0 && a.cell <= 3);
-  const backActuators = actuators.filter((a) => a.cell >= 4 && a.cell <= 7);
+  // Separate front and back actuators by their hardware cell IDs
+  const frontActuators = actuators.filter((a) => FRONT_CELLS.includes(a.cell));
+  const backActuators = actuators.filter((a) => BACK_CELLS.includes(a.cell));
 
   // Arrange in grid order (top-left, top-right, bottom-left, bottom-right)
   const frontGrid = [
-    frontActuators.find((a) => a.cell === 0),
-    frontActuators.find((a) => a.cell === 1),
-    frontActuators.find((a) => a.cell === 2),
-    frontActuators.find((a) => a.cell === 3),
+    frontActuators.find((a) => a.cell === 2), // Upper Left
+    frontActuators.find((a) => a.cell === 5), // Upper Right
+    frontActuators.find((a) => a.cell === 3), // Lower Left
+    frontActuators.find((a) => a.cell === 4), // Lower Right
   ].filter(Boolean) as VestEffect[];
 
   const backGrid = [
-    backActuators.find((a) => a.cell === 4),
-    backActuators.find((a) => a.cell === 5),
-    backActuators.find((a) => a.cell === 6),
-    backActuators.find((a) => a.cell === 7),
+    backActuators.find((a) => a.cell === 1), // Upper Left
+    backActuators.find((a) => a.cell === 6), // Upper Right
+    backActuators.find((a) => a.cell === 0), // Lower Left
+    backActuators.find((a) => a.cell === 7), // Lower Right
   ].filter(Boolean) as VestEffect[];
 
   return (
@@ -86,7 +91,7 @@ export function EffectControls({
               🎯 Front
             </h3>
             <div className="grid grid-cols-2 gap-2">
-              {frontGrid.map((effect) => {
+              {frontGrid.map((effect, index) => {
                 const isActive = activeCells.has(effect.cell);
                 return (
                   <button
@@ -100,7 +105,7 @@ export function EffectControls({
                     }`}
                   >
                     <p className="text-sm font-medium">
-                      {getShortLabel(effect.label)}
+                      {POSITION_LABELS[index]}
                     </p>
                     <p className={`mt-0.5 text-xs ${isActive ? "text-emerald-300" : "text-slate-400"}`}>
                       Cell {effect.cell}
@@ -117,7 +122,7 @@ export function EffectControls({
               🔙 Back
             </h3>
             <div className="grid grid-cols-2 gap-2">
-              {backGrid.map((effect) => {
+              {backGrid.map((effect, index) => {
                 const isActive = activeCells.has(effect.cell);
                 return (
                   <button
@@ -131,7 +136,7 @@ export function EffectControls({
                     }`}
                   >
                     <p className="text-sm font-medium">
-                      {getShortLabel(effect.label)}
+                      {POSITION_LABELS[index]}
                     </p>
                     <p className={`mt-0.5 text-xs ${isActive ? "text-emerald-300" : "text-slate-400"}`}>
                       Cell {effect.cell}
@@ -142,11 +147,6 @@ export function EffectControls({
             </div>
           </div>
         </div>
-
-        {/* Legend */}
-        <p className="mt-3 text-center text-xs text-slate-500">
-          ↑ = Upper · ↓ = Lower · Speed: 6
-        </p>
       </div>
 
       {/* Combined Effects / Presets */}

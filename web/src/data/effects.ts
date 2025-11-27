@@ -2,29 +2,30 @@ import { VestEffect } from "../types";
 
 /**
  * Third Space Vest Actuator Layout (8 cells total):
- *
+ * 
+ * Physical cell mapping (hardware IDs):
  *     FRONT                    BACK
  *   ┌─────────┐            ┌─────────┐
- *   │ 0     1 │            │ 4     5 │
+ *   │ 2     5 │            │ 1     6 │
  *   │  Upper  │            │  Upper  │
  *   ├─────────┤            ├─────────┤
- *   │ 2     3 │            │ 6     7 │
+ *   │ 3     4 │            │ 0     7 │
  *   │  Lower  │            │  Lower  │
  *   └─────────┘            └─────────┘
  *     Left  Right           Left  Right
  */
 
-// All 8 individual actuators
+// All 8 individual actuators (mapped to correct hardware cells)
 export const actuatorEffects: VestEffect[] = [
-  // Front actuators (cells 0-3)
-  { label: "Front Upper Left", cell: 0, speed: 6 },
-  { label: "Front Upper Right", cell: 1, speed: 6 },
-  { label: "Front Lower Left", cell: 2, speed: 6 },
-  { label: "Front Lower Right", cell: 3, speed: 6 },
-  // Back actuators (cells 4-7)
-  { label: "Back Upper Left", cell: 4, speed: 6 },
-  { label: "Back Upper Right", cell: 5, speed: 6 },
-  { label: "Back Lower Left", cell: 6, speed: 6 },
+  // Front actuators
+  { label: "Front Upper Left", cell: 2, speed: 6 },
+  { label: "Front Upper Right", cell: 5, speed: 6 },
+  { label: "Front Lower Left", cell: 3, speed: 6 },
+  { label: "Front Lower Right", cell: 4, speed: 6 },
+  // Back actuators
+  { label: "Back Upper Left", cell: 1, speed: 6 },
+  { label: "Back Upper Right", cell: 6, speed: 6 },
+  { label: "Back Lower Left", cell: 0, speed: 6 },
   { label: "Back Lower Right", cell: 7, speed: 6 },
 ];
 

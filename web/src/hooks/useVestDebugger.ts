@@ -123,10 +123,12 @@ export function useVestDebugger() {
           const cellsToTrigger: number[] = [];
           switch (effect.preset) {
             case "front":
-              cellsToTrigger.push(0, 1, 2, 3);
+              // Front cells: Upper Left (2), Upper Right (5), Lower Left (3), Lower Right (4)
+              cellsToTrigger.push(2, 5, 3, 4);
               break;
             case "back":
-              cellsToTrigger.push(4, 5, 6, 7);
+              // Back cells: Upper Left (1), Upper Right (6), Lower Left (0), Lower Right (7)
+              cellsToTrigger.push(1, 6, 0, 7);
               break;
             case "all":
               cellsToTrigger.push(0, 1, 2, 3, 4, 5, 6, 7);
@@ -168,6 +170,23 @@ export function useVestDebugger() {
       setLoading(false);
     }
   }, [pushLog]);
+
+  const sendCustomCommand = useCallback(
+    async (cell: number, speed: number) => {
+      setLoading(true);
+      try {
+        await triggerEffect({ label: `Custom Cell ${cell}`, cell, speed });
+      } catch (error) {
+        pushLog(
+          error instanceof Error ? error.message : "Failed to send custom command",
+          "error"
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [pushLog]
+  );
 
   // Subscribe to daemon events
   useEffect(() => {
@@ -249,6 +268,7 @@ export function useVestDebugger() {
       activeCells,
       refreshStatus,
       sendEffect,
+      sendCustomCommand,
       haltAll,
     }),
     [
@@ -261,6 +281,7 @@ export function useVestDebugger() {
       activeCells,
       refreshStatus,
       sendEffect,
+      sendCustomCommand,
       haltAll,
     ]
   );
