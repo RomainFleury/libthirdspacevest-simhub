@@ -22,6 +22,18 @@ These documents outline approaches, patterns, and implementation strategies for 
   - Client examples in Python, C#, Node.js
   - Implementation phases
 
+- **`EFFECTS_LIBRARY.md`** - Predefined haptic effects from TN Games SDK
+  - 28 effects across 5 categories (Weapons, Impacts, Melee, Driving, Special)
+  - Effect pattern definitions and cell mappings
+  - Daemon protocol: `play_effect`, `list_effects`, `stop_effect`
+  - UI panel with categorized effect buttons
+  - ✅ **IMPLEMENTED**
+
+- **`CELL_MAPPING_AUDIT.md`** - Hardware cell layout documentation
+  - Correct cell indices from reverse engineering
+  - Audit of game integration implementations
+  - Central `cell_layout.py` module reference
+
 ### Game Integration Strategies
 
 - **`CS2_INTEGRATION.md`** - Counter-Strike 2 integration via Game State Integration (GSI)

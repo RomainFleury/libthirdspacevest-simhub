@@ -6,7 +6,26 @@ This file helps AI assistants quickly understand recent project evolution.
 
 ---
 
-## 2025-11-26 (Latest)
+## 2025-11-27 (Latest)
+
+### Added
+
+- **Effects Library** - Predefined haptic patterns from TN Games SDK
+  - 28 effects across 5 categories: Weapons, Impacts, Melee, Driving, Special
+  - `vest/effects.py`: Effect pattern definitions using `HapticEffect` dataclass
+  - Daemon commands: `play_effect`, `list_effects`, `stop_effect`
+  - React UI panel with collapsible categories and play buttons
+  - **Files**: `effects.py`, `effectsHandlers.cjs`, `EffectsLibraryPanel.tsx`
+  - **Docs**: See [`docs-external-integrations-ideas/EFFECTS_LIBRARY.md`](docs-external-integrations-ideas/EFFECTS_LIBRARY.md) for details
+
+- **Cell Layout Fixes** - Corrected hardware cell mapping across all integrations
+  - Central `vest/cell_layout.py` module with correct hardware indices
+  - Updated CS2, Alyx, and SUPERHOT managers to use shared constants
+  - **Docs**: See [`docs-external-integrations-ideas/CELL_MAPPING_AUDIT.md`](docs-external-integrations-ideas/CELL_MAPPING_AUDIT.md)
+
+---
+
+## 2025-11-26
 
 ### Added
 
@@ -153,7 +172,8 @@ After (Daemon-based):
 ## Upcoming / Ideas
 
 - [ ] Configurable effect mapping (YAML/JSON)
-- [ ] More game integrations (Superhot VR, etc.)
+- [x] ~~SUPERHOT VR integration~~ ✅ Done
 - [x] ~~Half-Life: Alyx integration~~ ✅ Done
-- [ ] Effect patterns/presets system
+- [x] ~~Effect patterns/presets system~~ ✅ Done (Effects Library)
 - [ ] Daemon auto-start from Electron
+- [ ] Pistol Whip integration (planned)
