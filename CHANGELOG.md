@@ -23,6 +23,11 @@ This file helps AI assistants quickly understand recent project evolution.
   - Updated CS2, Alyx, and SUPERHOT managers to use shared constants
   - **Docs**: See [`docs-external-integrations-ideas/CELL_MAPPING_AUDIT.md`](docs-external-integrations-ideas/CELL_MAPPING_AUDIT.md)
 
+- **SimHub Plugin Cell Mapping** - Corrected `VestCells` constants to match hardware
+  - `HapticCommand.cs`: Fixed all 8 cell indices based on reverse engineering
+  - Updated cell groups (`AllFront`, `AllBack`, `LeftSide`, etc.) to use named constants
+  - Now consistent with Python `cell_layout.py` module
+
 ### Fixed
 
 - **SUPERHOT VR IPC Handlers** - Fixed `sendCommand is not a function` error
