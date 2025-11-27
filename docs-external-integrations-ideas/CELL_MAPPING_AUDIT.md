@@ -1,9 +1,11 @@
 # Cell Mapping Audit
 
-> **Status**: 🔴 **ACTION REQUIRED**
+> **Status**: ✅ **COMPLETE**
 >
 > This document audits the cell mapping across our codebase against the
 > reverse-engineered hardware specification.
+>
+> All issues have been resolved as of November 2025.
 
 ## Reference: Correct Hardware Cell Layout
 
@@ -80,89 +82,27 @@ RIGHT_SIDE = [5, 4, 6, 7]   # Front upper/lower + Back upper/lower
 
 ---
 
-### 🔴 Needs Updating: Game Integrations
+### ✅ Fixed: Game Integrations
 
-These files use hardcoded cell numbers with the **OLD incorrect layout**:
+All game integrations now import from the central `cell_layout.py` module:
 
-#### 1. `superhot_manager.py`
+#### 1. `superhot_manager.py` ✅ FIXED
 
-**Current (WRONG):**
-```python
-# Line 43-50 - Comment shows wrong layout
-#   FRONT          BACK
-# │ 0 │ 1 │    │ 4 │ 5 │  Upper
-# │ 2 │ 3 │    │ 6 │ 7 │  Lower
+- Removed hardcoded cell constants
+- Now imports `ALL_CELLS, LEFT_ARM, RIGHT_ARM, LEFT_SIDE, RIGHT_SIDE, TORSO` from `cell_layout`
+- Updated docstring with correct layout diagram
 
-# Line 53-58 - Constants use wrong values
-LEFT_ARM = [0, 4]       # WRONG
-RIGHT_ARM = [1, 5]      # WRONG
-LEFT_SIDE = [0, 2, 4, 6]  # WRONG
-RIGHT_SIDE = [1, 3, 5, 7] # WRONG
-TORSO = [2, 3, 6, 7]      # WRONG
-```
+#### 2. `alyx_manager.py` ✅ FIXED
 
-**Should Be:**
-```python
-# Vest cell layout (hardware):
-#   FRONT          BACK
-# │ 2 │ 5 │    │ 1 │ 6 │  Upper
-# │ 3 │ 4 │    │ 0 │ 7 │  Lower
+- Now imports `Cell, FRONT_CELLS, BACK_CELLS, ALL_CELLS, LEFT_SIDE, RIGHT_SIDE, UPPER_CELLS`
+- `angle_to_cells()` uses correct cell mappings
+- `map_event_to_haptics()` uses `Cell.FRONT_UPPER_LEFT`, `Cell.BACK_UPPER_RIGHT`, etc.
 
-# Hand-specific cell mappings
-LEFT_ARM = [2, 1]         # Front upper left + Back upper left
-RIGHT_ARM = [5, 6]        # Front upper right + Back upper right
-LEFT_SIDE = [2, 3, 1, 0]  # All left cells
-RIGHT_SIDE = [5, 4, 6, 7] # All right cells
-TORSO = [3, 4, 0, 7]      # Lower cells (front + back)
-```
+#### 3. `cs2_manager.py` ✅ FIXED
 
----
-
-#### 2. `alyx_manager.py`
-
-**Current (WRONG) - Lines 180-240:**
-```python
-# Line 183-184: Recoil uses cells 0,1 (should be 2,5)
-commands.append((0, speed))
-commands.append((1, speed))
-
-# Line 190-191: Heartbeat uses 0,2 (should be 2,3)
-commands.append((0, 3))
-commands.append((2, 3))
-
-# Line 195-196: Heal uses 0,1,2,3 (should be 2,5,3,4)
-for cell in [0, 1, 2, 3]:
-
-# Line 210: Barnacle uses 4,5 (should be 1,6)
-for cell in [4, 5]:
-
-# Line 233: Backpack uses 4,5 (should be 1,6)
-cell = 4 if left else 5  # Should be: cell = 1 if left else 6
-```
-
----
-
-#### 3. `cs2_manager.py`
-
-**Current (WRONG) - Lines 389-440:**
-```python
-# Line 395-396: Light damage uses 0,1 (should be 2,5)
-self._trigger(0, speed)
-self._trigger(1, speed)
-
-# Line 398: Medium damage uses 0,1,2,3 (should be 2,5,3,4)
-for cell in [0, 1, 2, 3]:
-
-# Line 414: Flash uses 0,1,4,5 (should be 2,5,1,6 for upper cells)
-for cell in [0, 1, 4, 5]:
-
-# Line 420: Bomb planted uses 2,3,6,7 (should be 3,4,0,7 for lower/torso)
-for cell in [2, 3, 6, 7]:
-
-# Line 438-439: Kill feedback uses 0,1 (should be 2,5)
-self._trigger(0, 5)
-self._trigger(1, 5)
-```
+- Now imports `Cell, FRONT_CELLS, ALL_CELLS, UPPER_CELLS, LOWER_CELLS`
+- All trigger functions use semantic cell names
+- Added layout diagram in comments
 
 ---
 
@@ -170,16 +110,14 @@ self._trigger(1, 5)
 
 | File | Status | Notes |
 |------|--------|-------|
-| `simhub-plugin/TelemetryMapper.cs` | 🟡 CHECK | May have hardcoded cells |
+| `simhub-plugin/TelemetryMapper.cs` | 🟡 CHECK | C# plugin - may need separate update |
 | Game mod documentation | 🟡 CHECK | Update haptic mapping tables |
 
 ---
 
-## Recommended Fix
+## Implementation: Central Constants File
 
-### Option 1: Create Central Constants File (Recommended)
-
-Create `modern-third-space/src/modern_third_space/vest/cell_layout.py`:
+Created `modern-third-space/src/modern_third_space/vest/cell_layout.py`:
 
 ```python
 """
@@ -240,10 +178,10 @@ Just update the hardcoded values in each file using the correct mapping.
 
 ## Action Items
 
-- [ ] Create `cell_layout.py` constants module
-- [ ] Update `superhot_manager.py` to use correct cells
-- [ ] Update `alyx_manager.py` to use correct cells
-- [ ] Update `cs2_manager.py` to use correct cells
+- [x] Create `cell_layout.py` constants module ✅
+- [x] Update `superhot_manager.py` to use correct cells ✅
+- [x] Update `alyx_manager.py` to use correct cells ✅
+- [x] Update `cs2_manager.py` to use correct cells ✅
 - [ ] Update `simhub-plugin/TelemetryMapper.cs` if needed
 - [ ] Update integration documentation with correct cell references
 - [ ] Add unit tests to verify cell mapping

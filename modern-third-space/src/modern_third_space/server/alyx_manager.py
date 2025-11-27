@@ -26,6 +26,16 @@ from pathlib import Path
 from threading import Thread
 from typing import Callable, Optional, List
 
+from ..vest.cell_layout import (
+    Cell,
+    FRONT_CELLS,
+    BACK_CELLS,
+    ALL_CELLS,
+    LEFT_SIDE,
+    RIGHT_SIDE,
+    UPPER_CELLS,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -126,25 +136,30 @@ def angle_to_cells(angle: float) -> List[int]:
     - 180° = Back
     - 270° = Right
     
-    Vest cell layout:
-    Front: 0 (top-left), 1 (top-right), 2 (bottom-left), 3 (bottom-right)
-    Back:  4 (top-left), 5 (top-right), 6 (bottom-left), 7 (bottom-right)
+    Uses correct hardware cell layout from cell_layout module:
+          FRONT                    BACK
+      ┌─────┬─────┐          ┌─────┬─────┐
+      │  2  │  5  │  Upper   │  1  │  6  │
+      ├─────┼─────┤          ├─────┼─────┤
+      │  3  │  4  │  Lower   │  0  │  7  │
+      └─────┴─────┘          └─────┴─────┘
+        L     R                L     R
     """
     # Normalize angle to 0-360
     angle = angle % 360
     
     if angle < 45 or angle >= 315:
-        # Front
-        return [0, 1]
+        # Front upper cells
+        return [Cell.FRONT_UPPER_LEFT, Cell.FRONT_UPPER_RIGHT]
     elif 45 <= angle < 135:
         # Left side (from player perspective)
-        return [0, 2, 4, 6]
+        return LEFT_SIDE
     elif 135 <= angle < 225:
         # Back
-        return [4, 5, 6, 7]
+        return BACK_CELLS
     else:  # 225 <= angle < 315
         # Right side
-        return [1, 3, 5, 7]
+        return RIGHT_SIDE
 
 
 def map_event_to_haptics(event: AlyxEvent) -> List[tuple[int, int]]:
@@ -152,6 +167,8 @@ def map_event_to_haptics(event: AlyxEvent) -> List[tuple[int, int]]:
     Map an Alyx event to haptic commands.
     
     Returns list of (cell, speed) tuples.
+    
+    Uses correct hardware cell layout from cell_layout module.
     """
     commands = []
     
@@ -168,7 +185,7 @@ def map_event_to_haptics(event: AlyxEvent) -> List[tuple[int, int]]:
     
     elif event.type == "PlayerDeath":
         # Full vest strong effect
-        for cell in range(8):
+        for cell in ALL_CELLS:
             commands.append((cell, 10))
     
     elif event.type == "PlayerShootWeapon":
@@ -180,62 +197,60 @@ def map_event_to_haptics(event: AlyxEvent) -> List[tuple[int, int]]:
         else:
             speed = 5
         # Recoil on front upper cells
-        commands.append((0, speed))
-        commands.append((1, speed))
+        commands.append((Cell.FRONT_UPPER_LEFT, speed))
+        commands.append((Cell.FRONT_UPPER_RIGHT, speed))
     
     elif event.type == "PlayerHealth":
         health = event.params.get("health", 100)
         if health <= 30:
-            # Heartbeat - subtle front pulse
-            commands.append((0, 3))
-            commands.append((2, 3))
+            # Heartbeat - subtle left side pulse
+            commands.append((Cell.FRONT_UPPER_LEFT, 3))
+            commands.append((Cell.FRONT_LOWER_LEFT, 3))
     
     elif event.type == "PlayerHeal":
         # Soothing wave on front
-        for cell in [0, 1, 2, 3]:
+        for cell in FRONT_CELLS:
             commands.append((cell, 2))
     
     elif event.type == "PlayerGrabbityPull":
-        # Light front pulse
-        commands.append((0, 3))
-        commands.append((1, 3))
+        # Light front upper pulse
+        commands.append((Cell.FRONT_UPPER_LEFT, 3))
+        commands.append((Cell.FRONT_UPPER_RIGHT, 3))
     
     elif event.type == "GrabbityGloveCatch":
-        # Quick front tap
-        commands.append((0, 4))
-        commands.append((1, 4))
+        # Quick front upper tap
+        commands.append((Cell.FRONT_UPPER_LEFT, 4))
+        commands.append((Cell.FRONT_UPPER_RIGHT, 4))
     
     elif event.type == "PlayerGrabbedByBarnacle":
-        # Strong pull-up effect on back
-        for cell in [4, 5]:
-            commands.append((cell, 8))
+        # Strong pull-up effect on back upper cells
+        commands.append((Cell.BACK_UPPER_LEFT, 8))
+        commands.append((Cell.BACK_UPPER_RIGHT, 8))
     
     elif event.type == "PlayerCoughStart":
-        # Chest pulses
-        commands.append((0, 2))
-        commands.append((1, 2))
-        commands.append((2, 2))
-        commands.append((3, 2))
+        # Chest pulses (front cells)
+        for cell in FRONT_CELLS:
+            commands.append((cell, 2))
     
     elif event.type == "TwoHandStart":
-        # Subtle shoulder feedback
-        commands.append((0, 2))
-        commands.append((1, 2))
+        # Subtle shoulder/upper feedback
+        commands.append((Cell.FRONT_UPPER_LEFT, 2))
+        commands.append((Cell.FRONT_UPPER_RIGHT, 2))
     
     elif event.type == "Reset":
         # Quick full-body pulse on spawn
-        for cell in range(8):
+        for cell in ALL_CELLS:
             commands.append((cell, 3))
     
-    # Backpack interactions - shoulder taps
+    # Backpack interactions - back upper shoulder taps
     elif event.type in ("PlayerDropAmmoInBackpack", "PlayerDropResinInBackpack"):
         left = event.params.get("left_side", False)
-        cell = 4 if left else 5  # Back top cells
+        cell = Cell.BACK_UPPER_LEFT if left else Cell.BACK_UPPER_RIGHT
         commands.append((cell, 3))
     
     elif event.type in ("PlayerRetrievedBackpackClip",):
         left = event.params.get("left_side", False)
-        cell = 4 if left else 5
+        cell = Cell.BACK_UPPER_LEFT if left else Cell.BACK_UPPER_RIGHT
         commands.append((cell, 4))
     
     return commands

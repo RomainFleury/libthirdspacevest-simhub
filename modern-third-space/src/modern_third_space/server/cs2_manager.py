@@ -22,6 +22,14 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from threading import Thread
 from typing import Callable, Optional, Any
 
+from ..vest.cell_layout import (
+    Cell,
+    FRONT_CELLS,
+    ALL_CELLS,
+    UPPER_CELLS,
+    LOWER_CELLS,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -385,6 +393,16 @@ class CS2Manager:
     # =========================================================================
     # Haptic Effect Triggers
     # =========================================================================
+    # Uses correct hardware cell layout from cell_layout module:
+    #
+    #       FRONT                    BACK
+    #   ┌─────┬─────┐          ┌─────┬─────┐
+    #   │  2  │  5  │  Upper   │  1  │  6  │
+    #   ├─────┼─────┤          ├─────┼─────┤
+    #   │  3  │  4  │  Lower   │  0  │  7  │
+    #   └─────┴─────┘          └─────┴─────┘
+    #     L     R                L     R
+    # =========================================================================
     
     def _trigger_damage(self, damage: int):
         """Trigger haptics for taking damage."""
@@ -392,51 +410,57 @@ class CS2Manager:
         speed = min(10, max(1, damage // 10))
         
         if damage < 25:
-            self._trigger(0, speed)
-            self._trigger(1, speed)
+            # Light damage - front upper only
+            self._trigger(Cell.FRONT_UPPER_LEFT, speed)
+            self._trigger(Cell.FRONT_UPPER_RIGHT, speed)
         elif damage < 50:
-            for cell in [0, 1, 2, 3]:
+            # Medium damage - all front cells
+            for cell in FRONT_CELLS:
                 self._trigger(cell, speed)
         else:
-            for cell in range(8):
+            # Heavy damage - full vest
+            for cell in ALL_CELLS:
                 self._trigger(cell, speed)
     
     def _trigger_death(self):
         """Trigger haptics for player death."""
         logger.info("CS2: Player died")
-        for cell in range(8):
+        for cell in ALL_CELLS:
             self._trigger(cell, 10)
     
     def _trigger_flash(self, intensity: int):
         """Trigger haptics for flashbang."""
         logger.info(f"CS2: Player flashed (intensity: {intensity})")
         speed = min(10, max(5, intensity // 25))
-        for cell in [0, 1, 4, 5]:
+        # Flash affects upper cells (head level)
+        for cell in UPPER_CELLS:
             self._trigger(cell, speed)
     
     def _trigger_bomb_planted(self):
         """Trigger haptics for bomb planted."""
         logger.info("CS2: Bomb planted")
-        for cell in [2, 3, 6, 7]:
+        # Subtle rumble on lower/torso cells
+        for cell in LOWER_CELLS:
             self._trigger(cell, 3)
     
     def _trigger_bomb_exploded(self):
         """Trigger haptics for bomb explosion."""
         logger.info("CS2: Bomb exploded")
-        for cell in range(8):
+        for cell in ALL_CELLS:
             self._trigger(cell, 10)
     
     def _trigger_round_start(self):
         """Trigger haptics for round start."""
         logger.info("CS2: Round started")
-        for cell in range(8):
+        for cell in ALL_CELLS:
             self._trigger(cell, 2)
     
     def _trigger_kill(self):
         """Trigger haptics for getting a kill."""
         logger.info("CS2: Player got a kill")
-        self._trigger(0, 5)
-        self._trigger(1, 5)
+        # Quick front upper tap for satisfaction feedback
+        self._trigger(Cell.FRONT_UPPER_LEFT, 5)
+        self._trigger(Cell.FRONT_UPPER_RIGHT, 5)
 
 
 # =============================================================================

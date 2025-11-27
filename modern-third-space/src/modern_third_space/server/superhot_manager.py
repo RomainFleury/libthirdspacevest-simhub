@@ -20,6 +20,10 @@ import time
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional, Any
 
+from ..vest.cell_layout import (
+    ALL_CELLS, LEFT_ARM, RIGHT_ARM, LEFT_SIDE, RIGHT_SIDE, TORSO
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -38,26 +42,19 @@ class SuperHotManager:
     Unlike CS2/Alyx which run servers, SuperHot events come directly
     from the MelonLoader mod as TCP commands. This manager just handles
     the event processing and haptic mapping.
+    
+    Cell layout (hardware mapping from cell_layout.py):
+    
+          FRONT                    BACK
+      ┌─────┬─────┐          ┌─────┬─────┐
+      │  2  │  5  │  Upper   │  1  │  6  │
+      ├─────┼─────┤          ├─────┼─────┤
+      │  3  │  4  │  Lower   │  0  │  7  │
+      └─────┴─────┘          └─────┴─────┘
+        L     R                L     R
     """
     
-    # Vest cell layout:
-    #   FRONT          BACK
-    # ┌───┬───┐    ┌───┬───┐
-    # │ 0 │ 1 │    │ 4 │ 5 │  Upper
-    # ├───┼───┤    ├───┼───┤
-    # │ 2 │ 3 │    │ 6 │ 7 │  Lower
-    # └───┴───┘    └───┴───┘
-    #   L   R        L   R
-    
-    # Hand-specific cell mappings
-    LEFT_ARM = [0, 4]       # Left upper front + back
-    RIGHT_ARM = [1, 5]      # Right upper front + back
-    LEFT_SIDE = [0, 2, 4, 6]
-    RIGHT_SIDE = [1, 3, 5, 7]
-    ALL_CELLS = [0, 1, 2, 3, 4, 5, 6, 7]
-    TORSO = [2, 3, 6, 7]    # Lower cells (torso)
-    
-    # Event to haptic mappings
+    # Event to haptic mappings (uses constants from cell_layout)
     EVENT_MAPPINGS: Dict[str, HapticMapping] = {
         # Combat
         "death": HapticMapping(cells=ALL_CELLS, speed=10, duration_ms=1500),
@@ -164,25 +161,27 @@ class SuperHotManager:
     ) -> List[int]:
         """
         Get vest cells for an event, handling hand-specific mappings.
+        
+        Uses correct hardware cell layout from cell_layout module.
         """
         # If mapping has predefined cells, use them
         if mapping.cells:
             return mapping.cells
         
-        # Hand-specific mappings
+        # Hand-specific mappings (using correct hardware layout)
         if hand == "right":
             if event_name == "shotgun_recoil":
-                return self.RIGHT_SIDE
-            return self.RIGHT_ARM
+                return RIGHT_SIDE
+            return RIGHT_ARM
         elif hand == "left":
             if event_name == "shotgun_recoil":
-                return self.LEFT_SIDE
-            return self.LEFT_ARM
+                return LEFT_SIDE
+            return LEFT_ARM
         
         # Default to right if no hand specified
         if event_name == "shotgun_recoil":
-            return self.RIGHT_SIDE
-        return self.RIGHT_ARM
+            return RIGHT_SIDE
+        return RIGHT_ARM
     
     def get_status(self) -> Dict[str, Any]:
         """Get current status."""

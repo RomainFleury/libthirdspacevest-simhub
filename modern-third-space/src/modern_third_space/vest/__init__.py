@@ -19,6 +19,41 @@ If you need to add game integration features, create a separate package
 from .status import VestStatus
 from .controller import VestController
 from .discovery import list_devices
+from .cell_layout import (
+    Cell,
+    FRONT_CELLS,
+    BACK_CELLS,
+    ALL_CELLS,
+    LEFT_SIDE,
+    RIGHT_SIDE,
+    LEFT_ARM,
+    RIGHT_ARM,
+    UPPER_CELLS,
+    LOWER_CELLS,
+    TORSO,
+    SHOULDERS,
+    cells_for_hand,
+    cells_for_side,
+)
 
-__all__ = ["VestStatus", "VestController", "list_devices"]
+__all__ = [
+    "VestStatus",
+    "VestController",
+    "list_devices",
+    # Cell layout
+    "Cell",
+    "FRONT_CELLS",
+    "BACK_CELLS",
+    "ALL_CELLS",
+    "LEFT_SIDE",
+    "RIGHT_SIDE",
+    "LEFT_ARM",
+    "RIGHT_ARM",
+    "UPPER_CELLS",
+    "LOWER_CELLS",
+    "TORSO",
+    "SHOULDERS",
+    "cells_for_hand",
+    "cells_for_side",
+]
 
