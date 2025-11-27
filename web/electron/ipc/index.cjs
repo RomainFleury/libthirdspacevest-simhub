@@ -11,6 +11,7 @@ const { registerDaemonHandlers } = require("./daemonHandlers.cjs");
 const { registerCS2Handlers } = require("./cs2Handlers.cjs");
 const { registerAlyxHandlers } = require("./alyxHandlers.cjs");
 const { registerSuperHotHandlers } = require("./superhotHandlers.cjs");
+const { registerEffectsHandlers } = require("./effectsHandlers.cjs");
 
 /**
  * Register all IPC handlers.
@@ -34,6 +35,9 @@ function registerAllHandlers(getDaemonBridge, getMainWindow, reconnectToDaemon) 
   // SUPERHOT VR integration handlers
   registerSuperHotHandlers();
 
+  // Predefined effects library handlers
+  registerEffectsHandlers();
+
   console.log("✓ IPC handlers registered");
 }
 
@@ -44,5 +48,6 @@ module.exports = {
   registerCS2Handlers,
   registerAlyxHandlers,
   registerSuperHotHandlers,
+  registerEffectsHandlers,
 };
 

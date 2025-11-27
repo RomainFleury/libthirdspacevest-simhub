@@ -63,4 +63,9 @@ contextBridge.exposeInMainWorld("vestBridge", {
   superhotStart: () => ipcRenderer.invoke("superhot:start"),
   superhotStop: () => ipcRenderer.invoke("superhot:stop"),
   superhotStatus: () => ipcRenderer.invoke("superhot:status"),
+
+  // Predefined Effects Library API
+  playEffect: (effectName) => ipcRenderer.invoke("effects:play", effectName),
+  listEffectsLibrary: () => ipcRenderer.invoke("effects:list"),
+  stopEffect: () => ipcRenderer.invoke("effects:stop"),
 });

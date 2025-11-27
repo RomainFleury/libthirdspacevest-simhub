@@ -1,6 +1,7 @@
 import { DeviceSelector } from "./components/DeviceSelector";
 import { EffectControls } from "./components/EffectControls";
 import { CustomEffectPanel } from "./components/CustomEffectPanel";
+import { EffectsLibraryPanel } from "./components/EffectsLibraryPanel";
 import { LogPanel } from "./components/LogPanel";
 import { StatusPanel } from "./components/StatusPanel";
 import { CS2IntegrationPanel } from "./components/CS2IntegrationPanel";
@@ -73,6 +74,9 @@ function App() {
             />
           </div>
         </div>
+
+        {/* Effects Library - Predefined patterns from SDK */}
+        <EffectsLibraryPanel />
 
         {/* Game Integrations */}
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

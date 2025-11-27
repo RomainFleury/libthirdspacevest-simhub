@@ -127,6 +127,35 @@ export type AlyxModInfoResult = {
   error?: string;
 };
 
+// Predefined Effects Library types
+export type EffectStep = {
+  cells: number[];
+  speed: number;
+  duration_ms: number;
+  delay_ms: number;
+};
+
+export type PredefinedEffect = {
+  name: string;
+  display_name: string;
+  category: string;
+  description: string;
+  duration_ms: number;
+  steps: EffectStep[];
+};
+
+export type EffectsListResult = {
+  success: boolean;
+  effects: PredefinedEffect[];
+  categories: string[];
+  error?: string;
+};
+
+export type PlayEffectResult = {
+  success: boolean;
+  error?: string;
+};
+
 // Type definition for the Electron bridge API
 declare global {
   interface Window {
@@ -178,6 +207,10 @@ declare global {
       alyxStop: () => Promise<AlyxStopResult>;
       alyxStatus: () => Promise<AlyxStatus>;
       alyxGetModInfo: () => Promise<AlyxModInfoResult>;
+      // Predefined Effects Library API
+      playEffect: (effectName: string) => Promise<PlayEffectResult>;
+      listEffectsLibrary: () => Promise<EffectsListResult>;
+      stopEffect: () => Promise<{ success: boolean; error?: string }>;
     };
   }
 }
@@ -395,4 +428,31 @@ export async function alyxStatus(): Promise<AlyxStatus> {
  */
 export async function alyxGetModInfo(): Promise<AlyxModInfoResult> {
   return await ensureBridge().alyxGetModInfo();
+}
+
+// -------------------------------------------------------------------------
+// Predefined Effects Library
+// -------------------------------------------------------------------------
+
+/**
+ * Play a predefined effect by name.
+ * @param effectName Name of the effect to play (e.g., "machinegun_front")
+ */
+export async function playEffect(effectName: string): Promise<PlayEffectResult> {
+  return await ensureBridge().playEffect(effectName);
+}
+
+/**
+ * List all available predefined effects.
+ * Returns effects organized by category.
+ */
+export async function listEffectsLibrary(): Promise<EffectsListResult> {
+  return await ensureBridge().listEffectsLibrary();
+}
+
+/**
+ * Stop any currently playing effect (emergency stop).
+ */
+export async function stopEffect(): Promise<{ success: boolean; error?: string }> {
+  return await ensureBridge().stopEffect();
 }

@@ -650,6 +650,112 @@ class DaemonBridge extends EventEmitter {
       };
     }
   }
+
+  // -------------------------------------------------------------------------
+  // SUPERHOT VR Integration API
+  // -------------------------------------------------------------------------
+
+  /**
+   * Enable SUPERHOT VR integration.
+   */
+  async superhotStart() {
+    try {
+      await this.sendCommand("superhot_start");
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Disable SUPERHOT VR integration.
+   */
+  async superhotStop() {
+    try {
+      await this.sendCommand("superhot_stop");
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Get SUPERHOT VR integration status.
+   */
+  async superhotStatus() {
+    try {
+      const response = await this.sendCommand("superhot_status");
+      return {
+        enabled: response.running ?? false,
+        events_received: response.events_received ?? 0,
+        last_event_ts: response.last_event_ts ?? null,
+      };
+    } catch (error) {
+      return {
+        enabled: false,
+        error: error.message,
+      };
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Predefined Effects Library API
+  // -------------------------------------------------------------------------
+
+  /**
+   * Play a predefined effect by name.
+   * @param {string} effectName - Name of the effect to play
+   */
+  async playEffect(effectName) {
+    try {
+      const response = await this.sendCommand("play_effect", {
+        effect_name: effectName,
+      });
+      return {
+        success: response.success ?? false,
+        error: response.message,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * List all available predefined effects.
+   * Returns effects organized by category.
+   */
+  async listEffects() {
+    try {
+      const response = await this.sendCommand("list_effects");
+      return {
+        success: true,
+        effects: response.effects ?? [],
+        categories: response.categories ?? [],
+      };
+    } catch (error) {
+      return {
+        success: false,
+        effects: [],
+        categories: [],
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Stop any currently playing effect (emergency stop).
+   */
+  async stopEffect() {
+    try {
+      await this.sendCommand("stop_effect");
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
 }
 
 // Singleton instance

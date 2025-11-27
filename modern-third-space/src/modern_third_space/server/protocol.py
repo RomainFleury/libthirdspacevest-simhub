@@ -49,6 +49,10 @@ class CommandType(Enum):
     SUPERHOT_START = "superhot_start"
     SUPERHOT_STOP = "superhot_stop"
     SUPERHOT_STATUS = "superhot_status"
+    # Predefined effects
+    PLAY_EFFECT = "play_effect"
+    LIST_EFFECTS = "list_effects"
+    STOP_EFFECT = "stop_effect"
 
 
 class EventType(Enum):
@@ -78,6 +82,9 @@ class EventType(Enum):
     ALYX_GAME_EVENT = "alyx_game_event"
     # SUPERHOT VR integration
     SUPERHOT_STARTED = "superhot_started"
+    # Predefined effects
+    EFFECT_STARTED = "effect_started"
+    EFFECT_COMPLETED = "effect_completed"
     SUPERHOT_STOPPED = "superhot_stopped"
     SUPERHOT_GAME_EVENT = "superhot_game_event"
 
@@ -102,6 +109,8 @@ class Command:
     event: Optional[str] = None  # Event name (death, pistol_recoil, etc.)
     hand: Optional[str] = None   # "left" or "right"
     priority: Optional[int] = None
+    # Predefined effects params
+    effect_name: Optional[str] = None  # Effect to play
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Command":
@@ -119,6 +128,7 @@ class Command:
             event=data.get("event"),
             hand=data.get("hand"),
             priority=data.get("priority"),
+            effect_name=data.get("effect_name"),
         )
     
     @classmethod
@@ -162,6 +172,8 @@ class Event:
     params: Optional[Dict[str, Any]] = None  # For alyx_game_event params
     # SUPERHOT VR info
     hand: Optional[str] = None  # "left" or "right" for hand-specific events
+    # Predefined effects info
+    effect_name: Optional[str] = None  # Name of effect being played/completed
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary, excluding None values."""
@@ -205,6 +217,9 @@ class Response:
     # Half-Life: Alyx response
     log_path: Optional[str] = None
     mod_info: Optional[Dict[str, Any]] = None
+    # Predefined effects response
+    effects: Optional[List[Dict[str, Any]]] = None
+    categories: Optional[List[str]] = None
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary, excluding None values."""
@@ -495,5 +510,51 @@ def response_superhot_status(
         running=enabled,
         events_received=events_received,
         last_event_ts=last_event_ts,
+    )
+
+
+# -------------------------------------------------------------------------
+# Predefined Effects events and responses
+# -------------------------------------------------------------------------
+
+def event_effect_started(effect_name: str) -> Event:
+    """Event when an effect starts playing."""
+    return Event(
+        event=EventType.EFFECT_STARTED.value,
+        effect_name=effect_name,
+    )
+
+def event_effect_completed(effect_name: str) -> Event:
+    """Event when an effect finishes playing."""
+    return Event(
+        event=EventType.EFFECT_COMPLETED.value,
+        effect_name=effect_name,
+    )
+
+def response_play_effect(
+    success: bool,
+    effect_name: Optional[str] = None,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to play_effect command."""
+    return Response(
+        response="play_effect",
+        req_id=req_id,
+        success=success,
+        message=error,
+    )
+
+def response_list_effects(
+    effects: List[Dict[str, Any]],
+    categories: List[str],
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to list_effects command with all available effects."""
+    return Response(
+        response="list_effects",
+        req_id=req_id,
+        effects=effects,
+        categories=categories,
     )
 

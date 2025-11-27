@@ -19,7 +19,7 @@ import logging
 import signal
 from typing import Any, Dict, Optional
 
-from ..vest import VestController, VestStatus, list_devices
+from ..vest import VestController, VestStatus, list_devices, get_effect, all_effects_to_dict, effect_to_dict
 from .client_manager import Client, ClientManager
 from .protocol import (
     Command,
@@ -62,6 +62,11 @@ from .protocol import (
     event_superhot_stopped,
     event_superhot_game_event,
     response_superhot_status,
+    # Predefined effects
+    event_effect_started,
+    event_effect_completed,
+    response_play_effect,
+    response_list_effects,
 )
 
 logger = logging.getLogger(__name__)
@@ -307,6 +312,16 @@ class VestDaemon:
         
         if cmd_type == CommandType.SUPERHOT_STATUS:
             return await self._cmd_superhot_status(command)
+        
+        # Predefined effects commands
+        if cmd_type == CommandType.PLAY_EFFECT:
+            return await self._cmd_play_effect(command)
+        
+        if cmd_type == CommandType.LIST_EFFECTS:
+            return await self._cmd_list_effects(command)
+        
+        if cmd_type == CommandType.STOP_EFFECT:
+            return await self._cmd_stop_effect(command)
         
         return response_error(f"Command not implemented: {command.cmd}", command.req_id)
     
@@ -774,6 +789,110 @@ class VestDaemon:
                 self._clients.broadcast(event),
                 self._loop,
             )
+    
+    # -------------------------------------------------------------------------
+    # Predefined Effects command handlers
+    # -------------------------------------------------------------------------
+    
+    async def _cmd_play_effect(self, command: Command) -> Response:
+        """
+        Play a predefined effect.
+        
+        The effect will run asynchronously, triggering cells according to
+        its step pattern.
+        """
+        if not command.effect_name:
+            return response_error("Missing effect_name", command.req_id)
+        
+        effect = get_effect(command.effect_name)
+        if effect is None:
+            return response_error(f"Unknown effect: {command.effect_name}", command.req_id)
+        
+        # Check if we have a device
+        if self._selected_device is None:
+            return response_error("No device selected", command.req_id)
+        
+        # Auto-connect if needed
+        if self._controller is None or not self._controller.status().connected:
+            self._controller = VestController()
+            status = self._controller.connect_to_device({
+                "bus": self._selected_device.get("bus"),
+                "address": self._selected_device.get("address"),
+            })
+            if not status.connected:
+                return response_error("Failed to connect to vest", command.req_id)
+        
+        # Start the effect playback in background
+        asyncio.create_task(self._play_effect_sequence(effect))
+        
+        return response_play_effect(
+            success=True,
+            effect_name=command.effect_name,
+            req_id=command.req_id,
+        )
+    
+    async def _play_effect_sequence(self, effect) -> None:
+        """
+        Play an effect's step sequence.
+        
+        This runs asynchronously, triggering cells according to the effect's
+        timing pattern.
+        """
+        from ..vest.effects import Effect
+        
+        # Broadcast effect started
+        await self._clients.broadcast(event_effect_started(effect.name))
+        
+        try:
+            for step in effect.steps:
+                # Trigger all cells in this step
+                for cell in step.cells:
+                    if self._controller is not None:
+                        self._controller.trigger_effect(cell, step.speed)
+                    # Broadcast individual trigger
+                    await self._clients.broadcast(event_effect_triggered(cell, step.speed))
+                
+                # Wait for step duration
+                await asyncio.sleep(step.duration_ms / 1000.0)
+                
+                # Stop cells (speed 0)
+                for cell in step.cells:
+                    if self._controller is not None:
+                        self._controller.trigger_effect(cell, 0)
+                
+                # Wait for delay before next step
+                if step.delay_ms > 0:
+                    await asyncio.sleep(step.delay_ms / 1000.0)
+        
+        finally:
+            # Broadcast effect completed
+            await self._clients.broadcast(event_effect_completed(effect.name))
+    
+    async def _cmd_list_effects(self, command: Command) -> Response:
+        """
+        List all available predefined effects.
+        
+        Returns effects organized by category.
+        """
+        effects_data = all_effects_to_dict()
+        return response_list_effects(
+            effects=effects_data["effects"],
+            categories=effects_data["categories"],
+            req_id=command.req_id,
+        )
+    
+    async def _cmd_stop_effect(self, command: Command) -> Response:
+        """
+        Stop all cells (emergency stop for effects).
+        
+        This stops all cells immediately.
+        """
+        if self._controller is not None:
+            for cell in range(8):
+                self._controller.trigger_effect(cell, 0)
+        
+        await self._clients.broadcast(event_all_stopped())
+        return response_ok(command.req_id)
 
 
 def run_daemon(
