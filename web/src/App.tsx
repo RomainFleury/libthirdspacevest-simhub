@@ -7,7 +7,7 @@ import { AlyxIntegrationPanel } from "./components/AlyxIntegrationPanel";
 import { SuperHotIntegrationPanel } from "./components/SuperHotIntegrationPanel";
 import { useVestDebugger } from "./hooks/useVestDebugger";
 // @ts-ignore-next-line
-import vestLogo from "./assets/vest-logo-color.png";
+import vestLogo from "./assets/round-icon-small.png";
 
 function App() {
   const {

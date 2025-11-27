@@ -33,8 +33,8 @@ function getDaemonBridgeInstance() {
 
 function getIconPath() {
   return isDev
-    ? path.join(__dirname, "..", "src", "assets", "vest-logo-color.png")
-    : path.join(process.cwd(), "dist", "vest-logo-color.png");
+    ? path.join(__dirname, "..", "src", "assets", "round-icon-small.png")
+    : path.join(process.cwd(), "dist", "round-icon-small.png");
 }
 
 async function createWindow() {
