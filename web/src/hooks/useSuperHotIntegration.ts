@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { onDaemonEvent } from '../lib/bridgeApi';
 
 interface SuperHotStatus {
   enabled: boolean;
@@ -85,7 +84,8 @@ export function useSuperHotIntegration() {
 
   // Subscribe to daemon events
   useEffect(() => {
-    const unsubscribe = onDaemonEvent((event) => {
+    // @ts-ignore - window.vestBridge
+    const unsubscribe = window.vestBridge?.onDaemonEvent?.((event: { event: string; event_type?: string; hand?: string; ts?: number }) => {
       // Handle SuperHot events
       if (event.event === 'superhot_game_event') {
         const gameEvent: SuperHotGameEvent = {
