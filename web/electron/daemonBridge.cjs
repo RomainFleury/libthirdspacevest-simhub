@@ -698,6 +698,53 @@ class DaemonBridge extends EventEmitter {
     }
   }
 
+  // Pistol Whip Integration API
+  // -------------------------------------------------------------------------
+
+  /**
+   * Enable Pistol Whip integration.
+   */
+  async pistolwhipStart() {
+    try {
+      await this.sendCommand("pistolwhip_start");
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Disable Pistol Whip integration.
+   */
+  async pistolwhipStop() {
+    try {
+      await this.sendCommand("pistolwhip_stop");
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Get Pistol Whip integration status.
+   */
+  async pistolwhipStatus() {
+    try {
+      const response = await this.sendCommand("pistolwhip_status");
+      return {
+        enabled: response.running ?? false,
+        events_received: response.events_received ?? 0,
+        last_event_ts: response.last_event_ts ?? null,
+        last_event_type: response.last_event_type ?? null,
+      };
+    } catch (error) {
+      return {
+        enabled: false,
+        error: error.message,
+      };
+    }
+  }
+
   // -------------------------------------------------------------------------
   // Predefined Effects Library API
   // -------------------------------------------------------------------------

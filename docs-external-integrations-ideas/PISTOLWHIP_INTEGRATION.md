@@ -1,8 +1,9 @@
 # Pistol Whip Integration Plan
 
-> **Status: 📋 PLANNED**
+> **Status: 🚀 IN PROGRESS**
 >
 > Integration strategy for Pistol Whip using MelonLoader mod framework.
+> **Reusing existing bHaptics/OWO mods** - adapting their Harmony patches to our daemon.
 > Very similar to SuperHot VR - same engine, same mod framework.
 
 ## Overview
@@ -271,11 +272,12 @@ The game supports dual wielding, so:
 
 ## Next Steps
 
-1. [ ] **Phase 1**: Create C# mod (fork SuperHot mod structure)
-2. [ ] **Phase 2**: Add `pistolwhip_manager.py` to daemon
-3. [ ] **Phase 3**: Create Electron UI panel
-4. [ ] **Phase 4**: Test and tune for rhythm gameplay
-5. [ ] **Phase 5**: Package and document
+1. [x] **Phase 1**: Create C# mod (adapted from SUPERHOT, reused bHaptics/OWO Harmony patches)
+2. [x] **Phase 2**: Add `pistolwhip_manager.py` to daemon
+3. [x] **Phase 3**: Add protocol commands and handlers
+4. [ ] **Phase 4**: Create Electron UI panel (optional)
+5. [ ] **Phase 5**: Test and tune for rhythm gameplay
+6. [ ] **Phase 6**: Package and document
 
 ## Estimated Effort
 
@@ -289,7 +291,28 @@ The game supports dual wielding, so:
 
 ---
 
-**Document Status:** Planning complete  
+**Document Status:** ✅ Implementation complete (Phases 1-3)  
 **Based on:** bHaptics v1.5.0 and OWO v3.0.2 source analysis  
-**Next Action:** Implement Phase 1 (C# MelonLoader mod)
+**Implementation:** Successfully reused existing mods' Harmony patches, replaced SDK calls with TCP daemon client
+
+## Implementation Summary
+
+✅ **Mod Created**: `pistolwhip-mod/ThirdSpace_PistolWhip/`
+- Reused Harmony patches from bHaptics/OWO mods
+- Replaced SDK calls with TCP daemon client (same pattern as SUPERHOT)
+- Handles all major events: gun fire, shotgun fire, reload (hip/shoulder), melee, player hit, death, low health, healing
+- **NEW**: Empty gun fire detection (subtle click feedback when trying to fire with no ammo)
+- Build script: `pistolwhip-mod/build.ps1`
+
+✅ **Python Daemon**: `modern-third-space/src/modern_third_space/server/pistolwhip_manager.py`
+- Event processor with haptic mappings
+- Handles hand-specific events (left/right)
+- Maps to 8-cell vest layout
+- Supports all event types including empty gun fire
+
+✅ **Protocol**: Added `pistolwhip_event`, `pistolwhip_start`, `pistolwhip_stop`, `pistolwhip_status` commands
+
+✅ **Build System**: Integrated into unified `build-all-mods.ps1` script
+
+**Next Action:** Test the mod in-game and tune haptic intensities for rhythm gameplay
 

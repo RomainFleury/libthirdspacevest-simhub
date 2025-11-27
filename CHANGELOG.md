@@ -10,6 +10,43 @@ This file helps AI assistants quickly understand recent project evolution.
 
 ### Added
 
+- **Pistol Whip Integration** - Complete MelonLoader mod integration for Pistol Whip
+  - Reused existing bHaptics/OWO mod Harmony patches, adapted for Third Space Vest daemon
+  - **Mod Features**:
+    - Gun fire (pistol & shotgun) with hand-specific recoil feedback
+    - Reload detection (hip & shoulder) with position-specific haptics
+    - Melee hit detection with hand-specific impact feedback
+    - Player hit detection (chest impact when getting shot)
+    - Death detection (full body pulse)
+    - Low health heartbeat pulse
+    - Healing feedback (warmth spread)
+    - Empty gun fire detection (subtle click feedback)
+  - **Mod Files**: `pistolwhip-mod/ThirdSpace_PistolWhip/` (C# MelonLoader project)
+    - `ThirdSpace_PistolWhip.cs`: Main mod with Harmony patches
+    - `DaemonClient.cs`: TCP client for daemon communication (reused from SUPERHOT)
+  - **Python Manager**: `server/pistolwhip_manager.py`
+    - Processes all Pistol Whip game events
+    - Hand-specific cell mapping (left/right)
+    - Intensity scaling (shotgun stronger than pistol)
+  - **Daemon Protocol**: Added `pistolwhip_event`, `pistolwhip_start`, `pistolwhip_stop`, `pistolwhip_status` commands
+  - **Electron UI**: Complete integration panel with live event log
+    - Status display (enabled/disabled, events received)
+    - Enable/disable controls
+    - Real-time event feed with icons
+    - Mod installation instructions
+  - **Build System**: 
+    - `pistolwhip-mod/build.ps1` - Individual mod build script
+    - Integrated into unified `build-all-mods.ps1` script
+  - **Documentation**: `docs-external-integrations-ideas/PISTOLWHIP_INTEGRATION.md`
+  - **Status**: Complete and ready for testing
+
+- **Unified Build Script** - `build-all-mods.ps1` for building all mods
+  - Builds SUPERHOT VR, GTA V, Pistol Whip, and SimHub plugin
+  - Supports selective builds (`-Mods superhot,gta5`)
+  - Auto-detects MSBuild and checks prerequisites
+  - Uses mod-specific build scripts when available
+  - **Documentation**: `BUILD.md` with usage examples
+
 - **GTA V Integration (Phase 1)** - Script Hook V .NET mod for Grand Theft Auto V
   - Player damage detection with directional haptic feedback (angle-based cell mapping)
   - Player death detection with full vest pulse (all cells, max intensity)

@@ -64,6 +64,11 @@ contextBridge.exposeInMainWorld("vestBridge", {
   superhotStop: () => ipcRenderer.invoke("superhot:stop"),
   superhotStatus: () => ipcRenderer.invoke("superhot:status"),
 
+  // Pistol Whip Integration API
+  pistolwhipStart: () => ipcRenderer.invoke("pistolwhip:start"),
+  pistolwhipStop: () => ipcRenderer.invoke("pistolwhip:stop"),
+  pistolwhipStatus: () => ipcRenderer.invoke("pistolwhip:status"),
+
   // Predefined Effects Library API
   playEffect: (effectName) => ipcRenderer.invoke("effects:play", effectName),
   listEffectsLibrary: () => ipcRenderer.invoke("effects:list"),

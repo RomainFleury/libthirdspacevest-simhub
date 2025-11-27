@@ -7,6 +7,7 @@ import { StatusPanel } from "./components/StatusPanel";
 import { CS2IntegrationPanel } from "./components/CS2IntegrationPanel";
 import { AlyxIntegrationPanel } from "./components/AlyxIntegrationPanel";
 import { SuperHotIntegrationPanel } from "./components/SuperHotIntegrationPanel";
+import { PistolWhipIntegrationPanel } from "./components/PistolWhipIntegrationPanel";
 import { useVestDebugger } from "./hooks/useVestDebugger";
 // @ts-ignore-next-line
 import vestLogo from "./assets/round-icon-small.png";
@@ -83,6 +84,7 @@ function App() {
           <CS2IntegrationPanel />
           <AlyxIntegrationPanel />
           <SuperHotIntegrationPanel />
+          <PistolWhipIntegrationPanel />
         </div>
 
         <LogPanel logs={logs} />

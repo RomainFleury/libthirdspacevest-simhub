@@ -54,6 +54,11 @@ class CommandType(Enum):
     GTAV_START = "gtav_start"
     GTAV_STOP = "gtav_stop"
     GTAV_STATUS = "gtav_status"
+    # Pistol Whip integration
+    PISTOLWHIP_EVENT = "pistolwhip_event"
+    PISTOLWHIP_START = "pistolwhip_start"
+    PISTOLWHIP_STOP = "pistolwhip_stop"
+    PISTOLWHIP_STATUS = "pistolwhip_status"
     # Predefined effects
     PLAY_EFFECT = "play_effect"
     LIST_EFFECTS = "list_effects"
@@ -93,6 +98,10 @@ class EventType(Enum):
     GTAV_STARTED = "gtav_started"
     GTAV_STOPPED = "gtav_stopped"
     GTAV_GAME_EVENT = "gtav_game_event"
+    # Pistol Whip integration
+    PISTOLWHIP_STARTED = "pistolwhip_started"
+    PISTOLWHIP_STOPPED = "pistolwhip_stopped"
+    PISTOLWHIP_GAME_EVENT = "pistolwhip_game_event"
     # Predefined effects
     EFFECT_STARTED = "effect_started"
     EFFECT_COMPLETED = "effect_completed"
@@ -569,6 +578,57 @@ def response_gtav_status(
     """Response to gtav_status command."""
     return Response(
         response="gtav_status",
+        req_id=req_id,
+        running=enabled,
+        events_received=events_received,
+        last_event_ts=last_event_ts,
+        last_event_type=last_event_type,
+    )
+
+
+# -------------------------------------------------------------------------
+# Pistol Whip events and responses
+# -------------------------------------------------------------------------
+
+def event_pistolwhip_started() -> Event:
+    """Event when Pistol Whip integration starts."""
+    return Event(
+        event=EventType.PISTOLWHIP_STARTED.value,
+    )
+
+def event_pistolwhip_stopped() -> Event:
+    """Event when Pistol Whip integration stops."""
+    return Event(
+        event=EventType.PISTOLWHIP_STOPPED.value,
+    )
+
+def event_pistolwhip_game_event(
+    event_type: str,
+    hand: Optional[str] = None,
+) -> Event:
+    """
+    Pistol Whip game event (gun_fire, shotgun_fire, melee_hit, etc.).
+    
+    Args:
+        event_type: Type of event ("gun_fire", "shotgun_fire", "melee_hit", etc.)
+        hand: "left" or "right" for hand-specific events, None otherwise
+    """
+    return Event(
+        event=EventType.PISTOLWHIP_GAME_EVENT.value,
+        event_type=event_type,
+        hand=hand,
+    )
+
+def response_pistolwhip_status(
+    enabled: bool,
+    events_received: int = 0,
+    last_event_ts: Optional[float] = None,
+    last_event_type: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to pistolwhip_status command."""
+    return Response(
+        response="pistolwhip_status",
         req_id=req_id,
         running=enabled,
         events_received=events_received,

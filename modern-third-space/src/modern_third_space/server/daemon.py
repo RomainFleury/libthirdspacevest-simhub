@@ -51,6 +51,7 @@ from .cs2_manager import CS2Manager, generate_cs2_config
 from .alyx_manager import AlyxManager, get_mod_info as get_alyx_mod_info
 from .superhot_manager import SuperHotManager
 from .gtav_manager import GTAVManager
+from .pistolwhip_manager import PistolWhipManager
 from .protocol import (
     event_alyx_started,
     event_alyx_stopped,
@@ -67,6 +68,10 @@ from .protocol import (
     event_gtav_stopped,
     event_gtav_game_event,
     response_gtav_status,
+    event_pistolwhip_started,
+    event_pistolwhip_stopped,
+    event_pistolwhip_game_event,
+    response_pistolwhip_status,
     # Predefined effects
     event_effect_started,
     event_effect_completed,
@@ -122,6 +127,10 @@ class VestDaemon:
         self._gtav_manager = GTAVManager()
         self._gtav_manager.set_event_callback(self._on_gtav_game_event)
         self._gtav_manager.set_trigger_callback(self._on_gtav_trigger)
+        
+        self._pistolwhip_manager = PistolWhipManager()
+        self._pistolwhip_manager.set_event_callback(self._on_pistolwhip_game_event)
+        self._pistolwhip_manager.set_trigger_callback(self._on_pistolwhip_trigger)
         
         self._loop: Optional[asyncio.AbstractEventLoop] = None
     
@@ -334,6 +343,19 @@ class VestDaemon:
         
         if cmd_type == CommandType.GTAV_STATUS:
             return await self._cmd_gtav_status(command)
+        
+        # Pistol Whip commands
+        if cmd_type == CommandType.PISTOLWHIP_EVENT:
+            return await self._cmd_pistolwhip_event(command)
+        
+        if cmd_type == CommandType.PISTOLWHIP_START:
+            return await self._cmd_pistolwhip_start(command)
+        
+        if cmd_type == CommandType.PISTOLWHIP_STOP:
+            return await self._cmd_pistolwhip_stop(command)
+        
+        if cmd_type == CommandType.PISTOLWHIP_STATUS:
+            return await self._cmd_pistolwhip_status(command)
         
         # Predefined effects commands
         if cmd_type == CommandType.PLAY_EFFECT:
@@ -812,6 +834,86 @@ class VestDaemon:
             last_event_ts=status["last_event_ts"],
             last_event_type=status.get("last_event_type"),
             req_id=command.req_id,
+        )
+    
+    # -------------------------------------------------------------------------
+    # Pistol Whip command handlers
+    # -------------------------------------------------------------------------
+    
+    async def _cmd_pistolwhip_event(self, command: Command) -> Response:
+        """
+        Process a Pistol Whip game event from the MelonLoader mod.
+        
+        This is the main entry point for events from the game.
+        """
+        if not command.event:
+            return response_error("Missing event name", command.req_id)
+        
+        success = self._pistolwhip_manager.process_event(
+            event_name=command.event,
+            hand=command.hand,
+            priority=command.priority or 0,
+        )
+        
+        if success:
+            return response_ok(command.req_id)
+        else:
+            return response_error(f"Failed to process event: {command.event}", command.req_id)
+    
+    async def _cmd_pistolwhip_start(self, command: Command) -> Response:
+        """Enable Pistol Whip event processing."""
+        self._pistolwhip_manager.enable()
+        await self._clients.broadcast(event_pistolwhip_started())
+        return response_ok(command.req_id)
+    
+    async def _cmd_pistolwhip_stop(self, command: Command) -> Response:
+        """Disable Pistol Whip event processing."""
+        self._pistolwhip_manager.disable()
+        await self._clients.broadcast(event_pistolwhip_stopped())
+        return response_ok(command.req_id)
+    
+    async def _cmd_pistolwhip_status(self, command: Command) -> Response:
+        """Get Pistol Whip integration status."""
+        status = self._pistolwhip_manager.get_status()
+        return response_pistolwhip_status(
+            enabled=status["enabled"],
+            events_received=status["events_received"],
+            last_event_ts=status["last_event_ts"],
+            last_event_type=status.get("last_event_type"),
+            req_id=command.req_id,
+        )
+    
+    # -------------------------------------------------------------------------
+    # Pistol Whip callbacks
+    # -------------------------------------------------------------------------
+    
+    def _on_pistolwhip_game_event(self, event_type: str, event_name: str, hand: Optional[str]):
+        """
+        Called when Pistol Whip manager processes a game event.
+        
+        Broadcasts the event to all connected clients for UI display.
+        """
+        if self._loop is None:
+            return
+        
+        event = event_pistolwhip_game_event(event_name, hand)
+        asyncio.run_coroutine_threadsafe(
+            self._clients.broadcast(event),
+            self._loop,
+        )
+    
+    def _on_pistolwhip_trigger(self, cell: int, speed: int):
+        """
+        Called when Pistol Whip manager wants to trigger a haptic effect.
+        
+        Routes the trigger command to the selected vest device.
+        """
+        if self._loop is None:
+            return
+        
+        asyncio.run_coroutine_threadsafe(
+            self._cmd_trigger(Command(cmd="trigger", cell=cell, speed=speed)),
+            self._loop,
         )
     
     # -------------------------------------------------------------------------
