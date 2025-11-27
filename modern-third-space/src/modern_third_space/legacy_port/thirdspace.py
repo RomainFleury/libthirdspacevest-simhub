@@ -201,8 +201,10 @@ class ThirdSpaceVest:
         # it fall through and post a message right now.
         try:
             self.tsv_device.detach_kernel_driver(0)
-        except usb.core.USBError:
-            print("Probably already detached, continuing")
+        except (usb.core.USBError, NotImplementedError):
+            # On Windows, detach_kernel_driver raises NotImplementedError
+            # On other platforms, it may raise USBError if already detached
+            pass
 
         self.tsv_device.set_configuration(1)
         return True
@@ -229,7 +231,8 @@ class ThirdSpaceVest:
         command = [chr(x) for x in command]
 
         # Send command, return value
-        return self.tsv_device.write(self.DEVICE_EP['out'], list(map(ord, command)), 0, 100)
+        # PyUSB 1.0+ API: write(endpoint, data, timeout=None)
+        return self.tsv_device.write(self.DEVICE_EP['out'], list(map(ord, command)), timeout=100)
 
     def read(self, size=64):
         """Reads in the requested amount of bytes
@@ -237,7 +240,8 @@ class ThirdSpaceVest:
 
         Returns list of bytes read.
         """
-        return self.tsv_device.read(self.DEVICE_EP['in'], size, 0, 100)
+        # PyUSB 1.0+ API: read(endpoint, size, timeout=None)
+        return self.tsv_device.read(self.DEVICE_EP['in'], size, timeout=100)
 
     def form_checksum(self, index, speed):
         """Returns a nybble based CRC8 of the index and speed"""

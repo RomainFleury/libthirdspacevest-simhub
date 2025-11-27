@@ -37,9 +37,28 @@ if %ERRORLEVEL% neq 0 (
 echo [OK] Node.js and Python found
 echo.
 
+:: Add libusb DLL to PATH for PyUSB (find it in Python's site-packages)
+for /f "tokens=*" %%i in ('%PYTHON_CMD% -c "import sys; print(sys.prefix)"') do set "PYTHON_PREFIX=%%i"
+set "LIBUSB_PATH=%PYTHON_PREFIX%\Lib\site-packages\libusb\_platform\_windows\x64"
+if exist "%LIBUSB_PATH%\libusb-1.0.dll" (
+    set "PATH=%LIBUSB_PATH%;%PATH%"
+    echo [OK] libusb DLL found
+) else (
+    echo [WARN] libusb DLL not found - USB devices may not be detected
+)
+echo.
+
+:: Create a temporary script for the daemon (avoids quoting issues)
+set "DAEMON_SCRIPT=%TEMP%\start-vest-daemon.bat"
+echo @echo off > "%DAEMON_SCRIPT%"
+echo set "PATH=%LIBUSB_PATH%;%%PATH%%" >> "%DAEMON_SCRIPT%"
+echo cd /d "%~dp0..\modern-third-space\src" >> "%DAEMON_SCRIPT%"
+echo %PYTHON_CMD% -m modern_third_space.cli daemon start --port 5050 >> "%DAEMON_SCRIPT%"
+echo pause >> "%DAEMON_SCRIPT%"
+
 :: Start the Python daemon in a new window
 echo [..] Starting Python daemon...
-start "Third Space Vest Daemon" cmd /k "cd /d "%~dp0..\modern-third-space\src" && %PYTHON_CMD% -m modern_third_space.cli daemon start --port 5050"
+start "Third Space Vest Daemon" cmd /k ""%DAEMON_SCRIPT%""
 
 :: Wait a moment for daemon to start
 echo [..] Waiting for daemon to initialize...
