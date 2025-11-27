@@ -191,3 +191,6 @@ simhub-plugin/**/*.suo
 simhub-plugin/**/*.user
 simhub-plugin/**/*.userosscache
 simhub-plugin/**/*.sln.docstates
+misc-documentations/bhaptics-svg-24-nov/mordhau/exampleMod/heartbeatmod/HeartbeatModWindowsClient.pak
+misc-documentations/bhaptics-svg-24-nov/mordhau/modManager/autoloaderwindowsclient/AutoLoaderWindowsClient.pak
+/misc-documentations/bhaptics-svg-24-nov/mordhau/Mods
