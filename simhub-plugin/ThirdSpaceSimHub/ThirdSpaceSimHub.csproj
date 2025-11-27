@@ -47,13 +47,15 @@
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Xml" />
     <Reference Include="WindowsBase" />
-    <!-- SimHub SDK References - User must copy from SimHub installation -->
+    <!-- SimHub SDK References - Try libs folder first, then SIMHUB_PATH -->
     <Reference Include="GameReaderCommon">
-      <HintPath>$(SIMHUB_PATH)\GameReaderCommon.dll</HintPath>
+      <HintPath Condition="Exists('..\libs\GameReaderCommon.dll')">..\libs\GameReaderCommon.dll</HintPath>
+      <HintPath Condition="!Exists('..\libs\GameReaderCommon.dll')">$(SIMHUB_PATH)\GameReaderCommon.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="SimHub.Plugins">
-      <HintPath>$(SIMHUB_PATH)\SimHub.Plugins.dll</HintPath>
+      <HintPath Condition="Exists('..\libs\SimHub.Plugins.dll')">..\libs\SimHub.Plugins.dll</HintPath>
+      <HintPath Condition="!Exists('..\libs\SimHub.Plugins.dll')">$(SIMHUB_PATH)\SimHub.Plugins.dll</HintPath>
       <Private>False</Private>
     </Reference>
   </ItemGroup>

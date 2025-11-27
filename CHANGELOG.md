@@ -10,6 +10,26 @@ This file helps AI assistants quickly understand recent project evolution.
 
 ### Added
 
+- **GTA V Integration (Phase 1)** - Script Hook V .NET mod for Grand Theft Auto V
+  - Player damage detection with directional haptic feedback (angle-based cell mapping)
+  - Player death detection with full vest pulse (all cells, max intensity)
+  - Damage intensity scaling (damage amount → haptic speed 1-10)
+  - TCP client connects to Python daemon (port 5050)
+  - Auto-connect on mod startup with in-game connection status notifications
+  - **Mod Files**: `gta5-mod/ThirdSpaceGTAV/` (C# Script Hook V .NET project)
+    - `ThirdSpaceGTAV.cs`: Main mod entry point
+    - `DaemonClient.cs`: TCP client for daemon communication
+    - `EventHooks.cs`: Player damage/death detection
+    - `HapticMapper.cs`: Angle-to-cells and damage-to-intensity mapping
+  - **Python Manager**: `server/gtav_manager.py`
+    - Processes `player_damage` and `player_death` events
+    - Maps damage angles (0-360°) to directional vest cells
+    - Scales intensity based on damage amount
+  - **Daemon Protocol**: Added `gtav_event`, `gtav_start`, `gtav_stop`, `gtav_status` commands
+  - **Build System**: `build.ps1` script for automated building
+  - **Documentation**: `docs-external-integrations-ideas/GTAV_INTEGRATION.md` (strategy and setup guide)
+  - **Status**: Phase 1 complete (damage/death). Vehicle events deferred to Phase 2.
+
 - **Effects Library** - Predefined haptic patterns from TN Games SDK
   - 28 effects across 5 categories: Weapons, Impacts, Melee, Driving, Special
   - `vest/effects.py`: Effect pattern definitions using `HapticEffect` dataclass
@@ -193,5 +213,7 @@ After (Daemon-based):
 - [x] ~~SUPERHOT VR integration~~ ✅ Done
 - [x] ~~Half-Life: Alyx integration~~ ✅ Done
 - [x] ~~Effect patterns/presets system~~ ✅ Done (Effects Library)
+- [x] ~~GTA V integration (Phase 1)~~ ✅ Done (damage/death)
+- [ ] GTA V Phase 2: Vehicle events (crashes, G-forces, acceleration/braking)
 - [ ] Daemon auto-start from Electron
 - [ ] Pistol Whip integration (planned)

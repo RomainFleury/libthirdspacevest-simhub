@@ -50,6 +50,7 @@ from .protocol import (
 from .cs2_manager import CS2Manager, generate_cs2_config
 from .alyx_manager import AlyxManager, get_mod_info as get_alyx_mod_info
 from .superhot_manager import SuperHotManager
+from .gtav_manager import GTAVManager
 from .protocol import (
     event_alyx_started,
     event_alyx_stopped,
@@ -62,6 +63,10 @@ from .protocol import (
     event_superhot_stopped,
     event_superhot_game_event,
     response_superhot_status,
+    event_gtav_started,
+    event_gtav_stopped,
+    event_gtav_game_event,
+    response_gtav_status,
     # Predefined effects
     event_effect_started,
     event_effect_completed,
@@ -113,6 +118,10 @@ class VestDaemon:
         self._superhot_manager = SuperHotManager()
         self._superhot_manager.set_event_callback(self._on_superhot_game_event)
         self._superhot_manager.set_trigger_callback(self._on_superhot_trigger)
+        
+        self._gtav_manager = GTAVManager()
+        self._gtav_manager.set_event_callback(self._on_gtav_game_event)
+        self._gtav_manager.set_trigger_callback(self._on_gtav_trigger)
         
         self._loop: Optional[asyncio.AbstractEventLoop] = None
     
@@ -312,6 +321,19 @@ class VestDaemon:
         
         if cmd_type == CommandType.SUPERHOT_STATUS:
             return await self._cmd_superhot_status(command)
+        
+        # GTA V commands
+        if cmd_type == CommandType.GTAV_EVENT:
+            return await self._cmd_gtav_event(command)
+        
+        if cmd_type == CommandType.GTAV_START:
+            return await self._cmd_gtav_start(command)
+        
+        if cmd_type == CommandType.GTAV_STOP:
+            return await self._cmd_gtav_stop(command)
+        
+        if cmd_type == CommandType.GTAV_STATUS:
+            return await self._cmd_gtav_status(command)
         
         # Predefined effects commands
         if cmd_type == CommandType.PLAY_EFFECT:
@@ -741,6 +763,88 @@ class VestDaemon:
             events_received=status["events_received"],
             last_event_ts=status["last_event_ts"],
             req_id=command.req_id,
+        )
+    
+    # -------------------------------------------------------------------------
+    # GTA V command handlers
+    # -------------------------------------------------------------------------
+    
+    async def _cmd_gtav_event(self, command: Command) -> Response:
+        """
+        Process a GTA V game event from the Script Hook V .NET mod.
+        
+        This is the main entry point for events from the game.
+        """
+        if not command.event:
+            return response_error("Missing event name", command.req_id)
+        
+        success = self._gtav_manager.process_event(
+            event_name=command.event,
+            angle=command.angle,
+            damage=command.damage,
+            health_remaining=command.health_remaining,
+            cause=command.cause,
+        )
+        
+        if success:
+            return response_ok(command.req_id)
+        else:
+            return response_error(f"Failed to process event: {command.event}", command.req_id)
+    
+    async def _cmd_gtav_start(self, command: Command) -> Response:
+        """Enable GTA V event processing."""
+        self._gtav_manager.enable()
+        await self._clients.broadcast(event_gtav_started())
+        return response_ok(command.req_id)
+    
+    async def _cmd_gtav_stop(self, command: Command) -> Response:
+        """Disable GTA V event processing."""
+        self._gtav_manager.disable()
+        await self._clients.broadcast(event_gtav_stopped())
+        return response_ok(command.req_id)
+    
+    async def _cmd_gtav_status(self, command: Command) -> Response:
+        """Get GTA V integration status."""
+        status = self._gtav_manager.get_status()
+        return response_gtav_status(
+            enabled=status["enabled"],
+            events_received=status["events_received"],
+            last_event_ts=status["last_event_ts"],
+            last_event_type=status.get("last_event_type"),
+            req_id=command.req_id,
+        )
+    
+    # -------------------------------------------------------------------------
+    # GTA V callbacks
+    # -------------------------------------------------------------------------
+    
+    def _on_gtav_game_event(self, event_type: str, params: Dict[str, Any]):
+        """
+        Called when GTA V manager processes a game event.
+        
+        Broadcasts the event to all connected clients for UI display.
+        """
+        if self._loop is None:
+            return
+        
+        event = event_gtav_game_event(params)
+        asyncio.run_coroutine_threadsafe(
+            self._clients.broadcast(event),
+            self._loop,
+        )
+    
+    def _on_gtav_trigger(self, cell: int, speed: int):
+        """
+        Called when GTA V manager wants to trigger a haptic effect.
+        
+        Routes the trigger command to the selected vest device.
+        """
+        if self._loop is None:
+            return
+        
+        asyncio.run_coroutine_threadsafe(
+            self._cmd_trigger(Command(cmd="trigger", cell=cell, speed=speed)),
+            self._loop,
         )
     
     # -------------------------------------------------------------------------

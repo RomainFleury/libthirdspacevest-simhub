@@ -49,6 +49,11 @@ class CommandType(Enum):
     SUPERHOT_START = "superhot_start"
     SUPERHOT_STOP = "superhot_stop"
     SUPERHOT_STATUS = "superhot_status"
+    # GTA V integration
+    GTAV_EVENT = "gtav_event"
+    GTAV_START = "gtav_start"
+    GTAV_STOP = "gtav_stop"
+    GTAV_STATUS = "gtav_status"
     # Predefined effects
     PLAY_EFFECT = "play_effect"
     LIST_EFFECTS = "list_effects"
@@ -82,11 +87,15 @@ class EventType(Enum):
     ALYX_GAME_EVENT = "alyx_game_event"
     # SUPERHOT VR integration
     SUPERHOT_STARTED = "superhot_started"
+    SUPERHOT_STOPPED = "superhot_stopped"
+    SUPERHOT_GAME_EVENT = "superhot_game_event"
+    # GTA V integration
+    GTAV_STARTED = "gtav_started"
+    GTAV_STOPPED = "gtav_stopped"
+    GTAV_GAME_EVENT = "gtav_game_event"
     # Predefined effects
     EFFECT_STARTED = "effect_started"
     EFFECT_COMPLETED = "effect_completed"
-    SUPERHOT_STOPPED = "superhot_stopped"
-    SUPERHOT_GAME_EVENT = "superhot_game_event"
 
 
 @dataclass
@@ -109,6 +118,11 @@ class Command:
     event: Optional[str] = None  # Event name (death, pistol_recoil, etc.)
     hand: Optional[str] = None   # "left" or "right"
     priority: Optional[int] = None
+    # GTA V params
+    angle: Optional[float] = None  # Damage angle in degrees
+    damage: Optional[float] = None  # Damage amount
+    health_remaining: Optional[float] = None  # Remaining health
+    cause: Optional[str] = None  # Death cause
     # Predefined effects params
     effect_name: Optional[str] = None  # Effect to play
     
@@ -128,6 +142,10 @@ class Command:
             event=data.get("event"),
             hand=data.get("hand"),
             priority=data.get("priority"),
+            angle=data.get("angle"),
+            damage=data.get("damage"),
+            health_remaining=data.get("health_remaining"),
+            cause=data.get("cause"),
             effect_name=data.get("effect_name"),
         )
     
@@ -510,6 +528,52 @@ def response_superhot_status(
         running=enabled,
         events_received=events_received,
         last_event_ts=last_event_ts,
+    )
+
+
+# -------------------------------------------------------------------------
+# GTA V events and responses
+# -------------------------------------------------------------------------
+
+def event_gtav_started() -> Event:
+    """Event when GTA V integration starts."""
+    return Event(
+        event=EventType.GTAV_STARTED.value,
+    )
+
+def event_gtav_stopped() -> Event:
+    """Event when GTA V integration stops."""
+    return Event(
+        event=EventType.GTAV_STOPPED.value,
+    )
+
+def event_gtav_game_event(params: Dict[str, Any]) -> Event:
+    """
+    GTA V game event (player_damage, player_death, etc.).
+    
+    Args:
+        params: Event parameters (angle, damage, health_remaining, cause, etc.)
+    """
+    return Event(
+        event=EventType.GTAV_GAME_EVENT.value,
+        **params,
+    )
+
+def response_gtav_status(
+    enabled: bool,
+    events_received: int = 0,
+    last_event_ts: Optional[float] = None,
+    last_event_type: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to gtav_status command."""
+    return Response(
+        response="gtav_status",
+        req_id=req_id,
+        running=enabled,
+        events_received=events_received,
+        last_event_ts=last_event_ts,
+        last_event_type=last_event_type,
     )
 
 
