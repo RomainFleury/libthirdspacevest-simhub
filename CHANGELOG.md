@@ -23,6 +23,19 @@ This file helps AI assistants quickly understand recent project evolution.
   - Updated CS2, Alyx, and SUPERHOT managers to use shared constants
   - **Docs**: See [`docs-external-integrations-ideas/CELL_MAPPING_AUDIT.md`](docs-external-integrations-ideas/CELL_MAPPING_AUDIT.md)
 
+### Fixed
+
+- **SUPERHOT VR IPC Handlers** - Fixed `sendCommand is not a function` error
+  - `superhotHandlers.cjs`: Use `getDaemonBridge()` and specific methods (`superhotStart()`, etc.)
+  - Was incorrectly trying to call non-existent `sendCommand()` method
+
+- **Effects Library IPC Handlers** - Fixed daemon instance timing
+  - `effectsHandlers.cjs`: Get daemon instance inside each handler, not at registration time
+
+- **useSuperHotIntegration Hook** - Fixed invalid import
+  - Removed non-existent `onDaemonEvent` import from `bridgeApi.ts`
+  - Use `window.vestBridge.onDaemonEvent` directly like other hooks
+
 ---
 
 ## 2025-11-26
