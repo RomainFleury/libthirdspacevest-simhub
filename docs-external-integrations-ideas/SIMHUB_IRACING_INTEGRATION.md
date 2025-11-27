@@ -293,11 +293,19 @@ Right turn → 1,3,5,7 (right side)
 3. Add enable/disable toggles
 4. Save/load user preferences
 
-### Phase 4: Daemon Integration (Optional)
+### Phase 4: Daemon Integration (N/A)
 
-1. Add `simhub_start`, `simhub_stop`, `simhub_status` daemon commands
-2. Add Electron UI panel for SimHub
-3. Status display showing SimHub connection
+~~1. Add `simhub_start`, `simhub_stop`, `simhub_status` daemon commands~~
+~~2. Add Electron UI panel for SimHub~~
+~~3. Status display showing SimHub connection~~
+
+**Note**: This phase was deemed unnecessary because SimHub manages the plugin lifecycle:
+- SimHub loads/unloads the plugin automatically
+- The plugin connects to daemon when SimHub runs a supported game
+- Unlike CS2/Alyx/SUPERHOT, we cannot control SimHub from our daemon
+- A status panel would only show "connected: yes/no" with limited value
+
+The integration works fully without daemon-side commands.
 
 ## Development Requirements
 
@@ -405,7 +413,7 @@ The SimHub plugin is complete and located in `simhub-plugin/`:
 - ✅ Phase 1: Core Plugin - `ThirdSpacePlugin.cs`
 - ✅ Phase 2: Effect Mapping - `TelemetryMapper.cs`
 - ✅ Phase 3: Settings UI - `SettingsView.xaml`
-- ⏳ Phase 4: Daemon Integration (optional, not yet implemented)
+- ⬚ Phase 4: Daemon Integration - N/A (SimHub manages plugin lifecycle, not needed)
 
 ### Building the Plugin
 
