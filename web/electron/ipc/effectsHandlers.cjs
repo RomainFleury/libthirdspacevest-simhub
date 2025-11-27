@@ -13,21 +13,22 @@ const { getDaemonBridge } = require("../daemonBridge.cjs");
  * Register IPC handlers for effects library.
  */
 function registerEffectsHandlers() {
-  const bridge = getDaemonBridge();
-
   // Play a predefined effect
   ipcMain.handle("effects:play", async (_event, effectName) => {
-    return bridge.playEffect(effectName);
+    const daemon = getDaemonBridge();
+    return await daemon.playEffect(effectName);
   });
 
   // List all available effects
   ipcMain.handle("effects:list", async () => {
-    return bridge.listEffects();
+    const daemon = getDaemonBridge();
+    return await daemon.listEffects();
   });
 
   // Stop all effects (emergency stop)
   ipcMain.handle("effects:stop", async () => {
-    return bridge.stopEffect();
+    const daemon = getDaemonBridge();
+    return await daemon.stopEffect();
   });
 }
 
