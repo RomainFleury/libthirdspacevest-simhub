@@ -256,18 +256,24 @@ public class DaemonClient
 ## Vest Cell Layout Reference
 
 ```
-  FRONT          BACK
-┌───┬───┐    ┌───┬───┐
-│ 0 │ 1 │    │ 4 │ 5 │  Upper
-├───┼───┤    ├───┼───┤
-│ 2 │ 3 │    │ 6 │ 7 │  Lower
-└───┴───┘    └───┴───┘
+      FRONT                    BACK
+  ┌─────┬─────┐          ┌─────┬─────┐
+  │  2  │  5  │  Upper   │  1  │  6  │
+  │ UL  │ UR  │          │ UL  │ UR  │
+  ├─────┼─────┤          ├─────┼─────┤
+  │  3  │  4  │  Lower   │  0  │  7  │
+  │ LL  │ LR  │          │ LL  │ LR  │
+  └─────┴─────┘          └─────┴─────┘
+    L     R                L     R
 
-Braking   → 0,1,2,3 (front)
-Accel     → 4,5,6,7 (back)
-Left turn → 0,2,4,6 (left side)
-Right turn → 1,3,5,7 (right side)
+Braking   → 2,5,3,4 (front cells)
+Accel     → 1,6,0,7 (back cells)
+Left turn → 2,3,1,0 (left side)
+Right turn → 5,4,6,7 (right side)
 ```
+
+> **Note**: Hardware cell indices from reverse engineering.
+> See `docs-external-integrations-ideas/CELL_MAPPING_AUDIT.md` for details.
 
 ## Implementation Plan
 

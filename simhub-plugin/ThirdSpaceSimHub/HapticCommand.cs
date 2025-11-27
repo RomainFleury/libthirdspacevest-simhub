@@ -7,13 +7,18 @@ namespace ThirdSpaceSimHub
     {
         /// <summary>
         /// Vest cell index (0-7).
-        /// Layout:
-        ///   FRONT          BACK
-        /// ┌───┬───┐    ┌───┬───┐
-        /// │ 0 │ 1 │    │ 4 │ 5 │  Upper
-        /// ├───┼───┤    ├───┼───┤
-        /// │ 2 │ 3 │    │ 6 │ 7 │  Lower
-        /// └───┴───┘    └───┴───┘
+        /// 
+        /// Hardware Layout (from reverse engineering):
+        /// 
+        ///       FRONT                    BACK
+        ///   ┌─────┬─────┐          ┌─────┬─────┐
+        ///   │  2  │  5  │  Upper   │  1  │  6  │
+        ///   │ UL  │ UR  │          │ UL  │ UR  │
+        ///   ├─────┼─────┤          ├─────┼─────┤
+        ///   │  3  │  4  │  Lower   │  0  │  7  │
+        ///   │ LL  │ LR  │          │ LL  │ LR  │
+        ///   └─────┴─────┘          └─────┴─────┘
+        ///     L     R                L     R
         /// </summary>
         public int Cell { get; set; }
 
@@ -33,28 +38,29 @@ namespace ThirdSpaceSimHub
 
     /// <summary>
     /// Vest cell constants for readability.
+    /// Based on hardware addressing from reverse engineering.
     /// </summary>
     public static class VestCells
     {
-        // Front cells
-        public const int FrontUpperLeft = 0;
-        public const int FrontUpperRight = 1;
-        public const int FrontLowerLeft = 2;
-        public const int FrontLowerRight = 3;
+        // Front cells (correct hardware indices)
+        public const int FrontUpperLeft = 2;
+        public const int FrontUpperRight = 5;
+        public const int FrontLowerLeft = 3;
+        public const int FrontLowerRight = 4;
 
-        // Back cells
-        public const int BackUpperLeft = 4;
-        public const int BackUpperRight = 5;
-        public const int BackLowerLeft = 6;
+        // Back cells (correct hardware indices)
+        public const int BackUpperLeft = 1;
+        public const int BackUpperRight = 6;
+        public const int BackLowerLeft = 0;
         public const int BackLowerRight = 7;
 
-        // Cell groups
-        public static readonly int[] AllFront = { 0, 1, 2, 3 };
-        public static readonly int[] AllBack = { 4, 5, 6, 7 };
-        public static readonly int[] LeftSide = { 0, 2, 4, 6 };
-        public static readonly int[] RightSide = { 1, 3, 5, 7 };
-        public static readonly int[] UpperRow = { 0, 1, 4, 5 };
-        public static readonly int[] LowerRow = { 2, 3, 6, 7 };
+        // Cell groups (using correct indices)
+        public static readonly int[] AllFront = { FrontUpperLeft, FrontUpperRight, FrontLowerLeft, FrontLowerRight };
+        public static readonly int[] AllBack = { BackUpperLeft, BackUpperRight, BackLowerLeft, BackLowerRight };
+        public static readonly int[] LeftSide = { FrontUpperLeft, FrontLowerLeft, BackUpperLeft, BackLowerLeft };
+        public static readonly int[] RightSide = { FrontUpperRight, FrontLowerRight, BackUpperRight, BackLowerRight };
+        public static readonly int[] UpperRow = { FrontUpperLeft, FrontUpperRight, BackUpperLeft, BackUpperRight };
+        public static readonly int[] LowerRow = { FrontLowerLeft, FrontLowerRight, BackLowerLeft, BackLowerRight };
         public static readonly int[] All = { 0, 1, 2, 3, 4, 5, 6, 7 };
     }
 }
