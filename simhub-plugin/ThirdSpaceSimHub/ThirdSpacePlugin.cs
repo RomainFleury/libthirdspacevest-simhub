@@ -68,7 +68,7 @@ namespace ThirdSpaceSimHub
             _daemon = new DaemonClient(_settings.DaemonHost, _settings.DaemonPort);
 
             // Connect logging
-            _daemon.OnLog += msg => SimHub.Logging.Current.Info(msg);
+            // _daemon.OnLog += msg => SimHub.Logging.Current.Info(msg);
 
             // Auto-connect if enabled
             if (_settings.AutoConnect)
@@ -76,7 +76,7 @@ namespace ThirdSpaceSimHub
                 _daemon.Connect();
             }
 
-            SimHub.Logging.Current.Info("[ThirdSpace] Plugin initialized!");
+            // SimHub.Logging.Current.Info("[ThirdSpace] Plugin initialized!");
         }
 
         /// <summary>
@@ -88,7 +88,7 @@ namespace ThirdSpaceSimHub
             _daemon?.SendStop();
             _daemon?.Disconnect();
             _daemon?.Dispose();
-            SimHub.Logging.Current.Info("[ThirdSpace] Plugin shutdown");
+            // SimHub.Logging.Current.Info("[ThirdSpace] Plugin shutdown");
         }
 
         /// <summary>
@@ -146,7 +146,7 @@ namespace ThirdSpaceSimHub
             }
             catch (Exception ex)
             {
-                SimHub.Logging.Current.Error($"[ThirdSpace] DataUpdate error: {ex.Message}");
+                // SimHub.Logging.Current.Error($"[ThirdSpace] DataUpdate error: {ex.Message}");
             }
         }
 
@@ -165,7 +165,7 @@ namespace ThirdSpaceSimHub
         {
             _daemon?.Disconnect();
             _daemon = new DaemonClient(_settings.DaemonHost, _settings.DaemonPort);
-            _daemon.OnLog += msg => SimHub.Logging.Current.Info(msg);
+            // _daemon.OnLog += msg => SimHub.Logging.Current.Info(msg);
             _daemon.Connect();
         }
 
@@ -184,11 +184,11 @@ namespace ThirdSpaceSimHub
         {
             if (!_daemon.IsConnected)
             {
-                SimHub.Logging.Current.Warn("[ThirdSpace] Cannot test - not connected to daemon");
+                // SimHub.Logging.Current.Warn("[ThirdSpace] Cannot test - not connected to daemon");
                 return;
             }
 
-            SimHub.Logging.Current.Info("[ThirdSpace] Testing all cells...");
+            // SimHub.Logging.Current.Info("[ThirdSpace] Testing all cells...");
             foreach (var cell in VestCells.All)
             {
                 _daemon.SendTrigger(cell, 5);
@@ -203,7 +203,7 @@ namespace ThirdSpaceSimHub
                 {
                     var json = File.ReadAllText(_settingsPath);
                     _settings = JsonConvert.DeserializeObject<PluginSettings>(json) ?? new PluginSettings();
-                    SimHub.Logging.Current.Info("[ThirdSpace] Settings loaded");
+                    // SimHub.Logging.Current.Info("[ThirdSpace] Settings loaded");
                 }
                 else
                 {
@@ -212,7 +212,7 @@ namespace ThirdSpaceSimHub
             }
             catch (Exception ex)
             {
-                SimHub.Logging.Current.Error($"[ThirdSpace] Failed to load settings: {ex.Message}");
+                // SimHub.Logging.Current.Error($"[ThirdSpace] Failed to load settings: {ex.Message}");
                 _settings = new PluginSettings();
             }
         }
@@ -227,11 +227,11 @@ namespace ThirdSpaceSimHub
 
                 var json = JsonConvert.SerializeObject(_settings, Formatting.Indented);
                 File.WriteAllText(_settingsPath, json);
-                SimHub.Logging.Current.Info("[ThirdSpace] Settings saved");
+                // SimHub.Logging.Current.Info("[ThirdSpace] Settings saved");
             }
             catch (Exception ex)
             {
-                SimHub.Logging.Current.Error($"[ThirdSpace] Failed to save settings: {ex.Message}");
+                // SimHub.Logging.Current.Error($"[ThirdSpace] Failed to save settings: {ex.Message}");
             }
         }
     }

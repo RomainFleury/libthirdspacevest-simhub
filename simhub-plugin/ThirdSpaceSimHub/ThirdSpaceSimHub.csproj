@@ -77,11 +77,11 @@
     </Page>
   </ItemGroup>
   <ItemGroup>
-    <None Include="packages.config" />
+    <Resource Include="vest-icon.png" />
   </ItemGroup>
   <ItemGroup>
-    <Resource Include="vest-icon.png" />
+    <Content Include="GameReaderCommon.dll" />
+    <Content Include="SimHub.Plugins.dll" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
-
