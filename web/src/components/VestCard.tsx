@@ -4,6 +4,7 @@
 
 import React from "react";
 import { ConnectedDevice } from "../hooks/useMultiVest";
+import { getDeviceColor, getDeviceDotColor, getDeviceBorderFromColor } from "../utils/deviceColors";
 
 interface VestCardProps {
   device: ConnectedDevice;
@@ -26,8 +27,10 @@ export const VestCard: React.FC<VestCardProps> = ({
     ? `Bus ${device.bus}, Address ${device.address}`
     : isMock ? "Mock Device" : "Unknown location";
 
+  const deviceBorderColor = getDeviceBorderFromColor(device.device_id);
+
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 border border-gray-200 dark:border-gray-700">
+    <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 border-2 ${deviceBorderColor}`}>
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
@@ -53,7 +56,7 @@ export const VestCard: React.FC<VestCardProps> = ({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <div className={`w-3 h-3 rounded-full ${isMain ? 'bg-green-500' : 'bg-gray-400'}`} />
+          <div className={`w-3 h-3 rounded-full ${isMain ? 'bg-green-500' : getDeviceDotColor(device.device_id)}`} />
         </div>
       </div>
 

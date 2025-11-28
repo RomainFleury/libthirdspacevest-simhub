@@ -1,32 +1,11 @@
 import { LogEntry } from "../types";
 import { useMultiVest } from "../hooks/useMultiVest";
 import { useState, useMemo } from "react";
+import { getDeviceColor } from "../utils/deviceColors";
 
 type Props = {
   logs: LogEntry[];
 };
-
-// Color palette for devices
-const COLORS = [
-  "bg-blue-500/20 text-blue-300 border-blue-500/50",
-  "bg-green-500/20 text-green-300 border-green-500/50",
-  "bg-purple-500/20 text-purple-300 border-purple-500/50",
-  "bg-yellow-500/20 text-yellow-300 border-yellow-500/50",
-  "bg-pink-500/20 text-pink-300 border-pink-500/50",
-  "bg-cyan-500/20 text-cyan-300 border-cyan-500/50",
-  "bg-orange-500/20 text-orange-300 border-orange-500/50",
-  "bg-indigo-500/20 text-indigo-300 border-indigo-500/50",
-];
-
-function getColorForId(id: string | undefined, colors: string[]): string {
-  if (!id) return "";
-  // Simple hash function to get consistent color for same ID
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) {
-    hash = id.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return colors[Math.abs(hash) % colors.length];
-}
 
 export function LogPanel({ logs }: Props) {
   const { devices, mainDeviceId } = useMultiVest();
@@ -126,7 +105,7 @@ export function LogPanel({ logs }: Props) {
         <ul className="space-y-2">
           {filteredLogs.map((log) => {
             const deviceInfo = getDeviceInfo(log.device_id);
-            const deviceColor = getColorForId(log.device_id, COLORS);
+            const deviceColor = getDeviceColor(log.device_id);
 
             return (
               <li

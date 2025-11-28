@@ -4,6 +4,7 @@
 
 import React, { useState } from "react";
 import { useMultiVest, ConnectedDevice } from "../hooks/useMultiVest";
+import { getDeviceDotColor, getDeviceBorderFromColor } from "../utils/deviceColors";
 
 export function ConnectedVestsList() {
   const { devices, mainDeviceId, loading, setMainDevice, disconnectDevice, fetchDevices } = useMultiVest();
@@ -54,13 +55,13 @@ export function ConnectedVestsList() {
           return (
             <div
               key={device.device_id}
-              className="rounded-md border border-slate-700 bg-slate-800/50 hover:bg-slate-800 transition-colors"
+              className={`rounded-md border-2 ${getDeviceBorderFromColor(device.device_id)} bg-slate-800/50 hover:bg-slate-800 transition-colors`}
             >
               <button
                 onClick={() => toggleExpand(device.device_id)}
                 className="w-full px-2 py-1.5 flex items-center gap-2 text-left"
               >
-                <div className={`w-2 h-2 rounded-full ${isMain ? 'bg-green-500' : 'bg-slate-500'}`} />
+                <div className={`w-2 h-2 rounded-full ${isMain ? 'bg-green-500' : getDeviceDotColor(device.device_id)}`} />
                 <span className="flex-1 text-xs text-slate-300 truncate">
                   {isMain && <span className="text-yellow-400 mr-1">⭐</span>}
                   {deviceName}
