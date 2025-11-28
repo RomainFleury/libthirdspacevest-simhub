@@ -132,8 +132,8 @@ export function useVestDebugger() {
 
   const pushLog = useCallback(
     (message: string, level: LogEntry["level"] = "info", metadata?: { device_id?: string; player_id?: string; player_num?: number; game_id?: string }) => {
-      setLogs((prev) => [
-        {
+      setLogs((prev) => {
+        const newLog = {
           id: crypto.randomUUID(),
           message,
           level,
@@ -142,9 +142,11 @@ export function useVestDebugger() {
           player_id: metadata?.player_id,
           player_num: metadata?.player_num,
           game_id: metadata?.game_id,
-        },
-        ...prev,
-      ]);
+        };
+        // Keep only the last 200 logs for performance
+        const updated = [newLog, ...prev];
+        return updated.slice(0, 200);
+      });
     },
     []
   );
