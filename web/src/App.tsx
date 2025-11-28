@@ -3,6 +3,7 @@ import { AppLayout } from "./components/layout/AppLayout";
 import { GamesPage } from "./pages/GamesPage";
 import { DebugPage } from "./pages/DebugPage";
 import { MiniGamesPage } from "./pages/MiniGamesPage";
+import { GamePage } from "./pages/GamePage";
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
           <Route path="games" element={<GamesPage />} />
           <Route path="debug" element={<DebugPage />} />
           <Route path="mini-games" element={<MiniGamesPage />} />
+          <Route path="mini-games/:gameId" element={<GamePage />} />
         </Route>
       </Routes>
     </BrowserRouter>
