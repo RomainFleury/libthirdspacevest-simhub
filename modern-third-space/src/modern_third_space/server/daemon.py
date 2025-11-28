@@ -267,10 +267,16 @@ class VestDaemon:
         finally:
             await self._clients.remove_client(client)
             try:
-                writer.close()
-                await writer.wait_closed()
-            except (BrokenPipeError, ConnectionResetError, OSError):
-                # Client already disconnected - this is normal
+                # Check if writer is already closed before attempting to close
+                if not writer.is_closing() and not writer.transport.is_closing():
+                    writer.close()
+                    try:
+                        await writer.wait_closed()
+                    except (BrokenPipeError, ConnectionResetError, OSError, RuntimeError):
+                        # Client already disconnected or transport closed - this is normal
+                        pass
+            except (BrokenPipeError, ConnectionResetError, OSError, RuntimeError, AttributeError):
+                # Client already disconnected or transport already closed - this is normal
                 pass
             except Exception as e:
                 logger.debug(f"Error closing client connection: {e}")
