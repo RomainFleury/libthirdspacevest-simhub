@@ -13,6 +13,7 @@ const { registerAlyxHandlers } = require("./alyxHandlers.cjs");
 const { registerSuperHotHandlers } = require("./superhotHandlers.cjs");
 const { registerPistolWhipHandlers } = require("./pistolwhipHandlers.cjs");
 const { registerEffectsHandlers } = require("./effectsHandlers.cjs");
+const { registerBF2Handlers } = require("./bf2Handlers.cjs");
 
 /**
  * Register all IPC handlers.
@@ -42,6 +43,9 @@ function registerAllHandlers(getDaemonBridge, getMainWindow, reconnectToDaemon) 
   // Predefined effects library handlers
   registerEffectsHandlers();
 
+  // EA Battlefront 2 (2017) settings handlers
+  registerBF2Handlers();
+
   console.log("✓ IPC handlers registered");
 }
 
@@ -54,5 +58,6 @@ module.exports = {
   registerSuperHotHandlers,
   registerPistolWhipHandlers,
   registerEffectsHandlers,
+  registerBF2Handlers,
 };
 
