@@ -14,6 +14,8 @@ import {
   defaultEffects,
 } from "../data/effects";
 import { LogEntry, VestEffect, VestStatus } from "../types";
+import { playEffectSound, getPlaySoundPreference } from "../utils/sound";
+import { useMultiVest } from "./useMultiVest";
 
 const FALLBACK_STATUS: VestStatus = {
   connected: false,
@@ -106,6 +108,7 @@ export function useVestDebugger() {
   const [loading, setLoading] = useState(false);
   const [daemonConnected, setDaemonConnected] = useState(false);
   const [activeCells, setActiveCells] = useState<Set<number>>(new Set());
+  const { mainDeviceId } = useMultiVest();
 
   // Track active cells with auto-clear after animation
   const flashCell = useCallback((cell: number) => {
@@ -261,6 +264,12 @@ export function useVestDebugger() {
         // Flash cell on effect triggered
         if (event.event === "effect_triggered" && event.cell !== undefined) {
           flashCell(event.cell);
+          
+          // Play sound if enabled and effect is on main device
+          const device_id = (event as any).device_id;
+          if (getPlaySoundPreference() && device_id === mainDeviceId) {
+            playEffectSound();
+          }
         }
       });
 

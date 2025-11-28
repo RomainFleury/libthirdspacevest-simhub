@@ -1,7 +1,8 @@
 import { LogEntry } from "../types";
 import { useMultiVest } from "../hooks/useMultiVest";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { getDeviceColor } from "../utils/deviceColors";
+import { getPlaySoundPreference, setPlaySoundPreference } from "../utils/sound";
 
 type Props = {
   logs: LogEntry[];
@@ -10,6 +11,7 @@ type Props = {
 export function LogPanel({ logs }: Props) {
   const { devices, mainDeviceId } = useMultiVest();
   const [filter, setFilter] = useState<string>("all");
+  const [playSoundOnEffect, setPlaySoundOnEffect] = useState<boolean>(() => getPlaySoundPreference());
 
   // Build filter options
   const filterOptions = useMemo(() => {
@@ -65,6 +67,11 @@ export function LogPanel({ logs }: Props) {
     };
   };
 
+  // Save preference when it changes
+  useEffect(() => {
+    setPlaySoundPreference(playSoundOnEffect);
+  }, [playSoundOnEffect]);
+
   return (
     <section className="rounded-2xl bg-slate-800/80 p-4 shadow-lg ring-1 ring-white/5">
       <header className="mb-3">
@@ -73,19 +80,30 @@ export function LogPanel({ logs }: Props) {
             <p className="text-sm uppercase tracking-wide text-slate-400">Logs</p>
             <h2 className="text-xl font-semibold text-white">Command History</h2>
           </div>
-          {filterOptions.length > 1 && (
-            <select
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {filterOptions.map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          )}
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={playSoundOnEffect}
+                onChange={(e) => setPlaySoundOnEffect(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-xs text-slate-300">Play sound on effect</span>
+            </label>
+            {filterOptions.length > 1 && (
+              <select
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {filterOptions.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
         </div>
         {filter !== "all" && (
           <p className="text-xs text-slate-400">
