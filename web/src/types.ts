@@ -28,5 +28,9 @@ export type LogEntry = {
   message: string;
   ts: number;
   level?: "info" | "error";
+  device_id?: string;  // Device that triggered the event
+  player_id?: string;  // Player that triggered the event
+  player_num?: number; // Player number for game-specific events
+  game_id?: string;    // Game that triggered the event
 };
 

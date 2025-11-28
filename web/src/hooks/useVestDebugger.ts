@@ -22,30 +22,84 @@ const FALLBACK_STATUS: VestStatus = {
 
 /**
  * Format a daemon event for display in the log panel.
+ * Returns the formatted message and extracts device/player info.
  */
-function formatDaemonEvent(event: DaemonEvent): string {
+function formatDaemonEvent(event: DaemonEvent): { message: string; device_id?: string; player_id?: string; player_num?: number; game_id?: string } {
+  const device_id = (event as any).device_id;
+  const player_id = (event as any).player_id;
+  const player_num = (event as any).player_num;
+  const game_id = (event as any).game_id;
+
+  let message = "";
+  let context = "";
+
+  // Build context string for device/player info
+  if (game_id && player_num !== undefined) {
+    context = ` [${game_id} - Player ${player_num}]`;
+  } else if (player_id) {
+    context = ` [${player_id}]`;
+  } else if (device_id) {
+    const deviceShortId = device_id.slice(-6);
+    context = ` [Device ${deviceShortId}]`;
+  }
+
   switch (event.event) {
     case "effect_triggered":
-      return `🎯 Effect triggered: cell ${event.cell}, speed ${event.speed}`;
+      message = `🎯 Effect triggered: cell ${event.cell}, speed ${event.speed}${context}`;
+      break;
     case "all_stopped":
-      return "⏹️ All effects stopped";
+      message = `⏹️ All effects stopped${context}`;
+      break;
     case "connected":
-      return `🔌 Connected to vest${event.device?.serial_number ? ` (${event.device.serial_number})` : ""}`;
+      message = `🔌 Connected to vest${event.device?.serial_number ? ` (${event.device.serial_number})` : ""}${context}`;
+      break;
     case "disconnected":
-      return "🔌 Disconnected from vest";
+      message = `🔌 Disconnected from vest${context}`;
+      break;
+    case "device_connected":
+      message = `🔌 Device connected${event.device?.serial_number ? ` (${event.device.serial_number})` : ""}${context}`;
+      break;
+    case "device_disconnected":
+      message = `🔌 Device disconnected${context}`;
+      break;
     case "device_selected":
-      return `📱 Device selected: bus ${event.device?.bus}, addr ${event.device?.address}`;
+      message = `📱 Device selected: bus ${event.device?.bus}, addr ${event.device?.address}${context}`;
+      break;
     case "device_cleared":
-      return "📱 Device selection cleared";
+      message = "📱 Device selection cleared";
+      break;
+    case "main_device_changed":
+      message = `📱 Main device changed${context}`;
+      break;
+    case "player_assigned":
+      message = `👤 Player assigned: ${player_id || "unknown"} → ${device_id ? `Device ${device_id.slice(-6)}` : "unknown"}${context}`;
+      break;
+    case "player_unassigned":
+      message = `👤 Player unassigned: ${player_id || "unknown"}${context}`;
+      break;
+    case "game_player_mapping_changed":
+      message = `🎮 Game mapping changed: ${game_id || "unknown"} - Player ${player_num || "?"}${context}`;
+      break;
     case "client_connected":
-      return `👤 Client connected: ${event.client_id}`;
+      message = `👤 Client connected: ${event.client_id}`;
+      break;
     case "client_disconnected":
-      return `👤 Client disconnected: ${event.client_id}`;
+      message = `👤 Client disconnected: ${event.client_id}`;
+      break;
     case "error":
-      return `❌ Error: ${event.message}`;
+      message = `❌ Error: ${event.message}${context}`;
+      break;
     default:
-      return `📡 ${event.event}`;
+      message = `📡 ${event.event}${context}`;
   }
+
+  return {
+    message,
+    device_id,
+    player_id,
+    player_num,
+    game_id,
+  };
 }
 
 /**
@@ -77,13 +131,17 @@ export function useVestDebugger() {
   }, []);
 
   const pushLog = useCallback(
-    (message: string, level: LogEntry["level"] = "info") => {
+    (message: string, level: LogEntry["level"] = "info", metadata?: { device_id?: string; player_id?: string; player_num?: number; game_id?: string }) => {
       setLogs((prev) => [
         {
           id: crypto.randomUUID(),
           message,
           level,
           ts: Date.now(),
+          device_id: metadata?.device_id,
+          player_id: metadata?.player_id,
+          player_num: metadata?.player_num,
+          game_id: metadata?.game_id,
         },
         ...prev,
       ]);
