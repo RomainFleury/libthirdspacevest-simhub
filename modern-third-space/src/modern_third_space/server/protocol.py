@@ -418,6 +418,49 @@ def response_disconnect_device(success: bool, device_id: Optional[str] = None, e
         message=error,
     )
 
+# Player management response helpers
+def response_create_player(success: bool, player_id: Optional[str] = None, name: Optional[str] = None, error: Optional[str] = None, req_id: Optional[str] = None) -> Response:
+    """Response for create_player command."""
+    return Response(
+        response="create_player",
+        req_id=req_id,
+        success=success,
+        message=error or name,  # Use message for name or error
+    )
+
+def response_assign_player(success: bool, player_id: Optional[str] = None, device_id: Optional[str] = None, error: Optional[str] = None, req_id: Optional[str] = None) -> Response:
+    """Response for assign_player command."""
+    return Response(
+        response="assign_player",
+        req_id=req_id,
+        success=success,
+        message=error,
+    )
+
+def response_unassign_player(success: bool, player_id: Optional[str] = None, error: Optional[str] = None, req_id: Optional[str] = None) -> Response:
+    """Response for unassign_player command."""
+    return Response(
+        response="unassign_player",
+        req_id=req_id,
+        success=success,
+        message=error,
+    )
+
+def response_list_players(players: List[Dict[str, Any]], req_id: Optional[str] = None) -> Response:
+    """Response for list_players command."""
+    return Response(response="list_players", req_id=req_id, devices=players)  # Reuse devices field for players list
+
+def response_get_player_device(device_id: Optional[str], player_id: Optional[str] = None, error: Optional[str] = None, req_id: Optional[str] = None) -> Response:
+    """Response for get_player_device command."""
+    # Create device dict if device_id is provided
+    device = {"device_id": device_id} if device_id else None
+    return Response(
+        response="get_player_device",
+        req_id=req_id,
+        device=device,
+        message=error,
+    )
+
 def response_ping(
     connected: bool,
     has_device_selected: bool,

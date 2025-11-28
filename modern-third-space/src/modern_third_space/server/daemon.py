@@ -305,6 +305,22 @@ class VestDaemon:
         if cmd_type == CommandType.DISCONNECT_DEVICE:
             return await self._cmd_disconnect_device(command)
         
+        # Player management commands
+        if cmd_type == CommandType.CREATE_PLAYER:
+            return await self._cmd_create_player(command)
+        
+        if cmd_type == CommandType.ASSIGN_PLAYER:
+            return await self._cmd_assign_player(command)
+        
+        if cmd_type == CommandType.UNASSIGN_PLAYER:
+            return await self._cmd_unassign_player(command)
+        
+        if cmd_type == CommandType.LIST_PLAYERS:
+            return await self._cmd_list_players(command)
+        
+        if cmd_type == CommandType.GET_PLAYER_DEVICE:
+            return await self._cmd_get_player_device(command)
+        
         # Vest control (requires selected device)
         if cmd_type == CommandType.CONNECT:
             return await self._cmd_connect(command)
