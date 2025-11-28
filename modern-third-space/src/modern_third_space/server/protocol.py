@@ -161,6 +161,10 @@ class Command:
             health_remaining=data.get("health_remaining"),
             cause=data.get("cause"),
             effect_name=data.get("effect_name"),
+            device_id=data.get("device_id"),
+            player_id=data.get("player_id"),
+            game_id=data.get("game_id"),
+            player_num=data.get("player_num"),
         )
     
     @classmethod
