@@ -4,6 +4,7 @@ import { GamesPage } from "./pages/GamesPage";
 import { DebugPage } from "./pages/DebugPage";
 import { MiniGamesPage } from "./pages/MiniGamesPage";
 import { GamePage } from "./pages/GamePage";
+import { VestsPage } from "./pages/VestsPage";
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
           <Route index element={<Navigate to="/games" replace />} />
           <Route path="games" element={<GamesPage />} />
           <Route path="debug" element={<DebugPage />} />
+          <Route path="vests" element={<VestsPage />} />
           <Route path="mini-games" element={<MiniGamesPage />} />
           <Route path="mini-games/:gameId" element={<GamePage />} />
         </Route>
