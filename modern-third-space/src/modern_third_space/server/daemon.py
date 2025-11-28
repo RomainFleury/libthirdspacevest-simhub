@@ -44,6 +44,7 @@ from .protocol import (
     event_main_device_changed,
     event_player_assigned,
     event_player_unassigned,
+    event_game_player_mapping_changed,
     response_error,
     response_get_selected_device,
     response_list,
