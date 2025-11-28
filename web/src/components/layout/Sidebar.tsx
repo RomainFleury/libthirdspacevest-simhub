@@ -8,14 +8,14 @@ type Props = {
 
 export function Sidebar({ logs }: Props) {
   return (
-    <aside className="w-80 bg-slate-900/50 border-r border-slate-800 flex flex-col">
+    <aside className="w-72 md:w-80 bg-slate-900/50 border-r border-slate-800 flex flex-col shrink-0">
       {/* Device Selector */}
-      <div className="p-4 border-b border-slate-800">
+      <div className="p-3 md:p-4 border-b border-slate-800 shrink-0">
         <DeviceSelector />
       </div>
 
       {/* Logs - Take remaining space */}
-      <div className="flex-1 overflow-hidden flex flex-col p-4">
+      <div className="flex-1 overflow-hidden flex flex-col p-3 md:p-4 min-h-0">
         <div className="flex-1 overflow-y-auto">
           <LogPanel logs={logs} />
         </div>

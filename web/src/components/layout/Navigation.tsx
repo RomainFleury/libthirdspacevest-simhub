@@ -2,12 +2,12 @@ import { NavLink } from "react-router-dom";
 
 export function Navigation() {
   return (
-    <nav className="bg-slate-800/80 border-b border-slate-700 px-6">
-      <div className="flex gap-1">
+    <nav className="bg-slate-800/80 border-b border-slate-700 px-4 md:px-6 shrink-0">
+      <div className="flex gap-1 overflow-x-auto">
         <NavLink
           to="/games"
           className={({ isActive }) =>
-            `px-4 py-3 text-sm font-medium transition-colors ${
+            `px-3 md:px-4 py-3 text-sm font-medium transition-all duration-200 whitespace-nowrap ${
               isActive
                 ? "text-blue-400 border-b-2 border-blue-400"
                 : "text-slate-400 hover:text-slate-200"
@@ -19,7 +19,7 @@ export function Navigation() {
         <NavLink
           to="/debug"
           className={({ isActive }) =>
-            `px-4 py-3 text-sm font-medium transition-colors ${
+            `px-3 md:px-4 py-3 text-sm font-medium transition-all duration-200 whitespace-nowrap ${
               isActive
                 ? "text-blue-400 border-b-2 border-blue-400"
                 : "text-slate-400 hover:text-slate-200"
@@ -31,7 +31,7 @@ export function Navigation() {
         <NavLink
           to="/mini-games"
           className={({ isActive }) =>
-            `px-4 py-3 text-sm font-medium transition-colors ${
+            `px-3 md:px-4 py-3 text-sm font-medium transition-all duration-200 whitespace-nowrap ${
               isActive
                 ? "text-blue-400 border-b-2 border-blue-400"
                 : "text-slate-400 hover:text-slate-200"

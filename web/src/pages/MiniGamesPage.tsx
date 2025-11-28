@@ -1,9 +1,9 @@
 export function MiniGamesPage() {
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
       <header>
-        <h1 className="text-3xl font-bold text-white">Mini-Games</h1>
-        <p className="mt-2 text-slate-400">
+        <h1 className="text-2xl md:text-3xl font-bold text-white">Mini-Games</h1>
+        <p className="mt-2 text-sm md:text-base text-slate-400">
           Interactive games with haptic feedback.
         </p>
       </header>

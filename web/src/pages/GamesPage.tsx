@@ -6,10 +6,10 @@ import { BF2SettingsPanel } from "../components/BF2SettingsPanel";
 
 export function GamesPage() {
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
       <header>
-        <h1 className="text-3xl font-bold text-white">Integrated Games</h1>
-        <p className="mt-2 text-slate-400">
+        <h1 className="text-2xl md:text-3xl font-bold text-white">Integrated Games</h1>
+        <p className="mt-2 text-sm md:text-base text-slate-400">
           Manage haptic feedback integrations for supported games.
         </p>
       </header>

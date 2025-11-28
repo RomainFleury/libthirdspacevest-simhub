@@ -18,10 +18,10 @@ export function DebugPage() {
   } = useVestDebugger();
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
       <header>
-        <h1 className="text-3xl font-bold text-white">Debug Console</h1>
-        <p className="mt-2 text-slate-400">
+        <h1 className="text-2xl md:text-3xl font-bold text-white">Debug Console</h1>
+        <p className="mt-2 text-sm md:text-base text-slate-400">
           Manual testing tools for the Third Space Vest.
         </p>
       </header>
