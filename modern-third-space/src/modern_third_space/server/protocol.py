@@ -32,6 +32,9 @@ class CommandType(Enum):
     LIST_CONNECTED_DEVICES = "list_connected_devices"
     SET_MAIN_DEVICE = "set_main_device"
     DISCONNECT_DEVICE = "disconnect_device"
+    # Mock device commands
+    CREATE_MOCK_DEVICE = "create_mock_device"
+    REMOVE_MOCK_DEVICE = "remove_mock_device"
     # Player management commands
     CREATE_PLAYER = "create_player"
     ASSIGN_PLAYER = "assign_player"
@@ -89,6 +92,9 @@ class EventType(Enum):
     DEVICE_CONNECTED = "device_connected"
     DEVICE_DISCONNECTED = "device_disconnected"
     MAIN_DEVICE_CHANGED = "main_device_changed"
+    # Mock device events
+    MOCK_DEVICE_CREATED = "mock_device_created"
+    MOCK_DEVICE_REMOVED = "mock_device_removed"
     # Player management events
     PLAYER_ASSIGNED = "player_assigned"
     PLAYER_UNASSIGNED = "player_unassigned"
@@ -357,6 +363,23 @@ def event_device_disconnected(device_id: str) -> Event:
         device_id=device_id,
     )
 
+def event_mock_device_created(device: Dict[str, Any], device_id: str) -> Event:
+    """Create a mock_device_created event."""
+    event_data = device.copy()
+    event_data["device_id"] = device_id
+    return Event(
+        event=EventType.MOCK_DEVICE_CREATED.value,
+        device=event_data,
+        device_id=device_id,
+    )
+
+def event_mock_device_removed(device_id: str) -> Event:
+    """Create a mock_device_removed event."""
+    return Event(
+        event=EventType.MOCK_DEVICE_REMOVED.value,
+        device_id=device_id,
+    )
+
 def event_main_device_changed(device_id: str, device: Optional[Dict[str, Any]] = None) -> Event:
     """Create a main_device_changed event."""
     return Event(
@@ -428,6 +451,28 @@ def response_disconnect_device(success: bool, device_id: Optional[str] = None, e
     """Response for disconnect_device command."""
     return Response(
         response="disconnect_device",
+        req_id=req_id,
+        success=success,
+        device_id=device_id,
+        message=error,
+    )
+
+# Mock device response helpers
+def response_create_mock_device(success: bool, device_id: Optional[str] = None, device: Optional[Dict[str, Any]] = None, error: Optional[str] = None, req_id: Optional[str] = None) -> Response:
+    """Response for create_mock_device command."""
+    return Response(
+        response="create_mock_device",
+        req_id=req_id,
+        success=success,
+        device_id=device_id,
+        device=device,
+        message=error,
+    )
+
+def response_remove_mock_device(success: bool, device_id: Optional[str] = None, error: Optional[str] = None, req_id: Optional[str] = None) -> Response:
+    """Response for remove_mock_device command."""
+    return Response(
+        response="remove_mock_device",
         req_id=req_id,
         success=success,
         device_id=device_id,

@@ -13,6 +13,7 @@ export interface ConnectedDevice {
   bus?: number;
   address?: number;
   serial_number?: string;
+  is_mock?: boolean;  // True if this is a mock device
 }
 
 export interface Player {
@@ -157,29 +158,68 @@ export function useMultiVest() {
     }
   }, [fetchPlayers]);
 
-  // Subscribe to daemon events
-  useEffect(() => {
-    const unsubscribe = bridge?.onDaemonEvent?.((event: any) => {
-      // Handle device events
-      if (event.event === "device_connected" || event.event === "device_disconnected") {
-        fetchDevices();
-      } else if (event.event === "main_device_changed") {
-        fetchDevices();
-      } else if (event.event === "player_assigned" || event.event === "player_unassigned") {
-        fetchPlayers();
-      }
-    });
+    // Subscribe to daemon events
+    useEffect(() => {
+      const unsubscribe = bridge?.onDaemonEvent?.((event: any) => {
+        // Handle device events
+        if (event.event === "device_connected" || 
+            event.event === "device_disconnected" ||
+            event.event === "mock_device_created" ||
+            event.event === "mock_device_removed") {
+          fetchDevices();
+        } else if (event.event === "main_device_changed") {
+          fetchDevices();
+        } else if (event.event === "player_assigned" || event.event === "player_unassigned") {
+          fetchPlayers();
+        }
+      });
 
-    return () => {
-      unsubscribe?.();
-    };
-  }, [fetchDevices, fetchPlayers]);
+      return () => {
+        unsubscribe?.();
+      };
+    }, [fetchDevices, fetchPlayers]);
 
   // Initial fetch
   useEffect(() => {
     fetchDevices();
     fetchPlayers();
   }, [fetchDevices, fetchPlayers]);
+
+  // Create mock device
+  const createMockDevice = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await bridge?.createMockDevice?.();
+      if (result?.success) {
+        await fetchDevices(); // Refresh device list
+      } else {
+        setError(result?.error || "Failed to create mock device");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchDevices]);
+
+  // Remove mock device
+  const removeMockDevice = useCallback(async (deviceId: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await bridge?.removeMockDevice?.(deviceId);
+      if (result?.success) {
+        await fetchDevices(); // Refresh device list
+      } else {
+        setError(result?.error || "Failed to remove mock device");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchDevices]);
 
   return {
     devices,
@@ -194,6 +234,8 @@ export function useMultiVest() {
     createPlayer,
     assignPlayer,
     unassignPlayer,
+    createMockDevice,
+    removeMockDevice,
   };
 }
 

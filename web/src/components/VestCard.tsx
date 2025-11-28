@@ -20,10 +20,11 @@ export const VestCard: React.FC<VestCardProps> = ({
   onDisconnect,
   loading = false,
 }) => {
+  const isMock = device.is_mock || device.device_id?.startsWith("mock_");
   const deviceName = device.serial_number || `Device ${device.device_id.slice(-6)}`;
   const deviceInfo = device.bus !== undefined && device.address !== undefined
     ? `Bus ${device.bus}, Address ${device.address}`
-    : "Unknown location";
+    : isMock ? "Mock Device" : "Unknown location";
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 border border-gray-200 dark:border-gray-700">
@@ -33,6 +34,11 @@ export const VestCard: React.FC<VestCardProps> = ({
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
               {deviceName}
             </h3>
+            {isMock && (
+              <span className="px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 rounded">
+                MOCK
+              </span>
+            )}
             {isMain && (
               <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded">
                 Main

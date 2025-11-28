@@ -42,6 +42,8 @@ from .protocol import (
     event_device_connected,
     event_device_disconnected,
     event_main_device_changed,
+    event_mock_device_created,
+    event_mock_device_removed,
     event_player_assigned,
     event_player_unassigned,
     event_game_player_mapping_changed,
@@ -58,6 +60,8 @@ from .protocol import (
     response_list_connected_devices,
     response_set_main_device,
     response_disconnect_device,
+    response_create_mock_device,
+    response_remove_mock_device,
     response_create_player,
     response_assign_player,
     response_unassign_player,
@@ -310,6 +314,13 @@ class VestDaemon:
         
         if cmd_type == CommandType.DISCONNECT_DEVICE:
             return await self._cmd_disconnect_device(command)
+        
+        # Mock device commands
+        if cmd_type == CommandType.CREATE_MOCK_DEVICE:
+            return await self._cmd_create_mock_device(command)
+        
+        if cmd_type == CommandType.REMOVE_MOCK_DEVICE:
+            return await self._cmd_remove_mock_device(command)
         
         # Player management commands
         if cmd_type == CommandType.CREATE_PLAYER:
@@ -581,12 +592,73 @@ class VestDaemon:
             self._controller = None
             self._selected_device = None
         
+        # Check if it's a mock device
+        is_mock = self._registry.is_mock_device(command.device_id)
+        
         # Broadcast device disconnected event
-        await self._clients.broadcast(
-            event_device_disconnected(command.device_id)
-        )
+        if is_mock:
+            await self._clients.broadcast(event_mock_device_removed(command.device_id))
+        else:
+            await self._clients.broadcast(event_device_disconnected(command.device_id))
         
         return response_disconnect_device(
+            success=True,
+            device_id=command.device_id,
+            req_id=command.req_id,
+        )
+    
+    async def _cmd_create_mock_device(self, command: Command) -> Response:
+        """Create a new mock device for testing."""
+        try:
+            device_id, controller = self._registry.add_mock_device()
+            device_info = self._registry.get_device_info(device_id)
+            
+            # Broadcast mock device created event
+            await self._clients.broadcast(event_mock_device_created(device_info, device_id))
+            
+            return response_create_mock_device(
+                success=True,
+                device_id=device_id,
+                device=device_info,
+                req_id=command.req_id,
+            )
+        except ValueError as e:
+            return response_create_mock_device(
+                success=False,
+                error=str(e),
+                req_id=command.req_id,
+            )
+    
+    async def _cmd_remove_mock_device(self, command: Command) -> Response:
+        """Remove a mock device."""
+        if not command.device_id:
+            return response_remove_mock_device(
+                success=False,
+                error="device_id is required",
+                req_id=command.req_id,
+            )
+        
+        if not self._registry.is_mock_device(command.device_id):
+            return response_remove_mock_device(
+                success=False,
+                error=f"Device {command.device_id} is not a mock device",
+                req_id=command.req_id,
+            )
+        
+        if not self._registry.has_device(command.device_id):
+            return response_remove_mock_device(
+                success=False,
+                error=f"Device {command.device_id} not found",
+                req_id=command.req_id,
+            )
+        
+        # Remove device from registry
+        self._registry.remove_device(command.device_id)
+        
+        # Broadcast mock device removed event
+        await self._clients.broadcast(event_mock_device_removed(command.device_id))
+        
+        return response_remove_mock_device(
             success=True,
             device_id=command.device_id,
             req_id=command.req_id,

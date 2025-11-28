@@ -21,6 +21,8 @@ export const VestsPage: React.FC = () => {
     createPlayer,
     assignPlayer,
     unassignPlayer,
+    createMockDevice,
+    removeMockDevice,
   } = useMultiVest();
 
   const [newPlayerId, setNewPlayerId] = useState("");
@@ -58,13 +60,23 @@ export const VestsPage: React.FC = () => {
           <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
             Connected Devices
           </h2>
-          <button
-            onClick={fetchDevices}
-            disabled={loading}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded transition-colors"
-          >
-            Refresh
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={createMockDevice}
+              disabled={loading}
+              className="px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded transition-colors"
+              title="Add a mock device for testing (max 20)"
+            >
+              + Add Mock Vest
+            </button>
+            <button
+              onClick={fetchDevices}
+              disabled={loading}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded transition-colors"
+            >
+              Refresh
+            </button>
+          </div>
         </div>
 
         {devices.length === 0 ? (
@@ -75,16 +87,19 @@ export const VestsPage: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {devices.map(device => (
-              <VestCard
-                key={device.device_id}
-                device={device}
-                isMain={device.device_id === mainDeviceId}
-                onSetMain={setMainDevice}
-                onDisconnect={disconnectDevice}
-                loading={loading}
-              />
-            ))}
+            {devices.map(device => {
+              const isMock = device.is_mock || device.device_id?.startsWith("mock_");
+              return (
+                <VestCard
+                  key={device.device_id}
+                  device={device}
+                  isMain={device.device_id === mainDeviceId}
+                  onSetMain={setMainDevice}
+                  onDisconnect={isMock ? () => removeMockDevice(device.device_id) : disconnectDevice}
+                  loading={loading}
+                />
+              );
+            })}
           </div>
         )}
       </section>

@@ -94,4 +94,6 @@ contextBridge.exposeInMainWorld("vestBridge", {
   setGamePlayerMapping: (gameId, playerNum, deviceId) => ipcRenderer.invoke("multivist:setGamePlayerMapping", gameId, playerNum, deviceId),
   clearGamePlayerMapping: (gameId, playerNum) => ipcRenderer.invoke("multivist:clearGamePlayerMapping", gameId, playerNum),
   listGamePlayerMappings: (gameId) => ipcRenderer.invoke("multivist:listGamePlayerMappings", gameId),
+  createMockDevice: () => ipcRenderer.invoke("multivist:createMockDevice"),
+  removeMockDevice: (deviceId) => ipcRenderer.invoke("multivist:removeMockDevice", deviceId),
 });

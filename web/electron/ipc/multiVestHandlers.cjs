@@ -190,6 +190,34 @@ function registerMultiVestHandlers(getDaemonBridge) {
       return { success: false, error: error.message };
     }
   });
+
+  // Create mock device
+  ipcMain.handle("multivist:createMockDevice", async () => {
+    try {
+      const daemonBridge = getDaemonBridge();
+      if (!daemonBridge?.connected) {
+        return { success: false, error: "Not connected to daemon" };
+      }
+      return await daemonBridge.sendCommand("create_mock_device");
+    } catch (error) {
+      console.error("Error in multivist:createMockDevice:", error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Remove mock device
+  ipcMain.handle("multivist:removeMockDevice", async (_, deviceId) => {
+    try {
+      const daemonBridge = getDaemonBridge();
+      if (!daemonBridge?.connected) {
+        return { success: false, error: "Not connected to daemon" };
+      }
+      return await daemonBridge.sendCommand("remove_mock_device", { device_id: deviceId });
+    } catch (error) {
+      console.error("Error in multivist:removeMockDevice:", error);
+      return { success: false, error: error.message };
+    }
+  });
 }
 
 module.exports = { registerMultiVestHandlers };

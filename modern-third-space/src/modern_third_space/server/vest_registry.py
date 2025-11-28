@@ -8,8 +8,9 @@ simultaneously, allowing the daemon to support multiple vests.
 from __future__ import annotations
 
 import uuid
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, Union
 from ..vest import VestController, VestStatus
+from ..vest.mock_controller import MockVestController
 
 
 class VestControllerRegistry:
@@ -25,9 +26,10 @@ class VestControllerRegistry:
     
     def __init__(self) -> None:
         """Initialize an empty registry."""
-        self._controllers: Dict[str, VestController] = {}
+        self._controllers: Dict[str, Union[VestController, MockVestController]] = {}
         self._device_info: Dict[str, Dict[str, Any]] = {}  # device_id -> device info
         self._main_device_id: Optional[str] = None
+        self._mock_counter = 0  # Counter for generating mock serial numbers
     
     def generate_device_id(self) -> str:
         """Generate a unique device ID."""
@@ -97,7 +99,7 @@ class VestControllerRegistry:
         
         return None
     
-    def get_controller(self, device_id: Optional[str] = None) -> Optional[VestController]:
+    def get_controller(self, device_id: Optional[str] = None) -> Optional[Union[VestController, MockVestController]]:
         """
         Get controller for device_id, or main device if None.
         
@@ -105,7 +107,7 @@ class VestControllerRegistry:
             device_id: Device ID to get controller for. If None, returns main device controller.
         
         Returns:
-            VestController if found, None otherwise
+            VestController or MockVestController if found, None otherwise
         """
         if device_id is None:
             device_id = self._main_device_id
@@ -187,4 +189,48 @@ class VestControllerRegistry:
     def count(self) -> int:
         """Get the number of connected devices."""
         return len(self._controllers)
+    
+    def is_mock_device(self, device_id: str) -> bool:
+        """Check if a device is a mock device."""
+        return device_id.startswith("mock_")
+    
+    def count_mock_devices(self) -> int:
+        """Get the number of mock devices."""
+        return sum(1 for device_id in self._controllers.keys() if self.is_mock_device(device_id))
+    
+    def add_mock_device(self) -> tuple[str, MockVestController]:
+        """
+        Add a new mock device to the registry.
+        
+        Returns:
+            Tuple of (device_id, MockVestController)
+        
+        Raises:
+            ValueError: If maximum number of mock devices (20) is reached
+        """
+        if self.count_mock_devices() >= 20:
+            raise ValueError("Maximum number of mock devices (20) reached")
+        
+        self._mock_counter += 1
+        mock_serial = f"MOCK-{self._mock_counter:03d}"
+        device_id = f"mock_{uuid.uuid4().hex[:8]}"
+        
+        controller = MockVestController(mock_serial)
+        
+        # Store controller and device info
+        self._controllers[device_id] = controller
+        self._device_info[device_id] = {
+            "serial_number": mock_serial,
+            "bus": None,
+            "address": None,
+            "vendor_id": "0x1234",
+            "product_id": "0x5678",
+            "is_mock": True,
+        }
+        
+        # Set as main if it's the first device
+        if self._main_device_id is None:
+            self._main_device_id = device_id
+        
+        return device_id, controller
 
