@@ -6,7 +6,6 @@ import React, { useState } from "react";
 import { useMultiVest } from "../hooks/useMultiVest";
 import { VestCard } from "../components/VestCard";
 import { PlayerCard } from "../components/PlayerCard";
-import { GamePlayerMappingCard } from "../components/GamePlayerMappingCard";
 
 export const VestsPage: React.FC = () => {
   const {
@@ -152,30 +151,6 @@ export const VestsPage: React.FC = () => {
         )}
       </section>
 
-      {/* Game-Specific Mappings Section */}
-      <section>
-        <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">
-          Game-Specific Player Mappings
-        </h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-          Configure which vest each player uses for specific games. If not configured, games will use the main device or global player assignments.
-        </p>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <GamePlayerMappingCard
-            gameId="cs2"
-            gameName="Counter-Strike 2"
-            maxPlayers={4}
-            devices={devices}
-          />
-          <GamePlayerMappingCard
-            gameId="roulette"
-            gameName="Roulette"
-            maxPlayers={4}
-            devices={devices}
-          />
-        </div>
-      </section>
     </div>
   );
 };
