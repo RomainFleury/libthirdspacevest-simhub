@@ -438,7 +438,7 @@ def response_get_selected_device(device: Optional[Dict[str, Any]], req_id: Optio
 # Multi-vest response helpers
 def response_list_connected_devices(devices: List[Dict[str, Any]], req_id: Optional[str] = None) -> Response:
     """Response for list_connected_devices command."""
-    return Response(response="list_connected_devices", req_id=req_id, devices=devices)
+    return Response(response="list_connected_devices", req_id=req_id, success=True, devices=devices)
 
 def response_set_main_device(success: bool, device_id: Optional[str] = None, error: Optional[str] = None, req_id: Optional[str] = None) -> Response:
     """Response for set_main_device command."""
