@@ -27,27 +27,29 @@ Warhorse Studios provides official modding tools:
 
 ## Integration Approaches
 
-### Approach 1: Telemetry Data Access (Recommended First) ⭐
+### Approach 1: Telemetry Data Access ⭐ (EXPLORE, BUT LIKELY INSUFFICIENT)
 
 **Key Discovery:** KCD 2 has telemetry metrics that are **stored locally on your device**. The Day One Patch added "additional telemetry metrics".
 
+**⚠️ Note:** Telemetry is likely focused on **performance metrics** (FPS, memory, crashes) rather than gameplay events. Worth exploring, but may not contain damage/health/combat data.
+
 **How it works:**
 1. Find where KCD stores telemetry files locally
-2. Watch telemetry files for changes
-3. Parse telemetry data (damage, health, combat events)
-4. Map to haptic effects
+2. Analyze telemetry data structure
+3. Verify if gameplay events are included (likely not)
+4. If insufficient, focus on other approaches
 
 **Research Needed:**
 - [ ] Find telemetry file location (likely AppData or game directory)
 - [ ] Document telemetry format (JSON, XML, binary?)
-- [ ] Identify available metrics/events
-- [ ] Test if damage/health/combat data is available
+- [ ] **Verify if gameplay events are included** (likely only performance data)
+- [ ] If insufficient, mark as not viable
 
 **References:**
 - [KCD Privacy Policy](https://legal.kingdomcomerpg.com/privacy) - Mentions telemetry stored locally
 - [KCD 2 Patch Notes](https://www.gamewatcher.com/news/kingdom-come-deliverance-2-patch-notes-roadmap) - "Added additional telemetry metrics"
 
-### Approach 2: Lua Scripting (via KCD API)
+### Approach 2: Lua Scripting (via KCD API) ⭐⭐⭐ (PROMISING)
 
 **There's an [unofficial KCD coding guide](https://github.com/benjaminfoo/kcd_coding_guide) for Lua scripting.**
 
@@ -56,11 +58,12 @@ Warhorse Studios provides official modding tools:
 3. Python integration watches file or receives TCP
 
 **Research Needed:**
-- [ ] Review KCD Coding Guide
-- [ ] Learn KCD Lua API
+- [ ] Review [KCD Coding Guide](https://github.com/benjaminfoo/kcd_coding_guide)
+- [ ] Learn KCD Lua API basics
 - [ ] Test Lua script execution
+- [ ] Test if damage/health/combat events can be accessed
 
-### Approach 3: Log File Watching (Alternative)
+### Approach 3: Log File Watching ⭐⭐ (RECOMMENDED)
 
 **Similar to HL:Alyx integration**
 
