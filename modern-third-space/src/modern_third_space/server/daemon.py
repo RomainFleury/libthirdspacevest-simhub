@@ -764,21 +764,122 @@ class VestDaemon:
             req_id=command.req_id,
         )
     
+    async def _cmd_set_game_player_mapping(self, command: Command) -> Response:
+        """Set a game-specific player mapping."""
+        if not command.game_id:
+            return response_set_game_player_mapping(
+                success=False,
+                error="game_id is required",
+                req_id=command.req_id,
+            )
+        
+        if command.player_num is None:
+            return response_set_game_player_mapping(
+                success=False,
+                error="player_num is required",
+                req_id=command.req_id,
+            )
+        
+        if not command.device_id:
+            return response_set_game_player_mapping(
+                success=False,
+                error="device_id is required",
+                req_id=command.req_id,
+            )
+        
+        # Verify device exists
+        if not self._registry.has_device(command.device_id):
+            return response_set_game_player_mapping(
+                success=False,
+                error=f"Device {command.device_id} not found",
+                req_id=command.req_id,
+            )
+        
+        # Set the mapping
+        self._game_mapping.set_mapping(command.game_id, command.player_num, command.device_id)
+        
+        # Broadcast mapping changed event
+        await self._clients.broadcast(
+            event_game_player_mapping_changed(command.game_id, command.player_num, command.device_id)
+        )
+        
+        return response_set_game_player_mapping(
+            success=True,
+            game_id=command.game_id,
+            player_num=command.player_num,
+            device_id=command.device_id,
+            req_id=command.req_id,
+        )
+    
+    async def _cmd_clear_game_player_mapping(self, command: Command) -> Response:
+        """Clear a game-specific player mapping."""
+        if not command.game_id:
+            return response_clear_game_player_mapping(
+                success=False,
+                error="game_id is required",
+                req_id=command.req_id,
+            )
+        
+        # Clear mapping (player_num is optional - if None, clears all for game)
+        success = self._game_mapping.clear_mapping(command.game_id, command.player_num)
+        if not success:
+            return response_clear_game_player_mapping(
+                success=False,
+                error=f"Game {command.game_id} has no mappings",
+                req_id=command.req_id,
+            )
+        
+        # Broadcast mapping changed event (device_id=None indicates cleared)
+        await self._clients.broadcast(
+            event_game_player_mapping_changed(command.game_id, command.player_num or 0, None)
+        )
+        
+        return response_clear_game_player_mapping(
+            success=True,
+            game_id=command.game_id,
+            req_id=command.req_id,
+        )
+    
+    async def _cmd_list_game_player_mappings(self, command: Command) -> Response:
+        """List all game-specific player mappings."""
+        # If game_id provided, list only for that game
+        mappings = self._game_mapping.list_mappings(command.game_id if command.game_id else None)
+        return response_list_game_player_mappings(mappings, command.req_id)
+    
+    def _resolve_device_id(self, command: Command) -> Optional[str]:
+        """
+        Resolve device_id from command using fallback logic:
+        1. Direct device_id
+        2. Game-specific mapping (game_id + player_num)
+        3. Global player mapping (player_id)
+        4. Main device
+        """
+        # 1. Direct device_id
+        if command.device_id:
+            return command.device_id
+        
+        # 2. Game-specific mapping (game_id + player_num)
+        if command.game_id and command.player_num is not None:
+            device_id = self._game_mapping.get_mapping(command.game_id, command.player_num)
+            if device_id:
+                return device_id
+        
+        # 3. Global player mapping (player_id)
+        if command.player_id:
+            device_id = self._player_manager.get_player_device(command.player_id)
+            if device_id:
+                return device_id
+        
+        # 4. Main device (fallback)
+        return self._registry.get_main_device_id()
+    
     async def _cmd_trigger(self, command: Command) -> Response:
-        """Trigger an effect (on specified device_id, player_id, or main device)."""
+        """Trigger an effect (on specified device_id, game_id+player_num, player_id, or main device)."""
         if command.cell is None or command.speed is None:
             return response_error("Must specify cell and speed", command.req_id)
         
-        # Resolve device_id from player_id if provided
-        target_device_id = command.device_id
-        if command.player_id:
-            target_device_id = self._player_manager.get_player_device(command.player_id)
-            # If player not assigned, fall back to main device
-            if target_device_id is None:
-                target_device_id = self._registry.get_main_device_id()
-        
-        # Get controller for specified device_id, or main device
-        controller = self._registry.get_controller(target_device_id)
+        # Resolve device_id using fallback logic
+        target_device_id = self._resolve_device_id(command)
         
         # If no controller found, try to auto-connect main device (backward compatibility)
         if controller is None:
@@ -804,12 +905,11 @@ class VestDaemon:
         success = controller.trigger_effect(command.cell, command.speed)
         
         if success:
-            # Broadcast effect triggered event (include device_id if specified)
-            device_id = command.device_id or self._registry.get_main_device_id()
+            # Broadcast effect triggered event (include resolved device_id)
             await self._clients.broadcast(event_effect_triggered(
                 command.cell, 
                 command.speed,
-                device_id=device_id
+                device_id=target_device_id
             ))
             return response_ok(command.req_id)
         else:
