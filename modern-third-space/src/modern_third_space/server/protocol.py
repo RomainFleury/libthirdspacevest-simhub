@@ -59,6 +59,11 @@ class CommandType(Enum):
     PISTOLWHIP_START = "pistolwhip_start"
     PISTOLWHIP_STOP = "pistolwhip_stop"
     PISTOLWHIP_STATUS = "pistolwhip_status"
+    # ULTRAKILL integration
+    ULTRAKILL_EVENT = "ultrakill_event"
+    ULTRAKILL_START = "ultrakill_start"
+    ULTRAKILL_STOP = "ultrakill_stop"
+    ULTRAKILL_STATUS = "ultrakill_status"
     # Predefined effects
     PLAY_EFFECT = "play_effect"
     LIST_EFFECTS = "list_effects"
@@ -102,6 +107,10 @@ class EventType(Enum):
     PISTOLWHIP_STARTED = "pistolwhip_started"
     PISTOLWHIP_STOPPED = "pistolwhip_stopped"
     PISTOLWHIP_GAME_EVENT = "pistolwhip_game_event"
+    # ULTRAKILL integration
+    ULTRAKILL_STARTED = "ultrakill_started"
+    ULTRAKILL_STOPPED = "ultrakill_stopped"
+    ULTRAKILL_GAME_EVENT = "ultrakill_game_event"
     # Predefined effects
     EFFECT_STARTED = "effect_started"
     EFFECT_COMPLETED = "effect_completed"
@@ -132,6 +141,9 @@ class Command:
     damage: Optional[float] = None  # Damage amount
     health_remaining: Optional[float] = None  # Remaining health
     cause: Optional[str] = None  # Death cause
+    # ULTRAKILL params
+    direction: Optional[str] = None  # "front", "back", "left", "right"
+    intensity: Optional[int] = None  # 0-100 intensity
     # Predefined effects params
     effect_name: Optional[str] = None  # Effect to play
     
@@ -155,6 +167,8 @@ class Command:
             damage=data.get("damage"),
             health_remaining=data.get("health_remaining"),
             cause=data.get("cause"),
+            direction=data.get("direction"),
+            intensity=data.get("intensity"),
             effect_name=data.get("effect_name"),
         )
     
@@ -199,6 +213,8 @@ class Event:
     params: Optional[Dict[str, Any]] = None  # For alyx_game_event params
     # SUPERHOT VR info
     hand: Optional[str] = None  # "left" or "right" for hand-specific events
+    # ULTRAKILL info
+    direction: Optional[str] = None  # "front", "back", "left", "right"
     # Predefined effects info
     effect_name: Optional[str] = None  # Name of effect being played/completed
     
@@ -629,6 +645,56 @@ def response_pistolwhip_status(
     """Response to pistolwhip_status command."""
     return Response(
         response="pistolwhip_status",
+        req_id=req_id,
+        running=enabled,
+        events_received=events_received,
+        last_event_ts=last_event_ts,
+        last_event_type=last_event_type,
+    )
+
+
+# -------------------------------------------------------------------------
+# ULTRAKILL events and responses
+# -------------------------------------------------------------------------
+
+def event_ultrakill_started() -> Event:
+    """ULTRAKILL integration started (mod connected)."""
+    return Event(event=EventType.ULTRAKILL_STARTED.value)
+
+def event_ultrakill_stopped() -> Event:
+    """ULTRAKILL integration stopped (mod disconnected)."""
+    return Event(event=EventType.ULTRAKILL_STOPPED.value)
+
+def event_ultrakill_game_event(
+    event_type: str,
+    direction: Optional[str] = None,
+    intensity: Optional[int] = None,
+) -> Event:
+    """
+    ULTRAKILL game event (damage, death, revolver_fire, etc.).
+    
+    Args:
+        event_type: Type of event ("damage", "death", "revolver_fire", etc.)
+        direction: "front", "back", "left", "right" for directional events
+        intensity: 0-100 intensity for damage events
+    """
+    return Event(
+        event=EventType.ULTRAKILL_GAME_EVENT.value,
+        event_type=event_type,
+        direction=direction,
+        intensity=intensity,
+    )
+
+def response_ultrakill_status(
+    enabled: bool,
+    events_received: int = 0,
+    last_event_ts: Optional[float] = None,
+    last_event_type: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to ultrakill_status command."""
+    return Response(
+        response="ultrakill_status",
         req_id=req_id,
         running=enabled,
         events_received=events_received,

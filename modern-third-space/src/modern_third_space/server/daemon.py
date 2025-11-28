@@ -52,6 +52,7 @@ from .alyx_manager import AlyxManager, get_mod_info as get_alyx_mod_info
 from .superhot_manager import SuperHotManager
 from .gtav_manager import GTAVManager
 from .pistolwhip_manager import PistolWhipManager
+from .ultrakill_manager import UltrakillManager
 from .protocol import (
     event_alyx_started,
     event_alyx_stopped,
@@ -72,6 +73,10 @@ from .protocol import (
     event_pistolwhip_stopped,
     event_pistolwhip_game_event,
     response_pistolwhip_status,
+    event_ultrakill_started,
+    event_ultrakill_stopped,
+    event_ultrakill_game_event,
+    response_ultrakill_status,
     # Predefined effects
     event_effect_started,
     event_effect_completed,
@@ -131,6 +136,10 @@ class VestDaemon:
         self._pistolwhip_manager = PistolWhipManager()
         self._pistolwhip_manager.set_event_callback(self._on_pistolwhip_game_event)
         self._pistolwhip_manager.set_trigger_callback(self._on_pistolwhip_trigger)
+        
+        self._ultrakill_manager = UltrakillManager()
+        self._ultrakill_manager.set_event_callback(self._on_ultrakill_game_event)
+        self._ultrakill_manager.set_trigger_callback(self._on_ultrakill_trigger)
         
         self._loop: Optional[asyncio.AbstractEventLoop] = None
     
@@ -356,6 +365,19 @@ class VestDaemon:
         
         if cmd_type == CommandType.PISTOLWHIP_STATUS:
             return await self._cmd_pistolwhip_status(command)
+        
+        # ULTRAKILL commands
+        if cmd_type == CommandType.ULTRAKILL_EVENT:
+            return await self._cmd_ultrakill_event(command)
+        
+        if cmd_type == CommandType.ULTRAKILL_START:
+            return await self._cmd_ultrakill_start(command)
+        
+        if cmd_type == CommandType.ULTRAKILL_STOP:
+            return await self._cmd_ultrakill_stop(command)
+        
+        if cmd_type == CommandType.ULTRAKILL_STATUS:
+            return await self._cmd_ultrakill_status(command)
         
         # Predefined effects commands
         if cmd_type == CommandType.PLAY_EFFECT:
@@ -882,7 +904,54 @@ class VestDaemon:
             last_event_type=status.get("last_event_type"),
             req_id=command.req_id,
         )
-    
+
+    # -------------------------------------------------------------------------
+    # ULTRAKILL command handlers
+    # -------------------------------------------------------------------------
+
+    async def _cmd_ultrakill_event(self, command: Command) -> Response:
+        """
+        Process an ULTRAKILL game event from the BepInEx mod.
+        
+        This is the main entry point for events from the game.
+        """
+        if not command.event:
+            return response_error("Missing event name", command.req_id)
+        
+        success = self._ultrakill_manager.process_event(
+            event_name=command.event,
+            direction=command.direction,
+            intensity=command.intensity,
+        )
+        
+        if success:
+            return response_ok(command.req_id)
+        else:
+            return response_error(f"Failed to process event: {command.event}", command.req_id)
+
+    async def _cmd_ultrakill_start(self, command: Command) -> Response:
+        """Enable ULTRAKILL event processing."""
+        self._ultrakill_manager.enable()
+        await self._clients.broadcast(event_ultrakill_started())
+        return response_ok(command.req_id)
+
+    async def _cmd_ultrakill_stop(self, command: Command) -> Response:
+        """Disable ULTRAKILL event processing."""
+        self._ultrakill_manager.disable()
+        await self._clients.broadcast(event_ultrakill_stopped())
+        return response_ok(command.req_id)
+
+    async def _cmd_ultrakill_status(self, command: Command) -> Response:
+        """Get ULTRAKILL integration status."""
+        status = self._ultrakill_manager.get_status()
+        return response_ultrakill_status(
+            enabled=status["enabled"],
+            events_received=status["events_received"],
+            last_event_ts=status["last_event_ts"],
+            last_event_type=status.get("last_event_type"),
+            req_id=command.req_id,
+        )
+
     # -------------------------------------------------------------------------
     # Pistol Whip callbacks
     # -------------------------------------------------------------------------
@@ -905,6 +974,39 @@ class VestDaemon:
     def _on_pistolwhip_trigger(self, cell: int, speed: int):
         """
         Called when Pistol Whip manager wants to trigger a haptic effect.
+        
+        Routes the trigger command to the selected vest device.
+        """
+        if self._loop is None:
+            return
+        
+        asyncio.run_coroutine_threadsafe(
+            self._cmd_trigger(Command(cmd="trigger", cell=cell, speed=speed)),
+            self._loop,
+        )
+
+    # -------------------------------------------------------------------------
+    # ULTRAKILL callbacks
+    # -------------------------------------------------------------------------
+
+    def _on_ultrakill_game_event(self, event_type: str, event_name: str, direction: Optional[str]):
+        """
+        Called when ULTRAKILL manager processes a game event.
+        
+        Broadcasts the event to all connected clients for UI display.
+        """
+        if self._loop is None:
+            return
+        
+        event = event_ultrakill_game_event(event_name, direction)
+        asyncio.run_coroutine_threadsafe(
+            self._clients.broadcast(event),
+            self._loop,
+        )
+
+    def _on_ultrakill_trigger(self, cell: int, speed: int):
+        """
+        Called when ULTRAKILL manager wants to trigger a haptic effect.
         
         Routes the trigger command to the selected vest device.
         """

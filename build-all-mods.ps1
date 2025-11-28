@@ -1,5 +1,5 @@
 # Build script for all Third Space Vest mods
-# This script builds all mods in the repository: SUPERHOT VR, GTA V, Pistol Whip, and SimHub plugin
+# This script builds all mods in the repository: SUPERHOT VR, GTA V, Pistol Whip, ULTRAKILL, and SimHub plugin
 #
 # Usage:
 #   .\build-all-mods.ps1              # Build all mods
@@ -8,7 +8,7 @@
 
 param(
     [Parameter()]
-    [string[]]$Mods = @("superhot", "gta5", "pistolwhip", "simhub"),
+    [string[]]$Mods = @("superhot", "gta5", "pistolwhip", "ultrakill", "simhub"),
     [switch]$Clean,
     [switch]$SkipPrerequisites
 )
@@ -46,6 +46,15 @@ $modConfigs = @{
         RequiresLibs = @("MelonLoader.dll", "0Harmony.dll", "Il2Cppmscorlib.dll", "Il2CppUnityEngine.dll", "Assembly-CSharp.dll")
         LibsSource = "Pistol Whip\MelonLoader\Managed\"
         BuildScript = $null
+    }
+    "ultrakill" = @{
+        Name = "ULTRAKILL"
+        Path = "ultrakill-mod"
+        Solution = "ThirdSpace_ULTRAKILL.sln"
+        OutputDll = "ThirdSpace_ULTRAKILL\bin\Release\ThirdSpace_ULTRAKILL.dll"
+        RequiresLibs = @("BepInEx.dll", "0Harmony.dll", "Assembly-CSharp.dll", "UnityEngine.dll", "UnityEngine.CoreModule.dll")
+        LibsSource = "ULTRAKILL\BepInEx\core\ and ULTRAKILL\ULTRAKILL_Data\Managed\"
+        BuildScript = "build.ps1"
     }
     "simhub" = @{
         Name = "SimHub Plugin"
