@@ -357,22 +357,56 @@ export type LogEntry = {
 
 ### Phase 6: Game Integration Updates
 
-**Goal**: Update game integrations to support multi-vest (optional).
+**Goal**: Update daemon trigger callbacks to use multi-vest registry while maintaining backward compatibility.
+
+**Key Principle**: 
+- **Game managers DO NOT need to change** - they keep the same callback signature `(cell: int, speed: int) -> None`
+- **All game integrations default to main device** (backward compatible)
+- **No breaking changes** - existing single-vest behavior is preserved
 
 **Tasks**:
-1. Update game managers to support device_id parameter
-2. Add player targeting for multiplayer games
-3. Maintain backward compatibility (default to main device)
+1. Update daemon's `_on_*_trigger` callbacks to use registry instead of `self._controller`
+2. Default to main device when no device_id/player_id specified
+3. Keep callback signatures unchanged (game managers don't need updates)
 
 **Files to Modify**:
-- `modern-third-space/src/modern_third_space/server/cs2_manager.py` - Add device_id support
-- `modern-third-space/src/modern_third_space/server/alyx_manager.py` - Add device_id support
-- Other game managers...
+- `modern-third-space/src/modern_third_space/server/daemon.py` - Update trigger callbacks:
+  - `_on_cs2_trigger(cell, speed)` → use registry.get_controller(main_device_id)
+  - `_on_alyx_trigger(cell, speed)` → use registry.get_controller(main_device_id)
+  - `_on_superhot_trigger(cell, speed)` → use registry.get_controller(main_device_id)
+  - `_on_gtav_trigger(cell, speed)` → use registry.get_controller(main_device_id)
+  - `_on_pistolwhip_trigger(cell, speed)` → already uses `_cmd_trigger`, keep as-is
 
 **Approach**:
-- Game integrations default to main device (backward compatible)
-- Can optionally target specific device_id or player_id
-- Multiplayer games can send different events to different players
+- **Backward Compatible**: All callbacks default to main device (no device_id specified)
+- **Game Managers Unchanged**: They continue calling `on_trigger(cell, speed)` with same signature
+- **Future Multiplayer**: For multiplayer games later, we can add optional `device_id`/`player_id` parameters, but for now, single-vest games work as-is
+- **Implementation**: Get main device controller from registry, call `trigger_effect()` directly (synchronous, thread-safe)
+
+**Example**:
+```python
+def _on_cs2_trigger(self, cell: int, speed: int):
+    """Called when CS2 wants to trigger a haptic effect (defaults to main device)."""
+    # Get main device controller (backward compatible - always uses main device)
+    main_device_id = self._registry.get_main_device_id()
+    if main_device_id is None:
+        return  # No device available
+    
+    controller = self._registry.get_controller(main_device_id)
+    if controller is None or not controller.status().connected:
+        return  # Device not connected
+    
+    # Trigger effect (synchronous, thread-safe)
+    controller.trigger_effect(cell, speed)
+    
+    # Broadcast event (async)
+    if self._loop is not None:
+        event = event_effect_triggered(cell, speed, device_id=main_device_id)
+        asyncio.run_coroutine_threadsafe(
+            self._clients.broadcast(event),
+            self._loop,
+        )
+```
 
 ---
 
