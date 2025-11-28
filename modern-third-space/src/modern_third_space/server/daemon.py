@@ -22,6 +22,7 @@ from typing import Any, Dict, Optional
 from ..vest import VestController, VestStatus, list_devices, get_effect, all_effects_to_dict, effect_to_dict
 from .client_manager import Client, ClientManager
 from .vest_registry import VestControllerRegistry
+from .player_manager import PlayerManager
 from .protocol import (
     Command,
     CommandType,
@@ -40,6 +41,8 @@ from .protocol import (
     event_device_connected,
     event_device_disconnected,
     event_main_device_changed,
+    event_player_assigned,
+    event_player_unassigned,
     response_error,
     response_get_selected_device,
     response_list,
@@ -53,6 +56,11 @@ from .protocol import (
     response_list_connected_devices,
     response_set_main_device,
     response_disconnect_device,
+    response_create_player,
+    response_assign_player,
+    response_unassign_player,
+    response_list_players,
+    response_get_player_device,
 )
 from .cs2_manager import CS2Manager, generate_cs2_config
 from .alyx_manager import AlyxManager, get_mod_info as get_alyx_mod_info
@@ -109,6 +117,7 @@ class VestDaemon:
         
         # State - Multi-vest support
         self._registry = VestControllerRegistry()
+        self._player_manager = PlayerManager()
         # Keep _selected_device for backward compatibility (refers to main device)
         self._selected_device: Optional[Dict[str, Any]] = None
         # Legacy: _controller now refers to main device controller (for backward compatibility)
@@ -604,13 +613,151 @@ class VestDaemon:
         
         return response_ok(command.req_id)
     
+    async def _cmd_create_player(self, command: Command) -> Response:
+        """Create a new player."""
+        if not command.player_id:
+            return response_create_player(
+                success=False,
+                error="player_id is required",
+                req_id=command.req_id,
+            )
+        
+        # Get name from command (could be in a name field or message field)
+        # For now, we'll use a simple approach - name can be passed via message or a new field
+        name = getattr(command, 'name', None) or (command.message if hasattr(command, 'message') else None)
+        
+        player = self._player_manager.create_player(command.player_id, name)
+        
+        return response_create_player(
+            success=True,
+            player_id=player.player_id,
+            name=player.name,
+            req_id=command.req_id,
+        )
+    
+    async def _cmd_assign_player(self, command: Command) -> Response:
+        """Assign a player to a device."""
+        if not command.player_id:
+            return response_assign_player(
+                success=False,
+                error="player_id is required",
+                req_id=command.req_id,
+            )
+        
+        if not command.device_id:
+            return response_assign_player(
+                success=False,
+                error="device_id is required",
+                req_id=command.req_id,
+            )
+        
+        # Verify device exists
+        if not self._registry.has_device(command.device_id):
+            return response_assign_player(
+                success=False,
+                error=f"Device {command.device_id} not found",
+                req_id=command.req_id,
+            )
+        
+        # Create player if doesn't exist
+        if not self._player_manager.has_player(command.player_id):
+            self._player_manager.create_player(command.player_id)
+        
+        # Assign player to device
+        success = self._player_manager.assign_player(command.player_id, command.device_id)
+        if not success:
+            return response_assign_player(
+                success=False,
+                error="Failed to assign player",
+                req_id=command.req_id,
+            )
+        
+        # Get player info for event
+        player = self._player_manager.get_player(command.player_id)
+        
+        # Broadcast player assigned event
+        await self._clients.broadcast(
+            event_player_assigned(command.player_id, command.device_id, player.name if player else None)
+        )
+        
+        return response_assign_player(
+            success=True,
+            player_id=command.player_id,
+            device_id=command.device_id,
+            req_id=command.req_id,
+        )
+    
+    async def _cmd_unassign_player(self, command: Command) -> Response:
+        """Unassign a player from their device."""
+        if not command.player_id:
+            return response_unassign_player(
+                success=False,
+                error="player_id is required",
+                req_id=command.req_id,
+            )
+        
+        if not self._player_manager.has_player(command.player_id):
+            return response_unassign_player(
+                success=False,
+                error=f"Player {command.player_id} not found",
+                req_id=command.req_id,
+            )
+        
+        success = self._player_manager.unassign_player(command.player_id)
+        if not success:
+            return response_unassign_player(
+                success=False,
+                error="Failed to unassign player",
+                req_id=command.req_id,
+            )
+        
+        # Broadcast player unassigned event
+        await self._clients.broadcast(
+            event_player_unassigned(command.player_id)
+        )
+        
+        return response_unassign_player(
+            success=True,
+            player_id=command.player_id,
+            req_id=command.req_id,
+        )
+    
+    async def _cmd_list_players(self, command: Command) -> Response:
+        """List all players."""
+        players = self._player_manager.list_players()
+        return response_list_players(players, command.req_id)
+    
+    async def _cmd_get_player_device(self, command: Command) -> Response:
+        """Get the device_id assigned to a player."""
+        if not command.player_id:
+            return response_get_player_device(
+                device_id=None,
+                error="player_id is required",
+                req_id=command.req_id,
+            )
+        
+        device_id = self._player_manager.get_player_device(command.player_id)
+        return response_get_player_device(
+            device_id=device_id,
+            player_id=command.player_id,
+            req_id=command.req_id,
+        )
+    
     async def _cmd_trigger(self, command: Command) -> Response:
-        """Trigger an effect (on specified device_id or main device)."""
+        """Trigger an effect (on specified device_id, player_id, or main device)."""
         if command.cell is None or command.speed is None:
             return response_error("Must specify cell and speed", command.req_id)
         
+        # Resolve device_id from player_id if provided
+        target_device_id = command.device_id
+        if command.player_id:
+            target_device_id = self._player_manager.get_player_device(command.player_id)
+            # If player not assigned, fall back to main device
+            if target_device_id is None:
+                target_device_id = self._registry.get_main_device_id()
+        
         # Get controller for specified device_id, or main device
-        controller = self._registry.get_controller(command.device_id)
+        controller = self._registry.get_controller(target_device_id)
         
         # If no controller found, try to auto-connect main device (backward compatibility)
         if controller is None:

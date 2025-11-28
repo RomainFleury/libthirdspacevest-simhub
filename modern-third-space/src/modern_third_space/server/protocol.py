@@ -32,6 +32,12 @@ class CommandType(Enum):
     LIST_CONNECTED_DEVICES = "list_connected_devices"
     SET_MAIN_DEVICE = "set_main_device"
     DISCONNECT_DEVICE = "disconnect_device"
+    # Player management commands
+    CREATE_PLAYER = "create_player"
+    ASSIGN_PLAYER = "assign_player"
+    UNASSIGN_PLAYER = "unassign_player"
+    LIST_PLAYERS = "list_players"
+    GET_PLAYER_DEVICE = "get_player_device"
     # Vest control
     CONNECT = "connect"
     DISCONNECT = "disconnect"
@@ -79,6 +85,9 @@ class EventType(Enum):
     DEVICE_CONNECTED = "device_connected"
     DEVICE_DISCONNECTED = "device_disconnected"
     MAIN_DEVICE_CHANGED = "main_device_changed"
+    # Player management events
+    PLAYER_ASSIGNED = "player_assigned"
+    PLAYER_UNASSIGNED = "player_unassigned"
     # Connection
     CONNECTED = "connected"
     DISCONNECTED = "disconnected"
@@ -348,6 +357,23 @@ def event_main_device_changed(device_id: str, device: Optional[Dict[str, Any]] =
         event=EventType.MAIN_DEVICE_CHANGED.value,
         device_id=device_id,
         device=device,
+    )
+
+# Player management event helpers
+def event_player_assigned(player_id: str, device_id: str, name: Optional[str] = None) -> Event:
+    """Create a player_assigned event."""
+    return Event(
+        event=EventType.PLAYER_ASSIGNED.value,
+        player_id=player_id,
+        device_id=device_id,
+        message=name,  # Use message field for player name
+    )
+
+def event_player_unassigned(player_id: str) -> Event:
+    """Create a player_unassigned event."""
+    return Event(
+        event=EventType.PLAYER_UNASSIGNED.value,
+        player_id=player_id,
     )
 
 
