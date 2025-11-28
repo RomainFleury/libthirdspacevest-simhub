@@ -13,6 +13,10 @@ export type VestEffect = {
   cell: number;
   speed: number;
   preset?: string; // For combined effects: "front", "back", "all"
+  device_id?: string;  // Optional: target specific device
+  player_id?: string;  // Optional: target specific player
+  game_id?: string;    // Optional: for game-specific targeting
+  player_num?: number; // Optional: player number for game-specific targeting
 };
 
 export type VestDevice = {
