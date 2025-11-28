@@ -23,6 +23,7 @@ from ..vest import VestController, VestStatus, list_devices, get_effect, all_eff
 from .client_manager import Client, ClientManager
 from .vest_registry import VestControllerRegistry
 from .player_manager import PlayerManager
+from .game_player_mapping import GamePlayerMapping
 from .protocol import (
     Command,
     CommandType,
@@ -61,6 +62,9 @@ from .protocol import (
     response_unassign_player,
     response_list_players,
     response_get_player_device,
+    response_set_game_player_mapping,
+    response_clear_game_player_mapping,
+    response_list_game_player_mappings,
 )
 from .cs2_manager import CS2Manager, generate_cs2_config
 from .alyx_manager import AlyxManager, get_mod_info as get_alyx_mod_info
@@ -118,6 +122,7 @@ class VestDaemon:
         # State - Multi-vest support
         self._registry = VestControllerRegistry()
         self._player_manager = PlayerManager()
+        self._game_mapping = GamePlayerMapping()
         # Keep _selected_device for backward compatibility (refers to main device)
         self._selected_device: Optional[Dict[str, Any]] = None
         # Legacy: _controller now refers to main device controller (for backward compatibility)

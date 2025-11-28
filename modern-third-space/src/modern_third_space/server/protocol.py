@@ -38,6 +38,10 @@ class CommandType(Enum):
     UNASSIGN_PLAYER = "unassign_player"
     LIST_PLAYERS = "list_players"
     GET_PLAYER_DEVICE = "get_player_device"
+    # Game-specific player mapping commands
+    SET_GAME_PLAYER_MAPPING = "set_game_player_mapping"
+    CLEAR_GAME_PLAYER_MAPPING = "clear_game_player_mapping"
+    LIST_GAME_PLAYER_MAPPINGS = "list_game_player_mappings"
     # Vest control
     CONNECT = "connect"
     DISCONNECT = "disconnect"
@@ -88,6 +92,8 @@ class EventType(Enum):
     # Player management events
     PLAYER_ASSIGNED = "player_assigned"
     PLAYER_UNASSIGNED = "player_unassigned"
+    # Game-specific player mapping events
+    GAME_PLAYER_MAPPING_CHANGED = "game_player_mapping_changed"
     # Connection
     CONNECTED = "connected"
     DISCONNECTED = "disconnected"
@@ -374,6 +380,16 @@ def event_player_unassigned(player_id: str) -> Event:
     return Event(
         event=EventType.PLAYER_UNASSIGNED.value,
         player_id=player_id,
+    )
+
+# Game-specific player mapping event helpers
+def event_game_player_mapping_changed(game_id: str, player_num: int, device_id: Optional[str] = None) -> Event:
+    """Create a game_player_mapping_changed event."""
+    return Event(
+        event=EventType.GAME_PLAYER_MAPPING_CHANGED.value,
+        game_id=game_id,
+        player_num=player_num,
+        device_id=device_id,
     )
 
 
