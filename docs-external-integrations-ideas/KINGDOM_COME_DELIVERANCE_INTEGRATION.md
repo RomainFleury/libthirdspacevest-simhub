@@ -51,9 +51,74 @@ Warhorse Studios provides official modding tools:
 
 ## Integration Approaches
 
-### Approach 1: Log File Watching ⭐⭐⭐
+### Approach 1: Telemetry Data Access ⭐⭐⭐
 
-**Complexity: MEDIUM** | **Feasibility: HIGH**
+**Complexity: MEDIUM** | **Feasibility: MEDIUM-HIGH**
+
+**Key Discovery:** Kingdom Come: Deliverance 2 has telemetry metrics that are **stored locally on your device** ([source](https://legal.kingdomcomerpg.com/privacy)). The Day One Patch added "additional telemetry metrics" ([source](https://www.gamewatcher.com/news/kingdom-come-deliverance-2-patch-notes-roadmap)).
+
+**How it works:**
+1. **KCD stores telemetry locally** - Data stored on device via "cookies and application data caches"
+2. **Find telemetry files** - Locate where telemetry data is stored locally
+3. **File watcher** - Python watches telemetry files for changes
+4. **Event parsing** - Parse telemetry data for damage, health, combat events
+5. **Haptic mapping** - Map events to vest cells
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Kingdom Come: Deliverance 2                            │
+│  • Collects telemetry data                              │
+│  • Stores locally on device                             │
+│  • Location: TBD (need to find)                        │
+└─────────────────────────────────────────────────────────┘
+                        │
+                        ▼ writes telemetry
+┌─────────────────────────────────────────────────────────┐
+│  Local Telemetry Files                                  │
+│  • Gameplay statistics                                  │
+│  • Feature usage                                        │
+│  • Combat events (possibly)                             │
+│  • Damage/health data (possibly)                        │
+└─────────────────────────────────────────────────────────┘
+                        │
+                        ▼ file watcher
+┌─────────────────────────────────────────────────────────┐
+│  Python Integration                                     │
+│  • Watches telemetry files                              │
+│  • Parses telemetry data                                │
+│  • Maps events → vest cells                            │
+│  • TCP to daemon                                       │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Advantages:**
+- ✅ **No mod required** - Uses existing telemetry system
+- ✅ **Real-time** - File watcher detects changes instantly
+- ✅ **Official feature** - Telemetry is part of the game
+- ✅ **Local access** - Data stored locally, no API calls
+
+**Challenges:**
+- ❓ Need to find where telemetry files are stored
+- ❓ Need to understand telemetry data format
+- ❓ May not contain all needed data (body parts, etc.)
+- ❓ Telemetry format may change with updates
+- ❓ May need to enable telemetry in settings
+
+**Research Needed:**
+- [ ] Find KCD telemetry file location (likely in AppData or game directory)
+- [ ] Document telemetry data format (JSON, XML, binary?)
+- [ ] Identify what events are in telemetry data
+- [ ] Test if damage/health/combat data is available
+- [ ] Check if telemetry needs to be enabled in settings
+
+**References:**
+- [KCD Privacy Policy](https://legal.kingdomcomerpg.com/privacy) - Mentions telemetry stored locally
+- [KCD 2 Patch Notes](https://www.gamewatcher.com/news/kingdom-come-deliverance-2-patch-notes-roadmap) - "Added additional telemetry metrics"
+- [KCD Coding Guide (Lua)](https://github.com/benjaminfoo/kcd_coding_guide) - May help understand game systems
+
+### Approach 2: Log File Watching ⭐⭐
+
+**Complexity: MEDIUM** | **Feasibility: MEDIUM**
 
 Monitor game log files for events (similar to HL:Alyx integration).
 
@@ -107,7 +172,38 @@ Monitor game log files for events (similar to HL:Alyx integration).
 - [ ] Identify what events are logged
 - [ ] Test if body part damage is in logs
 
-### Approach 2: CryEngine Mod - Event Hooks ⭐⭐
+### Approach 3: Lua Scripting (via KCD API) ⭐⭐
+
+**Complexity: MEDIUM-HIGH** | **Feasibility: MEDIUM**
+
+**Key Discovery:** There's an [unofficial KCD coding guide](https://github.com/benjaminfoo/kcd_coding_guide) that documents using **Lua** and the **KCD API** to interact with game systems.
+
+**How it works:**
+1. **Create Lua script** - Use KCD's Lua API to hook game events
+2. **Hook game events** - Access combat, damage, health events via Lua
+3. **Write to file** - Output events to log file (like HL:Alyx)
+4. **OR TCP client** - Send events directly to daemon
+5. **Python integration** - File watcher or TCP server
+
+**Advantages:**
+- ✅ **Official API** - Uses KCD's Lua scripting system
+- ✅ **Full control** - Can access game events directly
+- ✅ **Real-time** - Direct event hooks
+- ✅ **Body part data** - May be able to access detailed damage info
+
+**Challenges:**
+- ❌ Requires learning KCD Lua API
+- ❌ Need to understand KCD's scripting system
+- ❌ May need CryEngine modding knowledge
+- ❌ Needs to be updated with game patches
+
+**Research Needed:**
+- [ ] Review [KCD Coding Guide](https://github.com/benjaminfoo/kcd_coding_guide)
+- [ ] Learn KCD Lua API
+- [ ] Test Lua script execution
+- [ ] Document event hooking methods
+
+### Approach 4: CryEngine Mod - Event Hooks ⭐
 
 **Complexity: HIGH** | **Feasibility: MEDIUM**
 
@@ -137,7 +233,7 @@ Create a CryEngine mod that hooks game events and writes to file/TCP.
 - [ ] Test mod creation workflow
 - [ ] Document event hooking methods
 
-### Approach 3: Memory Reading (Not Recommended)
+### Approach 5: Memory Reading (Not Recommended)
 
 **Complexity: EXTREME** | **Feasibility: LOW**
 
@@ -248,14 +344,27 @@ Right Leg             → Back right (cells 5, 7)
 
 ### Immediate (Phase 1)
 
-1. **Log File Research**
+1. **Telemetry Data Research** ⭐ (PRIORITY)
+   - [ ] Find KCD telemetry file location (check AppData, game directory)
+   - [ ] Document telemetry data format (JSON, XML, binary?)
+   - [ ] Identify what events/metrics are in telemetry
+   - [ ] Test if damage/health/combat data is available
+   - [ ] Check if telemetry needs to be enabled in settings
+   - [ ] Create telemetry parser prototype
+
+2. **Lua API Research**
+   - [ ] Review [KCD Coding Guide](https://github.com/benjaminfoo/kcd_coding_guide)
+   - [ ] Learn KCD Lua API basics
+   - [ ] Test Lua script execution
+   - [ ] Document event hooking methods via Lua
+
+3. **Log File Research** (Alternative)
    - [ ] Find KCD log file location
    - [ ] Document log file format
    - [ ] Identify what events are logged
    - [ ] Test if body part damage is in logs
-   - [ ] Create log parser prototype
 
-2. **CryEngine Modding Research**
+4. **CryEngine Modding Research** (Fallback)
    - [ ] Review CryEngine Sandbox Editor documentation
    - [ ] Review existing KCD mods for event hooking examples
    - [ ] Learn FlowGraph basics
@@ -281,6 +390,9 @@ Right Leg             → Back right (cells 5, 7)
 
 ## Resources
 
+- **KCD Privacy Policy**: [legal.kingdomcomerpg.com](https://legal.kingdomcomerpg.com/privacy) - Mentions telemetry stored locally
+- **KCD 2 Patch Notes**: [gamewatcher.com](https://www.gamewatcher.com/news/kingdom-come-deliverance-2-patch-notes-roadmap) - "Added additional telemetry metrics"
+- **KCD Coding Guide (Lua)**: [github.com/benjaminfoo/kcd_coding_guide](https://github.com/benjaminfoo/kcd_coding_guide) - Unofficial guide for Lua scripting
 - **Official Modding Tools**: [Warhorse Studios Press Release](https://press.kingdomcomerpg.com/press-release/warhorse-studios-releases-modding-tools/)
 - **ModForge**: https://github.com/Destuur/ModForge
 - **KCD Mod Builder**: https://github.com/Antstar609/KCD-Mod-Packer
@@ -295,8 +407,9 @@ Right Leg             → Back right (cells 5, 7)
 
 ## Next Steps
 
-1. **Find Log Files** - Locate KCD log file location and format
-2. **Review Existing Mods** - Look at community mods to understand event hooking
-3. **Test Log Watching** - Create prototype log file watcher
-4. **OR Learn CryEngine** - If logs don't have enough data, learn CryEngine modding
+1. **Find Telemetry Files** ⭐ (PRIORITY) - Locate where KCD stores telemetry data locally
+2. **Analyze Telemetry Format** - Document data structure and available metrics
+3. **Test Telemetry Access** - Verify if damage/health/combat data is available
+4. **OR Review Lua API** - If telemetry insufficient, explore KCD Lua scripting
+5. **OR Find Log Files** - Alternative: locate KCD log file location and format
 

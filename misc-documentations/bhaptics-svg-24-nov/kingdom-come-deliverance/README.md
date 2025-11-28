@@ -27,7 +27,40 @@ Warhorse Studios provides official modding tools:
 
 ## Integration Approaches
 
-### Approach 1: Log File Watching (Recommended First)
+### Approach 1: Telemetry Data Access (Recommended First) ⭐
+
+**Key Discovery:** KCD 2 has telemetry metrics that are **stored locally on your device**. The Day One Patch added "additional telemetry metrics".
+
+**How it works:**
+1. Find where KCD stores telemetry files locally
+2. Watch telemetry files for changes
+3. Parse telemetry data (damage, health, combat events)
+4. Map to haptic effects
+
+**Research Needed:**
+- [ ] Find telemetry file location (likely AppData or game directory)
+- [ ] Document telemetry format (JSON, XML, binary?)
+- [ ] Identify available metrics/events
+- [ ] Test if damage/health/combat data is available
+
+**References:**
+- [KCD Privacy Policy](https://legal.kingdomcomerpg.com/privacy) - Mentions telemetry stored locally
+- [KCD 2 Patch Notes](https://www.gamewatcher.com/news/kingdom-come-deliverance-2-patch-notes-roadmap) - "Added additional telemetry metrics"
+
+### Approach 2: Lua Scripting (via KCD API)
+
+**There's an [unofficial KCD coding guide](https://github.com/benjaminfoo/kcd_coding_guide) for Lua scripting.**
+
+1. Use KCD's Lua API to hook game events
+2. Write events to file or send via TCP
+3. Python integration watches file or receives TCP
+
+**Research Needed:**
+- [ ] Review KCD Coding Guide
+- [ ] Learn KCD Lua API
+- [ ] Test Lua script execution
+
+### Approach 3: Log File Watching (Alternative)
 
 **Similar to HL:Alyx integration**
 
