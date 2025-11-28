@@ -478,11 +478,13 @@ def response_create_mock_device(success: bool, device_id: Optional[str] = None, 
 
 def response_remove_mock_device(success: bool, device_id: Optional[str] = None, error: Optional[str] = None, req_id: Optional[str] = None) -> Response:
     """Response for remove_mock_device command."""
+    # Create device dict if device_id is provided
+    device = {"device_id": device_id} if device_id else None
     return Response(
         response="remove_mock_device",
         req_id=req_id,
         success=success,
-        device_id=device_id,
+        device=device,
         message=error,
     )
 
