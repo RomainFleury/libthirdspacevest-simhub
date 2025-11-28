@@ -42,7 +42,7 @@ export const VestsPage: React.FC = () => {
           Multi-Vest Management
         </h1>
         <p className="text-gray-600 dark:text-gray-400">
-          Manage multiple vests, assign players, and configure game-specific mappings
+          Manage multiple vests and assign players to devices
         </p>
       </div>
 
