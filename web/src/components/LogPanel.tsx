@@ -75,12 +75,27 @@ export function LogPanel({ logs }: Props) {
   return (
     <section className="rounded-2xl bg-slate-800/80 p-4 shadow-lg ring-1 ring-white/5">
       <header className="mb-3">
-        <div className="flex items-center justify-between mb-2">
+        <div className="mb-3">
+          <p className="text-sm uppercase tracking-wide text-slate-400">Logs</p>
+          <h2 className="text-xl font-semibold text-white">Command History</h2>
+        </div>
+        <div className="space-y-2">
+          {filterOptions.length > 1 && (
+            <div>
+              <select
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {filterOptions.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div>
-            <p className="text-sm uppercase tracking-wide text-slate-400">Logs</p>
-            <h2 className="text-xl font-semibold text-white">Command History</h2>
-          </div>
-          <div className="flex items-center gap-3">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
@@ -90,19 +105,6 @@ export function LogPanel({ logs }: Props) {
               />
               <span className="text-xs text-slate-300">Play sound on effect</span>
             </label>
-            {filterOptions.length > 1 && (
-              <select
-                value={filter}
-                onChange={(e) => setFilter(e.target.value)}
-                className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {filterOptions.map(option => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            )}
           </div>
         </div>
         {filter !== "all" && (
