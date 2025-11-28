@@ -120,10 +120,23 @@ class GameState:
 # Event Detection
 # =============================================================================
 
-def detect_damage(current: GameState, previous_health: int) -> Optional[int]:
-    """Detect if player took damage. Returns damage amount or None."""
-    if current.player_state.health < previous_health:
-        return previous_health - current.player_state.health
+def detect_damage(current: GameState, previous_health: int = None) -> Optional[int]:
+    """
+    Detect if player took damage. Returns damage amount or None.
+    
+    Uses the 'previously' object from GSI payload which is more reliable.
+    """
+    # Use GSI's 'previously' field - this is the authoritative source
+    prev_player = current.previously.get("player", {})
+    prev_state = prev_player.get("state", {})
+    prev_health = prev_state.get("health")
+    
+    # Only detect damage if GSI explicitly tells us health changed
+    if prev_health is not None and current.player_state.health < prev_health:
+        damage = prev_health - current.player_state.health
+        # Ignore very small "damage" (can be false positives)
+        if damage >= 5:
+            return damage
     return None
 
 
@@ -167,11 +180,13 @@ def detect_round_start(current: GameState) -> bool:
 
 
 def detect_kill(current: GameState) -> bool:
-    """Detect if player got a kill."""
-    prev_player = current.previously.get("player", {})
-    prev_state = prev_player.get("state", {})
-    prev_kills = prev_state.get("round_kills", 0)
-    return current.player_state.round_kills > prev_kills
+    """
+    Detect if player got a kill.
+    
+    NOTE: Disabled - CS2 GSI sends round_kills inconsistently,
+    causing false positives on reload/fire.
+    """
+    return False  # Disabled due to false positives
 
 
 # =============================================================================
@@ -336,15 +351,12 @@ class CS2Manager:
             return
         
         self._process_game_state(game_state)
-        
-        # Update previous health for next comparison
-        self._previous_health = game_state.player_state.health
     
     def _process_game_state(self, gs: GameState):
         """Process game state and trigger effects/events."""
         
         # === DAMAGE ===
-        damage = detect_damage(gs, self._previous_health)
+        damage = detect_damage(gs)
         if damage:
             self._emit_event("damage", amount=damage)
             self._trigger_damage(damage)
@@ -375,10 +387,10 @@ class CS2Manager:
             self._emit_event("round_start")
             self._trigger_round_start()
         
-        # === GOT A KILL ===
-        if detect_kill(gs):
-            self._emit_event("kill")
-            self._trigger_kill()
+        # === GOT A KILL === (disabled - causes false positives)
+        # if detect_kill(gs):
+        #     self._emit_event("kill")
+        #     self._trigger_kill()
     
     def _emit_event(self, event_type: str, amount: Optional[int] = None, intensity: Optional[int] = None):
         """Emit a game event to the callback."""

@@ -20,9 +20,14 @@ src/modern_third_space/server/alyx_manager.py
 src/modern_third_space/server/client_manager.py
 src/modern_third_space/server/cs2_manager.py
 src/modern_third_space/server/daemon.py
+src/modern_third_space/server/gtav_manager.py
 src/modern_third_space/server/lifecycle.py
+src/modern_third_space/server/pistolwhip_manager.py
 src/modern_third_space/server/protocol.py
+src/modern_third_space/server/superhot_manager.py
 src/modern_third_space/vest/__init__.py
+src/modern_third_space/vest/cell_layout.py
 src/modern_third_space/vest/controller.py
 src/modern_third_space/vest/discovery.py
+src/modern_third_space/vest/effects.py
 src/modern_third_space/vest/status.py

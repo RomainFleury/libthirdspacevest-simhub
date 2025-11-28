@@ -145,10 +145,25 @@ class GameState:
 # Event Detection
 # =============================================================================
 
-def detect_damage(current: GameState, previous_health: int) -> Optional[int]:
-    """Detect if player took damage. Returns damage amount or None."""
-    if current.player_state.health < previous_health:
-        return previous_health - current.player_state.health
+def detect_damage(current: GameState, previous_health: int = None) -> Optional[int]:
+    """
+    Detect if player took damage. Returns damage amount or None.
+    
+    Uses the 'previously' object from GSI payload which is more reliable
+    than tracking health ourselves.
+    """
+    # Use GSI's 'previously' field - this is the authoritative source
+    prev_player = current.previously.get("player", {})
+    prev_state = prev_player.get("state", {})
+    prev_health = prev_state.get("health")
+    
+    # Only detect damage if GSI explicitly tells us health changed
+    if prev_health is not None and current.player_state.health < prev_health:
+        damage = prev_health - current.player_state.health
+        # Ignore very small "damage" (can be false positives)
+        if damage >= 5:
+            logger.debug(f"Damage detected: {prev_health} -> {current.player_state.health} = {damage}")
+            return damage
     return None
 
 
@@ -199,12 +214,21 @@ def detect_round_start(current: GameState) -> bool:
 
 
 def detect_kill(current: GameState) -> bool:
-    """Detect if player got a kill."""
-    prev_player = current.previously.get("player", {})
-    prev_state = prev_player.get("state", {})
-    prev_kills = prev_state.get("round_kills", 0)
+    """
+    Detect if player got a kill.
     
-    return current.player_state.round_kills > prev_kills
+    NOTE: This detection is unreliable - CS2 GSI sends round_kills in the
+    'previously' object inconsistently, causing false positives on reload/fire.
+    Disabled for now until a better detection method is found.
+    """
+    # Disabled due to false positives
+    return False
+    
+    # Original code (unreliable):
+    # prev_player = current.previously.get("player", {})
+    # prev_state = prev_player.get("state", {})
+    # prev_kills = prev_state.get("round_kills", 0)
+    # return current.player_state.round_kills > prev_kills
 
 
 # =============================================================================
@@ -288,7 +312,6 @@ class CS2GSIIntegration(BaseGameIntegration):
         self.gsi_port = gsi_port
         self._http_server: Optional[HTTPServer] = None
         self._server_thread: Optional[Thread] = None
-        self._previous_health = 100
         self._event_queue: asyncio.Queue = asyncio.Queue()
     
     async def start(self):
@@ -365,11 +388,15 @@ class CS2GSIIntegration(BaseGameIntegration):
         if game_state.player_activity != "playing":
             return
         
+        # Debug: log the 'previously' object to understand what triggers events
+        if game_state.previously:
+            prev_player = game_state.previously.get("player", {})
+            prev_state = prev_player.get("state", {})
+            if prev_state:
+                logger.info(f"GSI previously.player.state: {prev_state}")
+        
         # Detect events and trigger haptics
         await self._handle_game_event("game_state", {"state": game_state})
-        
-        # Update previous health for next comparison
-        self._previous_health = game_state.player_state.health
     
     async def _handle_game_event(self, event_type: str, data: dict):
         """
@@ -389,41 +416,47 @@ class CS2GSIIntegration(BaseGameIntegration):
                 return
         
         # === DAMAGE ===
-        damage = detect_damage(game_state, self._previous_health)
+        damage = detect_damage(game_state)
         if damage:
+            logger.info(f">>> TRIGGERING DAMAGE: {damage} HP")
             await self._trigger_damage(damage)
             self.emit_event("damage", {"amount": damage})
         
         # === DEATH ===
         if detect_death(game_state):
+            logger.info(">>> TRIGGERING DEATH")
             await self._trigger_death()
             self.emit_event("death", {})
         
         # === FLASH ===
         flash_intensity = detect_flash(game_state)
         if flash_intensity:
+            logger.info(f">>> TRIGGERING FLASH: {flash_intensity}")
             await self._trigger_flash(flash_intensity)
             self.emit_event("flash", {"intensity": flash_intensity})
         
         # === BOMB PLANTED ===
         if detect_bomb_planted(game_state):
+            logger.info(">>> TRIGGERING BOMB PLANTED")
             await self._trigger_bomb_planted()
             self.emit_event("bomb_planted", {})
         
         # === BOMB EXPLODED ===
         if detect_bomb_exploded(game_state):
+            logger.info(">>> TRIGGERING BOMB EXPLODED")
             await self._trigger_bomb_exploded()
             self.emit_event("bomb_exploded", {})
         
         # === ROUND START ===
         if detect_round_start(game_state):
+            logger.info(">>> TRIGGERING ROUND START")
             await self._trigger_round_start()
             self.emit_event("round_start", {})
         
-        # === GOT A KILL ===
-        if detect_kill(game_state):
-            await self._trigger_kill()
-            self.emit_event("kill", {})
+        # === GOT A KILL === (disabled - unreliable detection, causes false positives)
+        # if detect_kill(game_state):
+        #     await self._trigger_kill()
+        #     self.emit_event("kill", {})
     
     # =========================================================================
     # Haptic Effect Triggers
@@ -448,20 +481,37 @@ class CS2GSIIntegration(BaseGameIntegration):
         
         Intensity scales with damage amount.
         Higher damage = more cells, higher speed.
+        
+        Note: CS2 GSI doesn't provide hit direction, so we alternate between
+        front and back cells randomly to give a more varied experience.
+        For heavy damage, we trigger all cells.
         """
         logger.info(f"CS2: Player took {damage} damage")
         
         # Scale speed based on damage (1-10)
-        speed = min(10, max(1, damage // 10))
+        speed = min(10, max(3, damage // 8))
+        
+        # Use a simple alternation based on current health to vary front/back
+        # This gives the impression of being hit from different directions
+        import random
+        hit_from_back = random.choice([True, False])
         
         if damage < 25:
-            # Light damage: front cells only
-            await self.daemon.send_trigger(0, speed)
-            await self.daemon.send_trigger(1, speed)
+            # Light damage: 2 cells (front or back based on random)
+            if hit_from_back:
+                await self.daemon.send_trigger(4, speed)  # Back left upper
+                await self.daemon.send_trigger(5, speed)  # Back right upper
+            else:
+                await self.daemon.send_trigger(0, speed)  # Front left upper
+                await self.daemon.send_trigger(1, speed)  # Front right upper
         elif damage < 50:
-            # Medium damage: front + some back
-            for cell in [0, 1, 2, 3]:
-                await self.daemon.send_trigger(cell, speed)
+            # Medium damage: 4 cells (one side front + back)
+            if hit_from_back:
+                for cell in [4, 5, 6, 7]:  # All back cells
+                    await self.daemon.send_trigger(cell, speed)
+            else:
+                for cell in [0, 1, 2, 3]:  # All front cells
+                    await self.daemon.send_trigger(cell, speed)
         else:
             # Heavy damage: all cells
             for cell in range(8):
