@@ -21,6 +21,7 @@ from typing import Any, Dict, Optional
 
 from ..vest import VestController, VestStatus, list_devices, get_effect, all_effects_to_dict, effect_to_dict
 from .client_manager import Client, ClientManager
+from .vest_registry import VestControllerRegistry
 from .protocol import (
     Command,
     CommandType,
@@ -100,8 +101,11 @@ class VestDaemon:
         self.host = host
         self.port = port
         
-        # State
+        # State - Multi-vest support
+        self._registry = VestControllerRegistry()
+        # Keep _selected_device for backward compatibility (refers to main device)
         self._selected_device: Optional[Dict[str, Any]] = None
+        # Legacy: _controller now refers to main device controller (for backward compatibility)
         self._controller: Optional[VestController] = None
         self._clients = ClientManager()
         self._server: Optional[asyncio.Server] = None
@@ -141,10 +145,9 @@ class VestDaemon:
     
     @property
     def is_connected(self) -> bool:
-        """Whether connected to a vest."""
-        if self._controller is None:
-            return False
-        return self._controller.status().connected
+        """Whether connected to a vest (main device)."""
+        controller = self._registry.get_controller()
+        return controller is not None and controller.status().connected
     
     async def start(self) -> None:
         """Start the daemon server."""
@@ -175,10 +178,11 @@ class VestDaemon:
         if self._alyx_manager.is_running:
             self._alyx_manager.stop()
         
-        # Disconnect from vest
-        if self._controller is not None:
-            self._controller.disconnect()
-            self._controller = None
+        # Disconnect from all vests
+        for device_id in list(self._registry._controllers.keys()):
+            self._registry.remove_device(device_id)
+        self._controller = None
+        self._selected_device = None
         
         # Close server
         if self._server is not None:
@@ -393,7 +397,7 @@ class VestDaemon:
         return response_list(devices, command.req_id)
     
     async def _cmd_select_device(self, command: Command) -> Response:
-        """Select a device to use."""
+        """Select a device to use (adds to registry, doesn't replace)."""
         # Find the device
         devices = list_devices()
         selected = None
@@ -416,17 +420,25 @@ class VestDaemon:
         if selected is None:
             return response_error("Device not found", command.req_id)
         
-        # Disconnect from previous device if any
-        if self._controller is not None:
-            self._controller.disconnect()
-            self._controller = None
-        
-        self._selected_device = selected
-        
-        # Broadcast device selected event
-        await self._clients.broadcast(event_device_selected(selected))
-        
-        return response_ok(command.req_id)
+        # Add device to registry (or get existing if already connected)
+        try:
+            device_id, controller = self._registry.add_device(
+                device_id=command.device_id,  # Optional: allow specifying device_id
+                device_info=selected
+            )
+            
+            # Update selected device (for backward compatibility)
+            self._selected_device = selected
+            self._controller = controller  # Keep for backward compatibility
+            
+            # Broadcast device selected event (include device_id)
+            event_data = selected.copy()
+            event_data["device_id"] = device_id
+            await self._clients.broadcast(event_device_selected(event_data))
+            
+            return response_ok(command.req_id)
+        except ValueError as e:
+            return response_error(str(e), command.req_id)
     
     async def _cmd_get_selected_device(self, command: Command) -> Response:
         """Get the currently selected device."""
@@ -447,31 +459,52 @@ class VestDaemon:
         return response_ok(command.req_id)
     
     async def _cmd_connect(self, command: Command) -> Response:
-        """Connect to the selected device."""
+        """Connect to the selected device (or device_id if specified)."""
+        # If device_id specified, connect to that device
+        if command.device_id:
+            controller = self._registry.get_controller(command.device_id)
+            if controller is None:
+                return response_error(f"Device {command.device_id} not found in registry", command.req_id)
+            
+            device_info = self._registry.get_device_info(command.device_id)
+            if device_info:
+                await self._clients.broadcast(event_connected(device_info))
+            return response_ok(command.req_id)
+        
+        # Otherwise, connect to selected device (backward compatibility)
         if self._selected_device is None:
             return response_error("No device selected", command.req_id)
         
-        # Create controller and connect
-        self._controller = VestController()
-        status = self._controller.connect_to_device({
-            "bus": self._selected_device.get("bus"),
-            "address": self._selected_device.get("address"),
-        })
+        # Device should already be in registry from select_device
+        # Just verify connection
+        controller = self._registry.get_controller()
+        if controller is None or not controller.status().connected:
+            return response_error("Device not connected. Use select_device first.", command.req_id)
         
-        if status.connected:
-            # Broadcast connected event
-            await self._clients.broadcast(event_connected(self._selected_device))
-            return response_ok(command.req_id)
-        else:
-            error_msg = status.last_error or "Failed to connect"
-            await self._clients.broadcast(event_error(error_msg))
-            return response_error(error_msg, command.req_id)
+        # Broadcast connected event
+        await self._clients.broadcast(event_connected(self._selected_device))
+        return response_ok(command.req_id)
     
     async def _cmd_disconnect(self, command: Command) -> Response:
-        """Disconnect from the vest."""
-        if self._controller is not None:
-            self._controller.disconnect()
+        """Disconnect from the vest (or specific device_id if provided)."""
+        # If device_id specified, disconnect that device
+        if command.device_id:
+            if not self._registry.has_device(command.device_id):
+                return response_error(f"Device {command.device_id} not found", command.req_id)
+            
+            self._registry.remove_device(command.device_id)
+            # Update _controller if it was the disconnected device
+            if self._controller == self._registry.get_controller():
+                self._controller = self._registry.get_controller()
+            await self._clients.broadcast(event_disconnected())
+            return response_ok(command.req_id)
+        
+        # Otherwise, disconnect main device (backward compatibility)
+        main_id = self._registry.get_main_device_id()
+        if main_id:
+            self._registry.remove_device(main_id)
             self._controller = None
+            self._selected_device = None
         
         # Broadcast disconnected event
         await self._clients.broadcast(event_disconnected())
@@ -479,41 +512,63 @@ class VestDaemon:
         return response_ok(command.req_id)
     
     async def _cmd_trigger(self, command: Command) -> Response:
-        """Trigger an effect."""
-        if self._selected_device is None:
-            return response_error("No device selected", command.req_id)
-        
+        """Trigger an effect (on specified device_id or main device)."""
         if command.cell is None or command.speed is None:
             return response_error("Must specify cell and speed", command.req_id)
         
-        # Auto-connect if needed
-        if self._controller is None or not self._controller.status().connected:
-            self._controller = VestController()
-            status = self._controller.connect_to_device({
-                "bus": self._selected_device.get("bus"),
-                "address": self._selected_device.get("address"),
-            })
-            if status.connected:
+        # Get controller for specified device_id, or main device
+        controller = self._registry.get_controller(command.device_id)
+        
+        # If no controller found, try to auto-connect main device (backward compatibility)
+        if controller is None:
+            if self._selected_device is None:
+                return response_error("No device selected and no device_id specified", command.req_id)
+            
+            # Auto-connect main device
+            try:
+                device_id, controller = self._registry.add_device(
+                    device_id=None,
+                    device_info=self._selected_device
+                )
+                self._controller = controller  # Update for backward compatibility
                 await self._clients.broadcast(event_connected(self._selected_device))
+            except ValueError as e:
+                return response_error(str(e), command.req_id)
+        
+        # Check if connected
+        if not controller.status().connected:
+            return response_error("Device not connected", command.req_id)
         
         # Trigger the effect
-        if self._controller is None:
-            return response_error("Not connected to vest", command.req_id)
-        
-        success = self._controller.trigger_effect(command.cell, command.speed)
+        success = controller.trigger_effect(command.cell, command.speed)
         
         if success:
-            # Broadcast effect triggered event
-            await self._clients.broadcast(event_effect_triggered(command.cell, command.speed))
+            # Broadcast effect triggered event (include device_id if specified)
+            device_id = command.device_id or self._registry.get_main_device_id()
+            await self._clients.broadcast(event_effect_triggered(
+                command.cell, 
+                command.speed,
+                device_id=device_id
+            ))
             return response_ok(command.req_id)
         else:
-            error_msg = self._controller.status().last_error or "Failed to trigger effect"
+            error_msg = controller.status().last_error or "Failed to trigger effect"
             return response_error(error_msg, command.req_id)
     
     async def _cmd_stop(self, command: Command) -> Response:
-        """Stop all effects."""
-        if self._controller is not None:
-            self._controller.stop_all()
+        """Stop all effects (on specified device_id or all devices)."""
+        # If device_id specified, stop that device only
+        if command.device_id:
+            controller = self._registry.get_controller(command.device_id)
+            if controller is None:
+                return response_error(f"Device {command.device_id} not found", command.req_id)
+            controller.stop_all()
+            await self._clients.broadcast(event_all_stopped(device_id=command.device_id))
+            return response_ok(command.req_id)
+        
+        # Otherwise, stop all devices (backward compatibility)
+        for controller in self._registry._controllers.values():
+            controller.stop_all()
         
         # Broadcast all stopped event
         await self._clients.broadcast(event_all_stopped())
@@ -521,15 +576,34 @@ class VestDaemon:
         return response_ok(command.req_id)
     
     async def _cmd_status(self, command: Command) -> Response:
-        """Get connection status."""
-        if self._controller is None:
+        """Get connection status (for specified device_id or main device)."""
+        # If device_id specified, get status for that device
+        if command.device_id:
+            controller = self._registry.get_controller(command.device_id)
+            if controller is None:
+                return response_status(
+                    connected=False,
+                    device=None,
+                    req_id=command.req_id,
+                )
+            status = controller.status()
+            device_info = self._registry.get_device_info(command.device_id)
+            return response_status(
+                connected=status.connected,
+                device=device_info,
+                req_id=command.req_id,
+            )
+        
+        # Otherwise, get status for main device (backward compatibility)
+        controller = self._registry.get_controller()
+        if controller is None:
             return response_status(
                 connected=False,
                 device=self._selected_device,
                 req_id=command.req_id,
             )
         
-        status = self._controller.status()
+        status = controller.status()
         device_info = None
         if status.connected:
             device_info = {

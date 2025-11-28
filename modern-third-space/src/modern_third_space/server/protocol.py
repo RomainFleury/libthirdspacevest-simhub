@@ -134,6 +134,11 @@ class Command:
     cause: Optional[str] = None  # Death cause
     # Predefined effects params
     effect_name: Optional[str] = None  # Effect to play
+    # Multi-vest support
+    device_id: Optional[str] = None  # Target specific device
+    player_id: Optional[str] = None  # Target global player's device
+    game_id: Optional[str] = None  # Game identifier for game-specific mapping
+    player_num: Optional[int] = None  # Player number (1, 2, 3...) for game-specific mapping
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Command":
@@ -201,6 +206,11 @@ class Event:
     hand: Optional[str] = None  # "left" or "right" for hand-specific events
     # Predefined effects info
     effect_name: Optional[str] = None  # Name of effect being played/completed
+    # Multi-vest support
+    device_id: Optional[str] = None  # Device ID that triggered the event
+    player_id: Optional[str] = None  # Player ID that triggered the event
+    player_num: Optional[int] = None  # Player number for game-specific events
+    game_id: Optional[str] = None  # Game ID for game-specific events
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary, excluding None values."""
@@ -277,11 +287,21 @@ def event_connected(device: Dict[str, Any]) -> Event:
 def event_disconnected() -> Event:
     return Event(event=EventType.DISCONNECTED.value)
 
-def event_effect_triggered(cell: int, speed: int) -> Event:
-    return Event(event=EventType.EFFECT_TRIGGERED.value, cell=cell, speed=speed)
+def event_effect_triggered(cell: int, speed: int, device_id: Optional[str] = None) -> Event:
+    """Create an effect_triggered event."""
+    return Event(
+        event=EventType.EFFECT_TRIGGERED.value,
+        cell=cell,
+        speed=speed,
+        device_id=device_id,
+    )
 
-def event_all_stopped() -> Event:
-    return Event(event=EventType.ALL_STOPPED.value)
+def event_all_stopped(device_id: Optional[str] = None) -> Event:
+    """Create an all_stopped event."""
+    return Event(
+        event=EventType.ALL_STOPPED.value,
+        device_id=device_id,
+    )
 
 def event_client_connected(client_id: str, client_name: Optional[str] = None) -> Event:
     return Event(event=EventType.CLIENT_CONNECTED.value, client_id=client_id, client_name=client_name)
