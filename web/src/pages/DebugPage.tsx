@@ -1,4 +1,22 @@
+import { useVestDebugger } from "../hooks/useVestDebugger";
+import { StatusPanel } from "../components/StatusPanel";
+import { EffectControls } from "../components/EffectControls";
+import { CustomEffectPanel } from "../components/CustomEffectPanel";
+import { EffectsLibraryPanel } from "../components/EffectsLibraryPanel";
+
 export function DebugPage() {
+  const {
+    status,
+    actuators,
+    combined,
+    activeCells,
+    loading,
+    refreshStatus,
+    sendEffect,
+    sendCustomCommand,
+    haltAll,
+  } = useVestDebugger();
+
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       <header>
@@ -8,11 +26,31 @@ export function DebugPage() {
         </p>
       </header>
 
-      <div className="rounded-2xl bg-slate-800/80 p-8 text-center">
-        <p className="text-slate-400">
-          Debug tools will be moved here in Phase 3.
-        </p>
+      {/* Status Section */}
+      <StatusPanel
+        status={status}
+        onRefresh={refreshStatus}
+        disabled={loading}
+      />
+
+      {/* Effect Controls */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <EffectControls
+          actuators={actuators}
+          combined={combined}
+          activeCells={activeCells}
+          onSend={sendEffect}
+          onStopAll={haltAll}
+          disabled={loading}
+        />
+        <CustomEffectPanel
+          onSend={sendCustomCommand}
+          disabled={loading}
+        />
       </div>
+
+      {/* Effects Library */}
+      <EffectsLibraryPanel />
     </div>
   );
 }
