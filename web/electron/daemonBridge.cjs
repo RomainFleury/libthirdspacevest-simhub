@@ -130,7 +130,10 @@ class DaemonBridge extends EventEmitter {
         String(this.port),
       ];
 
-      this.daemonProcess = spawn("python3", pythonArgs, {
+      // Try to find Python executable (Windows uses 'python', Unix uses 'python3')
+      const pythonCmd = process.platform === "win32" ? "python" : "python3";
+      
+      this.daemonProcess = spawn(pythonCmd, pythonArgs, {
         cwd: PYTHON_SRC_PATH,
         env: {
           ...process.env,
