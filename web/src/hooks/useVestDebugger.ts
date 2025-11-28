@@ -254,9 +254,14 @@ export function useVestDebugger() {
     try {
       // Subscribe to daemon events
       unsubscribeEvents = subscribeToDaemonEvents((event) => {
-        const message = formatDaemonEvent(event);
+        const formatted = formatDaemonEvent(event);
         const level = isErrorEvent(event) ? "error" : "info";
-        pushLog(message, level);
+        pushLog(formatted.message, level, {
+          device_id: formatted.device_id,
+          player_id: formatted.player_id,
+          player_num: formatted.player_num,
+          game_id: formatted.game_id,
+        });
 
         // Update status on connection events
         if (event.event === "connected" || event.event === "disconnected") {
