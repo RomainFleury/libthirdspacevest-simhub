@@ -37,6 +37,9 @@ from .protocol import (
     event_cs2_started,
     event_cs2_stopped,
     event_cs2_game_event,
+    event_device_connected,
+    event_device_disconnected,
+    event_main_device_changed,
     response_error,
     response_get_selected_device,
     response_list,
@@ -47,6 +50,9 @@ from .protocol import (
     response_cs2_stop,
     response_cs2_status,
     response_cs2_generate_config,
+    response_list_connected_devices,
+    response_set_main_device,
+    response_disconnect_device,
 )
 from .cs2_manager import CS2Manager, generate_cs2_config
 from .alyx_manager import AlyxManager, get_mod_info as get_alyx_mod_info
@@ -280,6 +286,16 @@ class VestDaemon:
         if cmd_type == CommandType.CLEAR_DEVICE:
             return await self._cmd_clear_device(command)
         
+        # Multi-vest commands
+        if cmd_type == CommandType.LIST_CONNECTED_DEVICES:
+            return await self._cmd_list_connected_devices(command)
+        
+        if cmd_type == CommandType.SET_MAIN_DEVICE:
+            return await self._cmd_set_main_device(command)
+        
+        if cmd_type == CommandType.DISCONNECT_DEVICE:
+            return await self._cmd_disconnect_device(command)
+        
         # Vest control (requires selected device)
         if cmd_type == CommandType.CONNECT:
             return await self._cmd_connect(command)
@@ -436,6 +452,9 @@ class VestDaemon:
             event_data["device_id"] = device_id
             await self._clients.broadcast(event_device_selected(event_data))
             
+            # Also broadcast device_connected event for multi-vest support
+            await self._clients.broadcast(event_device_connected(selected, device_id))
+            
             return response_ok(command.req_id)
         except ValueError as e:
             return response_error(str(e), command.req_id)
@@ -457,6 +476,80 @@ class VestDaemon:
         await self._clients.broadcast(event_device_cleared())
         
         return response_ok(command.req_id)
+    
+    async def _cmd_list_connected_devices(self, command: Command) -> Response:
+        """List all currently connected devices."""
+        devices = self._registry.list_devices()
+        return response_list_connected_devices(devices, command.req_id)
+    
+    async def _cmd_set_main_device(self, command: Command) -> Response:
+        """Set the main device."""
+        if not command.device_id:
+            return response_set_main_device(
+                success=False,
+                error="device_id is required",
+                req_id=command.req_id,
+            )
+        
+        success = self._registry.set_main_device(command.device_id)
+        if not success:
+            return response_set_main_device(
+                success=False,
+                error=f"Device {command.device_id} not found",
+                req_id=command.req_id,
+            )
+        
+        # Get device info for event
+        device_info = self._registry.get_device_info(command.device_id)
+        
+        # Broadcast main device changed event
+        await self._clients.broadcast(
+            event_main_device_changed(command.device_id, device_info)
+        )
+        
+        return response_set_main_device(
+            success=True,
+            device_id=command.device_id,
+            req_id=command.req_id,
+        )
+    
+    async def _cmd_disconnect_device(self, command: Command) -> Response:
+        """Disconnect a specific device by device_id."""
+        if not command.device_id:
+            return response_disconnect_device(
+                success=False,
+                error="device_id is required",
+                req_id=command.req_id,
+            )
+        
+        if not self._registry.has_device(command.device_id):
+            return response_disconnect_device(
+                success=False,
+                error=f"Device {command.device_id} not found",
+                req_id=command.req_id,
+            )
+        
+        # Remove device from registry
+        self._registry.remove_device(command.device_id)
+        
+        # Update _controller if it was the disconnected device
+        main_id = self._registry.get_main_device_id()
+        if main_id:
+            self._controller = self._registry.get_controller()
+        else:
+            self._controller = None
+            self._selected_device = None
+        
+        # Broadcast device disconnected event
+        await self._clients.broadcast(
+            event_device_disconnected(command.device_id)
+        )
+        
+        return response_disconnect_device(
+            success=True,
+            device_id=command.device_id,
+            req_id=command.req_id,
+        )
     
     async def _cmd_connect(self, command: Command) -> Response:
         """Connect to the selected device (or device_id if specified)."""
