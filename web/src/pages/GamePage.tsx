@@ -14,6 +14,10 @@ export function GamePage() {
     return <Navigate to="/mini-games" replace />;
   }
 
-  return <GameComponent />;
+  return (
+    <div className="max-w-7xl mx-auto">
+      <GameComponent />
+    </div>
+  );
 }
 
