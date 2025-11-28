@@ -1,3 +1,9 @@
+import { CS2IntegrationPanel } from "../components/CS2IntegrationPanel";
+import { AlyxIntegrationPanel } from "../components/AlyxIntegrationPanel";
+import { SuperHotIntegrationPanel } from "../components/SuperHotIntegrationPanel";
+import { PistolWhipIntegrationPanel } from "../components/PistolWhipIntegrationPanel";
+import { BF2SettingsPanel } from "../components/BF2SettingsPanel";
+
 export function GamesPage() {
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -8,11 +14,16 @@ export function GamesPage() {
         </p>
       </header>
 
-      <div className="rounded-2xl bg-slate-800/80 p-8 text-center">
-        <p className="text-slate-400">
-          Game integrations will be moved here in Phase 2.
-        </p>
+      {/* Game Integrations */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <CS2IntegrationPanel />
+        <AlyxIntegrationPanel />
+        <SuperHotIntegrationPanel />
+        <PistolWhipIntegrationPanel />
       </div>
+
+      {/* EA Battlefront 2 (2017) Settings */}
+      <BF2SettingsPanel />
     </div>
   );
 }
