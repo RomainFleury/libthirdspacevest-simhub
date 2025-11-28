@@ -463,12 +463,16 @@ def response_disconnect_device(success: bool, device_id: Optional[str] = None, e
 # Mock device response helpers
 def response_create_mock_device(success: bool, device_id: Optional[str] = None, device: Optional[Dict[str, Any]] = None, error: Optional[str] = None, req_id: Optional[str] = None) -> Response:
     """Response for create_mock_device command."""
+    # Include device_id in device dict if provided
+    device_dict = device.copy() if device else {}
+    if device_id and device_dict:
+        device_dict["device_id"] = device_id
+    
     return Response(
         response="create_mock_device",
         req_id=req_id,
         success=success,
-        device_id=device_id,
-        device=device,
+        device=device_dict if device_dict else device,
         message=error,
     )
 
