@@ -73,4 +73,12 @@ contextBridge.exposeInMainWorld("vestBridge", {
   playEffect: (effectName) => ipcRenderer.invoke("effects:play", effectName),
   listEffectsLibrary: () => ipcRenderer.invoke("effects:list"),
   stopEffect: () => ipcRenderer.invoke("effects:stop"),
+
+  // EA Battlefront 2 (2017) Settings API
+  bf2GetSettings: () => ipcRenderer.invoke("bf2:getSettings"),
+  bf2SetSettings: (settings) => ipcRenderer.invoke("bf2:setSettings", settings),
+  bf2SetSetting: (key, value) => ipcRenderer.invoke("bf2:setSetting", key, value),
+  bf2ResetSettings: () => ipcRenderer.invoke("bf2:resetSettings"),
+  bf2GetConfigFilePath: () => ipcRenderer.invoke("bf2:getConfigFilePath"),
+  bf2WriteConfigFile: () => ipcRenderer.invoke("bf2:writeConfigFile"),
 });

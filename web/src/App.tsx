@@ -8,6 +8,7 @@ import { CS2IntegrationPanel } from "./components/CS2IntegrationPanel";
 import { AlyxIntegrationPanel } from "./components/AlyxIntegrationPanel";
 import { SuperHotIntegrationPanel } from "./components/SuperHotIntegrationPanel";
 import { PistolWhipIntegrationPanel } from "./components/PistolWhipIntegrationPanel";
+import { BF2SettingsPanel } from "./components/BF2SettingsPanel";
 import { useVestDebugger } from "./hooks/useVestDebugger";
 // @ts-ignore-next-line
 import vestLogo from "./assets/round-icon-small.png";
@@ -86,6 +87,9 @@ function App() {
           <SuperHotIntegrationPanel />
           <PistolWhipIntegrationPanel />
         </div>
+
+        {/* EA Battlefront 2 (2017) Settings */}
+        <BF2SettingsPanel />
 
         <LogPanel logs={logs} />
       </div>
