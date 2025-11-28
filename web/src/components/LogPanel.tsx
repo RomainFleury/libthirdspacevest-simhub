@@ -6,7 +6,7 @@ type Props = {
   logs: LogEntry[];
 };
 
-// Color palette for devices/players
+// Color palette for devices
 const COLORS = [
   "bg-blue-500/20 text-blue-300 border-blue-500/50",
   "bg-green-500/20 text-green-300 border-green-500/50",
@@ -29,7 +29,7 @@ function getColorForId(id: string | undefined, colors: string[]): string {
 }
 
 export function LogPanel({ logs }: Props) {
-  const { devices, players, mainDeviceId } = useMultiVest();
+  const { devices, mainDeviceId } = useMultiVest();
   const [filter, setFilter] = useState<string>("all");
 
   // Build filter options
@@ -57,16 +57,8 @@ export function LogPanel({ logs }: Props) {
       }
     });
 
-    // Add all players
-    players.forEach(player => {
-      options.push({
-        value: `player:${player.player_id}`,
-        label: player.name || player.player_id,
-      });
-    });
-
     return options;
-  }, [devices, players, mainDeviceId]);
+  }, [devices, mainDeviceId]);
 
   // Filter logs based on selected filter
   const filteredLogs = useMemo(() => {
@@ -79,15 +71,10 @@ export function LogPanel({ logs }: Props) {
       return logs.filter(log => log.device_id === deviceId);
     }
 
-    if (filter.startsWith("player:")) {
-      const playerId = filter.replace("player:", "");
-      return logs.filter(log => log.player_id === playerId);
-    }
-
     return logs;
   }, [logs, filter]);
 
-  // Get device/player info for display
+  // Get device info for display
   const getDeviceInfo = (deviceId?: string) => {
     if (!deviceId) return null;
     const device = devices.find(d => d.device_id === deviceId);
@@ -96,16 +83,6 @@ export function LogPanel({ logs }: Props) {
       id: deviceId,
       name: device.serial_number || `Device ${deviceId.slice(-6)}`,
       isMain: device.is_main,
-    };
-  };
-
-  const getPlayerInfo = (playerId?: string) => {
-    if (!playerId) return null;
-    const player = players.find(p => p.player_id === playerId);
-    if (!player) return { id: playerId, name: playerId };
-    return {
-      id: playerId,
-      name: player.name || playerId,
     };
   };
 
@@ -149,9 +126,7 @@ export function LogPanel({ logs }: Props) {
         <ul className="space-y-2">
           {filteredLogs.map((log) => {
             const deviceInfo = getDeviceInfo(log.device_id);
-            const playerInfo = getPlayerInfo(log.player_id);
             const deviceColor = getColorForId(log.device_id, COLORS);
-            const playerColor = getColorForId(log.player_id, COLORS);
 
             return (
               <li
@@ -173,11 +148,6 @@ export function LogPanel({ logs }: Props) {
                         <span className={`px-2 py-0.5 text-xs font-medium rounded border ${deviceColor}`}>
                           {deviceInfo.isMain ? "⭐ " : ""}
                           {deviceInfo.name}
-                        </span>
-                      )}
-                      {playerInfo && (
-                        <span className={`px-2 py-0.5 text-xs font-medium rounded border ${playerColor}`}>
-                          👤 {playerInfo.name}
                         </span>
                       )}
                       {log.game_id && log.player_num !== undefined && (

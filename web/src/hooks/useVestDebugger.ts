@@ -22,22 +22,19 @@ const FALLBACK_STATUS: VestStatus = {
 
 /**
  * Format a daemon event for display in the log panel.
- * Returns the formatted message and extracts device/player info.
+ * Returns the formatted message and extracts device info.
  */
-function formatDaemonEvent(event: DaemonEvent): { message: string; device_id?: string; player_id?: string; player_num?: number; game_id?: string } {
+function formatDaemonEvent(event: DaemonEvent): { message: string; device_id?: string; player_num?: number; game_id?: string } {
   const device_id = (event as any).device_id;
-  const player_id = (event as any).player_id;
   const player_num = (event as any).player_num;
   const game_id = (event as any).game_id;
 
   let message = "";
   let context = "";
 
-  // Build context string for device/player info
+  // Build context string for device info
   if (game_id && player_num !== undefined) {
     context = ` [${game_id} - Player ${player_num}]`;
-  } else if (player_id) {
-    context = ` [${player_id}]`;
   } else if (device_id) {
     const deviceShortId = device_id.slice(-6);
     context = ` [Device ${deviceShortId}]`;
@@ -71,12 +68,6 @@ function formatDaemonEvent(event: DaemonEvent): { message: string; device_id?: s
     case "main_device_changed":
       message = `📱 Main device changed${context}`;
       break;
-    case "player_assigned":
-      message = `👤 Player assigned: ${player_id || "unknown"} → ${device_id ? `Device ${device_id.slice(-6)}` : "unknown"}${context}`;
-      break;
-    case "player_unassigned":
-      message = `👤 Player unassigned: ${player_id || "unknown"}${context}`;
-      break;
     case "game_player_mapping_changed":
       message = `🎮 Game mapping changed: ${game_id || "unknown"} - Player ${player_num || "?"}${context}`;
       break;
@@ -96,7 +87,6 @@ function formatDaemonEvent(event: DaemonEvent): { message: string; device_id?: s
   return {
     message,
     device_id,
-    player_id,
     player_num,
     game_id,
   };
@@ -131,7 +121,7 @@ export function useVestDebugger() {
   }, []);
 
   const pushLog = useCallback(
-    (message: string, level: LogEntry["level"] = "info", metadata?: { device_id?: string; player_id?: string; player_num?: number; game_id?: string }) => {
+    (message: string, level: LogEntry["level"] = "info", metadata?: { device_id?: string; player_num?: number; game_id?: string }) => {
       setLogs((prev) => {
         const newLog = {
           id: crypto.randomUUID(),
@@ -139,7 +129,6 @@ export function useVestDebugger() {
           level,
           ts: Date.now(),
           device_id: metadata?.device_id,
-          player_id: metadata?.player_id,
           player_num: metadata?.player_num,
           game_id: metadata?.game_id,
         };
@@ -260,7 +249,6 @@ export function useVestDebugger() {
         const level = isErrorEvent(event) ? "error" : "info";
         pushLog(formatted.message, level, {
           device_id: formatted.device_id,
-          player_id: formatted.player_id,
           player_num: formatted.player_num,
           game_id: formatted.game_id,
         });
