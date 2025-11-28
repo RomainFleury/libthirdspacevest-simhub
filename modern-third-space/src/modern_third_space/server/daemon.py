@@ -460,8 +460,24 @@ class VestDaemon:
         )
     
     async def _cmd_list(self, command: Command) -> Response:
-        """List available devices."""
+        """List available devices (includes real USB devices and mock devices)."""
+        # Get real USB devices
         devices = list_devices()
+        
+        # Add mock devices from registry
+        mock_devices = self._registry.list_devices()
+        for mock_device in mock_devices:
+            if self._registry.is_mock_device(mock_device["device_id"]):
+                # Format mock device to match real device format
+                devices.append({
+                    "vendor_id": mock_device.get("vendor_id", "0x1234"),
+                    "product_id": mock_device.get("product_id", "0x5678"),
+                    "bus": mock_device.get("bus"),
+                    "address": mock_device.get("address"),
+                    "serial_number": mock_device.get("serial_number"),
+                    "is_mock": True,  # Flag to identify mock devices
+                })
+        
         return response_list(devices, command.req_id)
     
     async def _cmd_select_device(self, command: Command) -> Response:
