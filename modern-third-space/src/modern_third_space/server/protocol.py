@@ -282,6 +282,9 @@ class Response:
     running: Optional[bool] = None
     events_received: Optional[int] = None
     last_event_ts: Optional[float] = None
+    last_event_type: Optional[str] = None
+    events_received: Optional[int] = None
+    last_event_ts: Optional[float] = None
     config_content: Optional[str] = None
     filename: Optional[str] = None
     # Half-Life: Alyx response
