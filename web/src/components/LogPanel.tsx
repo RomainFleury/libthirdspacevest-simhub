@@ -73,8 +73,8 @@ export function LogPanel({ logs }: Props) {
   }, [playSoundOnEffect]);
 
   return (
-    <section className="rounded-2xl bg-slate-800/80 p-4 shadow-lg ring-1 ring-white/5">
-      <header className="mb-3">
+    <section className="rounded-2xl bg-slate-800/80 p-4 shadow-lg ring-1 ring-white/5 flex flex-col h-full min-h-0">
+      <header className="mb-3 shrink-0">
         <div className="mb-3">
           <p className="text-sm uppercase tracking-wide text-slate-400">Logs</p>
           <h2 className="text-xl font-semibold text-white">Command History</h2>
@@ -108,13 +108,13 @@ export function LogPanel({ logs }: Props) {
           </div>
         </div>
         {filter !== "all" && (
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-400 mt-2">
             Showing {filteredLogs.length} of {logs.length} events
           </p>
         )}
       </header>
 
-      <div className="max-h-80 overflow-y-auto pr-2">
+      <div className="flex-1 overflow-y-auto pr-2 min-h-0">
         {filteredLogs.length === 0 && (
           <p className="text-sm text-slate-400">
             {filter === "all" 
