@@ -891,6 +891,9 @@ class VestDaemon:
         # Resolve device_id using fallback logic
         target_device_id = self._resolve_device_id(command)
         
+        # Get controller for resolved device_id
+        controller = self._registry.get_controller(target_device_id)
+        
         # If no controller found, try to auto-connect main device (backward compatibility)
         if controller is None:
             if self._selected_device is None:

@@ -477,6 +477,29 @@ def response_get_player_device(device_id: Optional[str], player_id: Optional[str
         message=error,
     )
 
+# Game-specific player mapping response helpers
+def response_set_game_player_mapping(success: bool, game_id: Optional[str] = None, player_num: Optional[int] = None, device_id: Optional[str] = None, error: Optional[str] = None, req_id: Optional[str] = None) -> Response:
+    """Response for set_game_player_mapping command."""
+    return Response(
+        response="set_game_player_mapping",
+        req_id=req_id,
+        success=success,
+        message=error,
+    )
+
+def response_clear_game_player_mapping(success: bool, game_id: Optional[str] = None, error: Optional[str] = None, req_id: Optional[str] = None) -> Response:
+    """Response for clear_game_player_mapping command."""
+    return Response(
+        response="clear_game_player_mapping",
+        req_id=req_id,
+        success=success,
+        message=error,
+    )
+
+def response_list_game_player_mappings(mappings: List[Dict[str, Any]], req_id: Optional[str] = None) -> Response:
+    """Response for list_game_player_mappings command."""
+    return Response(response="list_game_player_mappings", req_id=req_id, devices=mappings)  # Reuse devices field for mappings list
+
 def response_ping(
     connected: bool,
     has_device_selected: bool,
