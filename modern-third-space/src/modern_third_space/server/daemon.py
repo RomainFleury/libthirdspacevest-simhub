@@ -326,6 +326,16 @@ class VestDaemon:
         if cmd_type == CommandType.GET_PLAYER_DEVICE:
             return await self._cmd_get_player_device(command)
         
+        # Game-specific player mapping commands
+        if cmd_type == CommandType.SET_GAME_PLAYER_MAPPING:
+            return await self._cmd_set_game_player_mapping(command)
+        
+        if cmd_type == CommandType.CLEAR_GAME_PLAYER_MAPPING:
+            return await self._cmd_clear_game_player_mapping(command)
+        
+        if cmd_type == CommandType.LIST_GAME_PLAYER_MAPPINGS:
+            return await self._cmd_list_game_player_mappings(command)
+        
         # Vest control (requires selected device)
         if cmd_type == CommandType.CONNECT:
             return await self._cmd_connect(command)
