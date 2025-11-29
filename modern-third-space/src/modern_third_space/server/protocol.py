@@ -160,6 +160,8 @@ class Command:
     gsi_port: Optional[int] = None
     # Half-Life: Alyx params
     log_path: Optional[str] = None
+    # Star Citizen params
+    message: Optional[str] = None  # Used for player name in Star Citizen
     # SUPERHOT VR params
     event: Optional[str] = None  # Event name (death, pistol_recoil, etc.)
     hand: Optional[str] = None   # "left" or "right"
@@ -190,6 +192,7 @@ class Command:
             speed=data.get("speed"),
             gsi_port=data.get("gsi_port"),
             log_path=data.get("log_path"),
+            message=data.get("message"),
             event=data.get("event"),
             hand=data.get("hand"),
             priority=data.get("priority"),
