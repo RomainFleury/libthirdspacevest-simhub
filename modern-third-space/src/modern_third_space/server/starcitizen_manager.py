@@ -320,23 +320,34 @@ class GameLogWatcher:
     
     def start(self) -> Tuple[bool, Optional[str]]:
         """Start watching the Game.log."""
+        logger.info(f"[STARCITIZEN] GameLogWatcher.start() called for: {self.log_path}")
+        
         if self._running:
+            logger.warning("[STARCITIZEN] GameLogWatcher already running")
             return False, "Already watching"
         
+        logger.info(f"[STARCITIZEN] Checking if log file exists: {self.log_path.exists()}")
         if not self.log_path.exists():
+            logger.error(f"[STARCITIZEN] Game.log not found: {self.log_path}")
             return False, f"Game.log not found: {self.log_path}"
         
+        logger.info("[STARCITIZEN] Setting up watcher...")
         self._running = True
         # Start from end of file (don't process old events)
         try:
+            logger.info("[STARCITIZEN] Getting file size...")
             self._last_position = self.log_path.stat().st_size
-        except OSError:
+            logger.info(f"[STARCITIZEN] File size: {self._last_position} bytes")
+        except OSError as e:
+            logger.warning(f"[STARCITIZEN] Could not get file size: {e}, starting from beginning")
             self._last_position = 0
         
+        logger.info("[STARCITIZEN] Starting watch thread...")
         self._thread = Thread(target=self._watch_loop, daemon=True)
         self._thread.start()
+        logger.info("[STARCITIZEN] Watch thread started")
         
-        logger.info(f"Started watching Game.log: {self.log_path}")
+        logger.info(f"[STARCITIZEN] Started watching Game.log: {self.log_path}")
         return True, None
     
     def stop(self):
@@ -470,15 +481,22 @@ class StarCitizenManager:
     
     def auto_detect_log_path(self) -> Optional[Path]:
         """Try to auto-detect the Game.log path."""
-        for path in self.DEFAULT_LOG_PATHS:
+        logger.info("[STARCITIZEN] Starting auto-detect for Game.log path")
+        for i, path in enumerate(self.DEFAULT_LOG_PATHS):
+            logger.debug(f"[STARCITIZEN] Checking path {i+1}/{len(self.DEFAULT_LOG_PATHS)}: {path}")
             if path.exists():
+                logger.info(f"[STARCITIZEN] Found Game.log at: {path}")
                 return path
         
+        logger.info("[STARCITIZEN] Game.log not found, checking parent directories")
         # Also check parent directories exist (game installed but no log yet)
-        for path in self.DEFAULT_LOG_PATHS:
+        for i, path in enumerate(self.DEFAULT_LOG_PATHS):
+            logger.debug(f"[STARCITIZEN] Checking parent directory {i+1}/{len(self.DEFAULT_LOG_PATHS)}: {path.parent}")
             if path.parent.exists():
+                logger.info(f"[STARCITIZEN] Parent directory exists, will use: {path}")
                 return path
         
+        logger.warning("[STARCITIZEN] Could not auto-detect Game.log path")
         return None
     
     def start(self, log_path: Optional[str] = None, player_name: Optional[str] = None) -> Tuple[bool, Optional[str]]:
@@ -492,29 +510,46 @@ class StarCitizenManager:
         Returns:
             (success, error_message)
         """
+        logger.info(f"[STARCITIZEN] Manager.start() called: log_path={log_path}, player_name={player_name}")
+        
         if self._running:
+            logger.warning("[STARCITIZEN] Already running, returning error")
             return False, "Star Citizen integration already running"
         
+        logger.info("[STARCITIZEN] Determining log path...")
         # Determine log path
         if log_path:
+            logger.info(f"[STARCITIZEN] Using provided log_path: {log_path}")
             self._log_path = Path(log_path)
         else:
+            logger.info("[STARCITIZEN] No log_path provided, calling auto_detect_log_path()")
             self._log_path = self.auto_detect_log_path()
+            logger.info(f"[STARCITIZEN] auto_detect_log_path() returned: {self._log_path}")
         
         if not self._log_path:
+            logger.error("[STARCITIZEN] No log path found, returning error")
             return False, "Could not find Game.log. Ensure Star Citizen is installed"
         
+        logger.info(f"[STARCITIZEN] Using log_path: {self._log_path}")
+        logger.info(f"[STARCITIZEN] Checking if log file exists: {self._log_path.exists()}")
+        
         self._player_name = player_name
+        logger.info(f"[STARCITIZEN] Player name set to: {self._player_name}")
         
         # Create watcher
+        logger.info("[STARCITIZEN] Creating GameLogWatcher...")
         self._watcher = GameLogWatcher(
             log_path=self._log_path,
             on_event=self._on_starcitizen_event,
             player_name=self._player_name,
         )
+        logger.info("[STARCITIZEN] GameLogWatcher created, calling watcher.start()...")
         
         success, error = self._watcher.start()
+        logger.info(f"[STARCITIZEN] watcher.start() returned: success={success}, error={error}")
+        
         if not success:
+            logger.error(f"[STARCITIZEN] Watcher failed to start: {error}")
             self._watcher = None
             return False, error
         
@@ -523,7 +558,7 @@ class StarCitizenManager:
         self._last_event_ts = None
         self._last_event_type = None
         
-        logger.info(f"Star Citizen integration started, watching: {self._log_path}")
+        logger.info(f"[STARCITIZEN] Integration started successfully, watching: {self._log_path}")
         return True, None
     
     def stop(self) -> bool:

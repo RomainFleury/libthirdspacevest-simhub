@@ -1461,23 +1461,37 @@ class VestDaemon:
     
     async def _cmd_starcitizen_start(self, command: Command) -> Response:
         """Start watching Star Citizen Game.log."""
+        logger.info(f"[STARCITIZEN] Received start command: log_path={command.log_path}, player_name={command.message}")
         log_path = command.log_path
         player_name = command.message  # Using message field for player name
         
-        success, error = self._starcitizen_manager.start(
-            log_path=log_path,
-            player_name=player_name,
-        )
+        logger.info(f"[STARCITIZEN] Calling manager.start() with log_path={log_path}, player_name={player_name}")
+        try:
+            success, error = self._starcitizen_manager.start(
+                log_path=log_path,
+                player_name=player_name,
+            )
+            logger.info(f"[STARCITIZEN] manager.start() returned: success={success}, error={error}")
+        except Exception as e:
+            logger.exception(f"[STARCITIZEN] Exception in manager.start(): {e}")
+            return response_starcitizen_start(
+                success=False,
+                error=f"Exception: {str(e)}",
+                req_id=command.req_id,
+            )
         
         if success:
             log_path_str = str(self._starcitizen_manager.log_path) if self._starcitizen_manager.log_path else None
+            logger.info(f"[STARCITIZEN] Broadcasting started event with log_path={log_path_str}")
             await self._clients.broadcast(event_starcitizen_started(log_path_str or ""))
+            logger.info(f"[STARCITIZEN] Returning success response")
             return response_starcitizen_start(
                 success=True,
                 log_path=log_path_str,
                 req_id=command.req_id,
             )
         else:
+            logger.warning(f"[STARCITIZEN] Returning error response: {error}")
             return response_starcitizen_start(
                 success=False,
                 error=error,
