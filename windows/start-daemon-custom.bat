@@ -16,11 +16,22 @@ if not exist "%PYTHON_EXE%" (
 )
 
 REM Show Python version
-for /f "tokens=*" %%i in ('"%PYTHON_EXE%" --version') do set PYTHON_VERSION=%%i
-echo [OK] %PYTHON_VERSION% found
+"%PYTHON_EXE%" --version >nul 2>&1
+if %ERRORLEVEL% equ 0 (
+    for /f "tokens=*" %%i in ('"%PYTHON_EXE%" --version 2^>^&1') do set PYTHON_VERSION=%%i
+    echo [OK] %PYTHON_VERSION% found
+) else (
+    echo [WARN] Could not get Python version
+)
 
 REM Add libusb DLL to PATH for PyUSB
-for /f "tokens=*" %%i in ('"%PYTHON_EXE%" -c "import sys; print(sys.prefix)"') do set PYTHON_PREFIX=%%i
+REM Use a temporary file to avoid quote issues
+set TEMP_SCRIPT=%TEMP%\get_python_prefix.py
+echo import sys > "%TEMP_SCRIPT%"
+echo print(sys.prefix) >> "%TEMP_SCRIPT%"
+for /f "tokens=*" %%i in ('"%PYTHON_EXE%" "%TEMP_SCRIPT%"') do set PYTHON_PREFIX=%%i
+del "%TEMP_SCRIPT%" >nul 2>&1
+
 set LIBUSB_PATH=%PYTHON_PREFIX%\Lib\site-packages\libusb\_platform\_windows\x64
 if exist "%LIBUSB_PATH%\libusb-1.0.dll" (
     set PATH=%LIBUSB_PATH%;%PATH%
