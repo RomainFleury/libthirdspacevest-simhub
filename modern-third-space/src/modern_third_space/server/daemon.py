@@ -596,13 +596,16 @@ class VestDaemon:
                 req_id=command.req_id,
             )
         
-        # Get device info for event
+        # Get device info for event (may be None for mock devices)
         device_info = self._registry.get_device_info(command.device_id)
         
-        # Broadcast main device changed event
-        await self._clients.broadcast(
-            event_main_device_changed(command.device_id, device_info)
-        )
+        # Broadcast main device changed event (non-blocking, don't fail on error)
+        try:
+            await self._clients.broadcast(
+                event_main_device_changed(command.device_id, device_info)
+            )
+        except Exception as e:
+            logger.warning(f"Failed to broadcast main_device_changed event: {e}")
         
         return response_set_main_device(
             success=True,
