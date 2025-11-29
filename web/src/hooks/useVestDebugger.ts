@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import {
   fetchEffects,
   fetchStatus,
@@ -14,7 +14,7 @@ import {
   defaultEffects,
 } from "../data/effects";
 import { LogEntry, VestEffect, VestStatus } from "../types";
-import { playEffectSound, getPlaySoundPreference } from "../utils/sound";
+import { playEffectSound, getPlaySoundPreference, playMp3Sound, playSound } from "../utils/sound";
 import { useMultiVest } from "./useMultiVest";
 
 const FALLBACK_STATUS: VestStatus = {
@@ -109,6 +109,9 @@ export function useVestDebugger() {
   const [daemonConnected, setDaemonConnected] = useState(false);
   const [activeCells, setActiveCells] = useState<Set<number>>(new Set());
   const { mainDeviceId } = useMultiVest();
+  
+  // Track last processed event to prevent duplicate sound plays
+  const lastEventRef = useRef<{ ts: number; cell?: number; device_id?: string } | null>(null);
 
   // Track active cells with auto-clear after animation
   const flashCell = useCallback((cell: number) => {
@@ -266,9 +269,17 @@ export function useVestDebugger() {
           flashCell(event.cell);
           
           // Play sound if enabled and effect is on main device
+          // Use event timestamp and cell to prevent duplicate plays
           const device_id = (event as any).device_id;
-          if (getPlaySoundPreference() && device_id === mainDeviceId) {
-            playEffectSound();
+          const eventKey = `${event.ts}_${event.cell}_${device_id || 'none'}`;
+          const lastKey = lastEventRef.current 
+            ? `${lastEventRef.current.ts}_${lastEventRef.current.cell}_${lastEventRef.current.device_id || 'none'}`
+            : null;
+          
+          // Only play sound if this is a new event (not a duplicate)
+          if (eventKey !== lastKey && getPlaySoundPreference() && device_id === mainDeviceId) {
+            lastEventRef.current = { ts: event.ts, cell: event.cell, device_id };
+            playSound("mp3");
           }
         }
       });
@@ -294,7 +305,7 @@ export function useVestDebugger() {
       unsubscribeEvents?.();
       unsubscribeStatus?.();
     };
-  }, [pushLog, refreshStatus, flashCell]);
+  }, [pushLog, refreshStatus, flashCell, mainDeviceId]);
 
   // Initial fetch
   useEffect(() => {
