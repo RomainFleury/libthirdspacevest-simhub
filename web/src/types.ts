@@ -13,6 +13,10 @@ export type VestEffect = {
   cell: number;
   speed: number;
   preset?: string; // For combined effects: "front", "back", "all"
+  device_id?: string;  // Optional: target specific device
+  player_id?: string;  // Optional: target specific player
+  game_id?: string;    // Optional: for game-specific targeting
+  player_num?: number; // Optional: player number for game-specific targeting
 };
 
 export type VestDevice = {
@@ -28,5 +32,8 @@ export type LogEntry = {
   message: string;
   ts: number;
   level?: "info" | "error";
+  device_id?: string;  // Device that triggered the event
+  player_num?: number; // Player number for game-specific events
+  game_id?: string;    // Game that triggered the event
 };
 

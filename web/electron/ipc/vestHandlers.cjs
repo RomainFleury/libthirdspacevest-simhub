@@ -68,7 +68,8 @@ function registerVestHandlers(getDaemonBridge) {
       if (!daemonBridge?.connected) {
         return { success: false, error: "Not connected to daemon" };
       }
-      return await daemonBridge.triggerEffect(effect.cell, effect.speed);
+      // Pass full effect object (supports device_id, player_id, game_id, player_num)
+      return await daemonBridge.triggerEffect(effect);
     } catch (error) {
       console.error("Error in vest:trigger:", error);
       return {

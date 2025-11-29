@@ -81,4 +81,19 @@ contextBridge.exposeInMainWorld("vestBridge", {
   bf2ResetSettings: () => ipcRenderer.invoke("bf2:resetSettings"),
   bf2GetConfigFilePath: () => ipcRenderer.invoke("bf2:getConfigFilePath"),
   bf2WriteConfigFile: () => ipcRenderer.invoke("bf2:writeConfigFile"),
+
+  // Multi-Vest Management API
+  listConnectedDevices: () => ipcRenderer.invoke("multivist:listConnectedDevices"),
+  setMainDevice: (deviceId) => ipcRenderer.invoke("multivist:setMainDevice", deviceId),
+  disconnectDevice: (deviceId) => ipcRenderer.invoke("multivist:disconnectDevice", deviceId),
+  createPlayer: (playerId, name) => ipcRenderer.invoke("multivist:createPlayer", playerId, name),
+  assignPlayer: (playerId, deviceId) => ipcRenderer.invoke("multivist:assignPlayer", playerId, deviceId),
+  unassignPlayer: (playerId) => ipcRenderer.invoke("multivist:unassignPlayer", playerId),
+  listPlayers: () => ipcRenderer.invoke("multivist:listPlayers"),
+  getPlayerDevice: (playerId) => ipcRenderer.invoke("multivist:getPlayerDevice", playerId),
+  setGamePlayerMapping: (gameId, playerNum, deviceId) => ipcRenderer.invoke("multivist:setGamePlayerMapping", gameId, playerNum, deviceId),
+  clearGamePlayerMapping: (gameId, playerNum) => ipcRenderer.invoke("multivist:clearGamePlayerMapping", gameId, playerNum),
+  listGamePlayerMappings: (gameId) => ipcRenderer.invoke("multivist:listGamePlayerMappings", gameId),
+  createMockDevice: () => ipcRenderer.invoke("multivist:createMockDevice"),
+  removeMockDevice: (deviceId) => ipcRenderer.invoke("multivist:removeMockDevice", deviceId),
 });

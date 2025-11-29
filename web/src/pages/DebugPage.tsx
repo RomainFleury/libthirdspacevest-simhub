@@ -3,6 +3,7 @@ import { StatusPanel } from "../components/StatusPanel";
 import { EffectControls } from "../components/EffectControls";
 import { CustomEffectPanel } from "../components/CustomEffectPanel";
 import { EffectsLibraryPanel } from "../components/EffectsLibraryPanel";
+import { MultiVestDebugPanel } from "../components/MultiVestDebugPanel";
 
 export function DebugPage() {
   const {
@@ -51,6 +52,9 @@ export function DebugPage() {
 
       {/* Effects Library */}
       <EffectsLibraryPanel />
+
+      {/* Multi-Vest Management */}
+      <MultiVestDebugPanel />
     </div>
   );
 }

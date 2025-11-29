@@ -130,7 +130,10 @@ class DaemonBridge extends EventEmitter {
         String(this.port),
       ];
 
-      this.daemonProcess = spawn("python3", pythonArgs, {
+      // Try to find Python executable (Windows uses 'python', Unix uses 'python3')
+      const pythonCmd = process.platform === "win32" ? "python" : "python3";
+      
+      this.daemonProcess = spawn(pythonCmd, pythonArgs, {
         cwd: PYTHON_SRC_PATH,
         env: {
           ...process.env,
@@ -417,10 +420,30 @@ class DaemonBridge extends EventEmitter {
 
   /**
    * Trigger an effect.
+   * @param {Object} effect - Effect object with cell, speed, and optional device_id/player_id/game_id/player_num
    */
-  async triggerEffect(cell, speed) {
+  async triggerEffect(effect) {
     try {
-      await this.sendCommand("trigger", { cell, speed });
+      const params = {
+        cell: effect.cell,
+        speed: effect.speed,
+      };
+      
+      // Add optional multi-vest parameters
+      if (effect.device_id) {
+        params.device_id = effect.device_id;
+      }
+      if (effect.player_id) {
+        params.player_id = effect.player_id;
+      }
+      if (effect.game_id) {
+        params.game_id = effect.game_id;
+      }
+      if (effect.player_num !== undefined) {
+        params.player_num = effect.player_num;
+      }
+      
+      await this.sendCommand("trigger", params);
       return { success: true };
     } catch (error) {
       return { success: false, error: error.message };

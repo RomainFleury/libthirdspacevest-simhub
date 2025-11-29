@@ -1,5 +1,6 @@
 import { DeviceSelector } from "../DeviceSelector";
 import { LogPanel } from "../LogPanel";
+import { ConnectedVestsList } from "../ConnectedVestsList";
 import { LogEntry } from "../../types";
 
 type Props = {
@@ -8,10 +9,15 @@ type Props = {
 
 export function Sidebar({ logs }: Props) {
   return (
-    <aside className="w-72 md:w-80 bg-slate-900/50 border-r border-slate-800 flex flex-col shrink-0">
+    <aside className="w-80 md:w-96 bg-slate-900/50 border-r border-slate-800 flex flex-col shrink-0">
       {/* Device Selector */}
       <div className="p-3 md:p-4 border-b border-slate-800 shrink-0">
         <DeviceSelector />
+      </div>
+
+      {/* Connected Vests List */}
+      <div className="shrink-0">
+        <ConnectedVestsList />
       </div>
 
       {/* Logs - Take remaining space */}

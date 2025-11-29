@@ -28,6 +28,23 @@ class CommandType(Enum):
     SELECT_DEVICE = "select_device"
     GET_SELECTED_DEVICE = "get_selected_device"
     CLEAR_DEVICE = "clear_device"
+    # Multi-vest commands
+    LIST_CONNECTED_DEVICES = "list_connected_devices"
+    SET_MAIN_DEVICE = "set_main_device"
+    DISCONNECT_DEVICE = "disconnect_device"
+    # Mock device commands
+    CREATE_MOCK_DEVICE = "create_mock_device"
+    REMOVE_MOCK_DEVICE = "remove_mock_device"
+    # Player management commands
+    CREATE_PLAYER = "create_player"
+    ASSIGN_PLAYER = "assign_player"
+    UNASSIGN_PLAYER = "unassign_player"
+    LIST_PLAYERS = "list_players"
+    GET_PLAYER_DEVICE = "get_player_device"
+    # Game-specific player mapping commands
+    SET_GAME_PLAYER_MAPPING = "set_game_player_mapping"
+    CLEAR_GAME_PLAYER_MAPPING = "clear_game_player_mapping"
+    LIST_GAME_PLAYER_MAPPINGS = "list_game_player_mappings"
     # Vest control
     CONNECT = "connect"
     DISCONNECT = "disconnect"
@@ -71,6 +88,18 @@ class EventType(Enum):
     DEVICE_SELECTED = "device_selected"
     DEVICE_CLEARED = "device_cleared"
     DEVICES_CHANGED = "devices_changed"
+    # Multi-vest events
+    DEVICE_CONNECTED = "device_connected"
+    DEVICE_DISCONNECTED = "device_disconnected"
+    MAIN_DEVICE_CHANGED = "main_device_changed"
+    # Mock device events
+    MOCK_DEVICE_CREATED = "mock_device_created"
+    MOCK_DEVICE_REMOVED = "mock_device_removed"
+    # Player management events
+    PLAYER_ASSIGNED = "player_assigned"
+    PLAYER_UNASSIGNED = "player_unassigned"
+    # Game-specific player mapping events
+    GAME_PLAYER_MAPPING_CHANGED = "game_player_mapping_changed"
     # Connection
     CONNECTED = "connected"
     DISCONNECTED = "disconnected"
@@ -134,6 +163,11 @@ class Command:
     cause: Optional[str] = None  # Death cause
     # Predefined effects params
     effect_name: Optional[str] = None  # Effect to play
+    # Multi-vest support
+    device_id: Optional[str] = None  # Target specific device
+    player_id: Optional[str] = None  # Target global player's device
+    game_id: Optional[str] = None  # Game identifier for game-specific mapping
+    player_num: Optional[int] = None  # Player number (1, 2, 3...) for game-specific mapping
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Command":
@@ -156,6 +190,10 @@ class Command:
             health_remaining=data.get("health_remaining"),
             cause=data.get("cause"),
             effect_name=data.get("effect_name"),
+            device_id=data.get("device_id"),
+            player_id=data.get("player_id"),
+            game_id=data.get("game_id"),
+            player_num=data.get("player_num"),
         )
     
     @classmethod
@@ -201,6 +239,11 @@ class Event:
     hand: Optional[str] = None  # "left" or "right" for hand-specific events
     # Predefined effects info
     effect_name: Optional[str] = None  # Name of effect being played/completed
+    # Multi-vest support
+    device_id: Optional[str] = None  # Device ID that triggered the event
+    player_id: Optional[str] = None  # Player ID that triggered the event
+    player_num: Optional[int] = None  # Player number for game-specific events
+    game_id: Optional[str] = None  # Game ID for game-specific events
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary, excluding None values."""
@@ -237,6 +280,9 @@ class Response:
     # CS2 GSI response
     gsi_port: Optional[int] = None
     running: Optional[bool] = None
+    events_received: Optional[int] = None
+    last_event_ts: Optional[float] = None
+    last_event_type: Optional[str] = None
     events_received: Optional[int] = None
     last_event_ts: Optional[float] = None
     config_content: Optional[str] = None
@@ -277,11 +323,21 @@ def event_connected(device: Dict[str, Any]) -> Event:
 def event_disconnected() -> Event:
     return Event(event=EventType.DISCONNECTED.value)
 
-def event_effect_triggered(cell: int, speed: int) -> Event:
-    return Event(event=EventType.EFFECT_TRIGGERED.value, cell=cell, speed=speed)
+def event_effect_triggered(cell: int, speed: int, device_id: Optional[str] = None) -> Event:
+    """Create an effect_triggered event."""
+    return Event(
+        event=EventType.EFFECT_TRIGGERED.value,
+        cell=cell,
+        speed=speed,
+        device_id=device_id,
+    )
 
-def event_all_stopped() -> Event:
-    return Event(event=EventType.ALL_STOPPED.value)
+def event_all_stopped(device_id: Optional[str] = None) -> Event:
+    """Create an all_stopped event."""
+    return Event(
+        event=EventType.ALL_STOPPED.value,
+        device_id=device_id,
+    )
 
 def event_client_connected(client_id: str, client_name: Optional[str] = None) -> Event:
     return Event(event=EventType.CLIENT_CONNECTED.value, client_id=client_id, client_name=client_name)
@@ -291,6 +347,76 @@ def event_client_disconnected(client_id: str) -> Event:
 
 def event_error(message: str) -> Event:
     return Event(event=EventType.ERROR.value, message=message)
+
+# Multi-vest event helpers
+def event_device_connected(device: Dict[str, Any], device_id: str) -> Event:
+    """Create a device_connected event."""
+    event_data = device.copy()
+    event_data["device_id"] = device_id
+    return Event(
+        event=EventType.DEVICE_CONNECTED.value,
+        device=event_data,
+        device_id=device_id,
+    )
+
+def event_device_disconnected(device_id: str) -> Event:
+    """Create a device_disconnected event."""
+    return Event(
+        event=EventType.DEVICE_DISCONNECTED.value,
+        device_id=device_id,
+    )
+
+def event_mock_device_created(device: Dict[str, Any], device_id: str) -> Event:
+    """Create a mock_device_created event."""
+    event_data = device.copy()
+    event_data["device_id"] = device_id
+    return Event(
+        event=EventType.MOCK_DEVICE_CREATED.value,
+        device=event_data,
+        device_id=device_id,
+    )
+
+def event_mock_device_removed(device_id: str) -> Event:
+    """Create a mock_device_removed event."""
+    return Event(
+        event=EventType.MOCK_DEVICE_REMOVED.value,
+        device_id=device_id,
+    )
+
+def event_main_device_changed(device_id: str, device: Optional[Dict[str, Any]] = None) -> Event:
+    """Create a main_device_changed event."""
+    return Event(
+        event=EventType.MAIN_DEVICE_CHANGED.value,
+        device_id=device_id,
+        device=device,
+    )
+
+# Player management event helpers
+def event_player_assigned(player_id: str, device_id: str, name: Optional[str] = None) -> Event:
+    """Create a player_assigned event."""
+    return Event(
+        event=EventType.PLAYER_ASSIGNED.value,
+        player_id=player_id,
+        device_id=device_id,
+        message=name,  # Use message field for player name
+    )
+
+def event_player_unassigned(player_id: str) -> Event:
+    """Create a player_unassigned event."""
+    return Event(
+        event=EventType.PLAYER_UNASSIGNED.value,
+        player_id=player_id,
+    )
+
+# Game-specific player mapping event helpers
+def event_game_player_mapping_changed(game_id: str, player_num: int, device_id: Optional[str] = None) -> Event:
+    """Create a game_player_mapping_changed event."""
+    return Event(
+        event=EventType.GAME_PLAYER_MAPPING_CHANGED.value,
+        game_id=game_id,
+        player_num=player_num,
+        device_id=device_id,
+    )
 
 
 # Factory functions for common responses
@@ -308,6 +434,125 @@ def response_status(connected: bool, device: Optional[Dict[str, Any]], req_id: O
 
 def response_get_selected_device(device: Optional[Dict[str, Any]], req_id: Optional[str] = None) -> Response:
     return Response(response="get_selected_device", req_id=req_id, device=device)
+
+# Multi-vest response helpers
+def response_list_connected_devices(devices: List[Dict[str, Any]], req_id: Optional[str] = None) -> Response:
+    """Response for list_connected_devices command."""
+    return Response(response="list_connected_devices", req_id=req_id, success=True, devices=devices)
+
+def response_set_main_device(success: bool, device_id: Optional[str] = None, error: Optional[str] = None, req_id: Optional[str] = None) -> Response:
+    """Response for set_main_device command."""
+    return Response(
+        response="set_main_device",
+        req_id=req_id,
+        success=success,
+        device_id=device_id,
+        message=error,
+    )
+
+def response_disconnect_device(success: bool, device_id: Optional[str] = None, error: Optional[str] = None, req_id: Optional[str] = None) -> Response:
+    """Response for disconnect_device command."""
+    return Response(
+        response="disconnect_device",
+        req_id=req_id,
+        success=success,
+        device_id=device_id,
+        message=error,
+    )
+
+# Mock device response helpers
+def response_create_mock_device(success: bool, device_id: Optional[str] = None, device: Optional[Dict[str, Any]] = None, error: Optional[str] = None, req_id: Optional[str] = None) -> Response:
+    """Response for create_mock_device command."""
+    # Include device_id in device dict if provided
+    device_dict = device.copy() if device else {}
+    if device_id and device_dict:
+        device_dict["device_id"] = device_id
+    
+    return Response(
+        response="create_mock_device",
+        req_id=req_id,
+        success=success,
+        device=device_dict if device_dict else device,
+        message=error,
+    )
+
+def response_remove_mock_device(success: bool, device_id: Optional[str] = None, error: Optional[str] = None, req_id: Optional[str] = None) -> Response:
+    """Response for remove_mock_device command."""
+    # Create device dict if device_id is provided
+    device = {"device_id": device_id} if device_id else None
+    return Response(
+        response="remove_mock_device",
+        req_id=req_id,
+        success=success,
+        device=device,
+        message=error,
+    )
+
+# Player management response helpers
+def response_create_player(success: bool, player_id: Optional[str] = None, name: Optional[str] = None, error: Optional[str] = None, req_id: Optional[str] = None) -> Response:
+    """Response for create_player command."""
+    return Response(
+        response="create_player",
+        req_id=req_id,
+        success=success,
+        message=error or name,  # Use message for name or error
+    )
+
+def response_assign_player(success: bool, player_id: Optional[str] = None, device_id: Optional[str] = None, error: Optional[str] = None, req_id: Optional[str] = None) -> Response:
+    """Response for assign_player command."""
+    return Response(
+        response="assign_player",
+        req_id=req_id,
+        success=success,
+        message=error,
+    )
+
+def response_unassign_player(success: bool, player_id: Optional[str] = None, error: Optional[str] = None, req_id: Optional[str] = None) -> Response:
+    """Response for unassign_player command."""
+    return Response(
+        response="unassign_player",
+        req_id=req_id,
+        success=success,
+        message=error,
+    )
+
+def response_list_players(players: List[Dict[str, Any]], req_id: Optional[str] = None) -> Response:
+    """Response for list_players command."""
+    return Response(response="list_players", req_id=req_id, devices=players)  # Reuse devices field for players list
+
+def response_get_player_device(device_id: Optional[str], player_id: Optional[str] = None, error: Optional[str] = None, req_id: Optional[str] = None) -> Response:
+    """Response for get_player_device command."""
+    # Create device dict if device_id is provided
+    device = {"device_id": device_id} if device_id else None
+    return Response(
+        response="get_player_device",
+        req_id=req_id,
+        device=device,
+        message=error,
+    )
+
+# Game-specific player mapping response helpers
+def response_set_game_player_mapping(success: bool, game_id: Optional[str] = None, player_num: Optional[int] = None, device_id: Optional[str] = None, error: Optional[str] = None, req_id: Optional[str] = None) -> Response:
+    """Response for set_game_player_mapping command."""
+    return Response(
+        response="set_game_player_mapping",
+        req_id=req_id,
+        success=success,
+        message=error,
+    )
+
+def response_clear_game_player_mapping(success: bool, game_id: Optional[str] = None, error: Optional[str] = None, req_id: Optional[str] = None) -> Response:
+    """Response for clear_game_player_mapping command."""
+    return Response(
+        response="clear_game_player_mapping",
+        req_id=req_id,
+        success=success,
+        message=error,
+    )
+
+def response_list_game_player_mappings(mappings: List[Dict[str, Any]], req_id: Optional[str] = None) -> Response:
+    """Response for list_game_player_mappings command."""
+    return Response(response="list_game_player_mappings", req_id=req_id, devices=mappings)  # Reuse devices field for mappings list
 
 def response_ping(
     connected: bool,
