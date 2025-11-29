@@ -2,12 +2,16 @@
  * Sound utility for playing audio feedback.
  */
 
+// Import the WAV file asset
+import switchTapSound from '../assets/mixkit-on-or-off-light-switch-tap-2585.wav';
+
 /**
  * Play a short beep sound when an effect is triggered.
  * Uses Web Audio API to generate a simple beep tone.
  */
 export function playEffectSound(): void {
   try {
+    console.log("playEffectSound");
     // Create audio context
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
     
@@ -40,6 +44,24 @@ export function playEffectSound(): void {
   } catch (error) {
     // Silently fail if audio context is not available
     console.warn('Could not play effect sound:', error);
+  }
+}
+
+/**
+ * Play the switch tap sound from the WAV file.
+ * Uses HTML5 Audio API to play the pre-recorded sound file.
+ */
+export function playMp3Sound(): void {
+  try {
+    const audio = new Audio(switchTapSound);
+    audio.volume = 0.5; // Set volume to 50% to avoid being too loud
+    audio.play().catch((error) => {
+      // Silently fail if audio playback is not available or blocked
+      console.warn('Could not play switch tap sound:', error);
+    });
+  } catch (error) {
+    // Silently fail if Audio is not available
+    console.warn('Could not play switch tap sound:', error);
   }
 }
 
