@@ -5,13 +5,26 @@
 // Import the WAV file asset
 import switchTapSound from '../assets/mixkit-on-or-off-light-switch-tap-2585.wav';
 
+export function playSound(type?: "effect" | "mp3"): void {
+  switch (type) {
+    case "effect":
+      playEffectSound();
+      break;
+    case "mp3":
+      playMp3Sound();
+      break;
+    default:
+      playEffectSound();
+      break;
+  }
+}
+
 /**
  * Play a short beep sound when an effect is triggered.
  * Uses Web Audio API to generate a simple beep tone.
  */
 export function playEffectSound(): void {
   try {
-    console.log("playEffectSound");
     // Create audio context
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
     
