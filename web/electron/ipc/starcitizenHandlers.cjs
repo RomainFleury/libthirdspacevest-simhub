@@ -4,11 +4,19 @@
 
 const { ipcMain, dialog } = require("electron");
 const { getDaemonBridge } = require("../daemonBridge.cjs");
+const starcitizenStorage = require("../starcitizenStorage.cjs");
 
 function registerStarCitizenHandlers(getMainWindow) {
   // Start Star Citizen integration
   ipcMain.handle("starcitizen:start", async (_, logPath, playerName) => {
     const daemon = getDaemonBridge();
+    // Save settings when starting
+    if (logPath) {
+      starcitizenStorage.setStarCitizenLogPath(logPath);
+    }
+    if (playerName) {
+      starcitizenStorage.setStarCitizenPlayerName(playerName);
+    }
     return await daemon.starcitizenStart(logPath, playerName);
   });
 
@@ -43,12 +51,50 @@ function registerStarCitizenHandlers(getMainWindow) {
       }
 
       const selectedPath = result.filePaths[0];
+      // Save the selected path
+      starcitizenStorage.setStarCitizenLogPath(selectedPath);
       return {
         success: true,
         path: selectedPath,
       };
     } catch (error) {
       console.error("Error in starcitizen:browseLogPath:", error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Get saved Star Citizen settings
+  ipcMain.handle("starcitizen:getSettings", async () => {
+    try {
+      return {
+        success: true,
+        logPath: starcitizenStorage.getStarCitizenLogPath(),
+        playerName: starcitizenStorage.getStarCitizenPlayerName(),
+      };
+    } catch (error) {
+      console.error("Error in starcitizen:getSettings:", error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Set Star Citizen log path
+  ipcMain.handle("starcitizen:setLogPath", async (_, logPath) => {
+    try {
+      starcitizenStorage.setStarCitizenLogPath(logPath || null);
+      return { success: true };
+    } catch (error) {
+      console.error("Error in starcitizen:setLogPath:", error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Set Star Citizen player name
+  ipcMain.handle("starcitizen:setPlayerName", async (_, playerName) => {
+    try {
+      starcitizenStorage.setStarCitizenPlayerName(playerName || null);
+      return { success: true };
+    } catch (error) {
+      console.error("Error in starcitizen:setPlayerName:", error);
       return { success: false, error: error.message };
     }
   });

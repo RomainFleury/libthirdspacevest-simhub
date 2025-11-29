@@ -34,6 +34,48 @@ export function useStarCitizenIntegration() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [gameEvents, setGameEvents] = useState<StarCitizenGameEvent[]>([]);
+  const [logPath, setLogPath] = useState<string>('');
+  const [playerName, setPlayerName] = useState<string>('');
+
+  // Load saved settings
+  const loadSettings = useCallback(async () => {
+    try {
+      // @ts-ignore - window.vestBridge
+      const result = await window.vestBridge?.starcitizenGetSettings?.();
+      if (result?.success) {
+        if (result.logPath) {
+          setLogPath(result.logPath);
+        }
+        if (result.playerName) {
+          setPlayerName(result.playerName);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load Star Citizen settings:', err);
+    }
+  }, []);
+
+  // Save log path
+  const saveLogPath = useCallback(async (path: string | null) => {
+    try {
+      // @ts-ignore - window.vestBridge
+      await window.vestBridge?.starcitizenSetLogPath?.(path);
+      setLogPath(path || '');
+    } catch (err) {
+      console.error('Failed to save log path:', err);
+    }
+  }, []);
+
+  // Save player name
+  const savePlayerName = useCallback(async (name: string | null) => {
+    try {
+      // @ts-ignore - window.vestBridge
+      await window.vestBridge?.starcitizenSetPlayerName?.(name);
+      setPlayerName(name || '');
+    } catch (err) {
+      console.error('Failed to save player name:', err);
+    }
+  }, []);
 
   // Fetch initial status
   const refreshStatus = useCallback(async () => {
@@ -107,6 +149,7 @@ export function useStarCitizenIntegration() {
       // @ts-ignore - window.vestBridge
       const result = await window.vestBridge?.starcitizenBrowseLogPath?.();
       if (result?.success && result.path) {
+        await saveLogPath(result.path);
         return result.path;
       }
       return null;
@@ -114,7 +157,7 @@ export function useStarCitizenIntegration() {
       console.error('Failed to browse for Game.log:', err);
       return null;
     }
-  }, []);
+  }, [saveLogPath]);
 
   // Subscribe to daemon events
   useEffect(() => {
@@ -151,10 +194,11 @@ export function useStarCitizenIntegration() {
     };
   }, []);
 
-  // Initial status fetch
+  // Initial status fetch and settings load
   useEffect(() => {
     refreshStatus();
-  }, [refreshStatus]);
+    loadSettings();
+  }, [refreshStatus, loadSettings]);
 
   return {
     status,
@@ -166,6 +210,10 @@ export function useStarCitizenIntegration() {
     clearEvents,
     refreshStatus,
     browseLogPath,
+    logPath,
+    setLogPath: saveLogPath,
+    playerName,
+    setPlayerName: savePlayerName,
   };
 }
 

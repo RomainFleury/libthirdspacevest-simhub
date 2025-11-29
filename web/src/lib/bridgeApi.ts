@@ -248,6 +248,20 @@ declare global {
         canceled?: boolean;
         error?: string;
       }>;
+      starcitizenGetSettings: () => Promise<{
+        success: boolean;
+        logPath?: string | null;
+        playerName?: string | null;
+        error?: string;
+      }>;
+      starcitizenSetLogPath: (logPath: string | null) => Promise<{
+        success: boolean;
+        error?: string;
+      }>;
+      starcitizenSetPlayerName: (playerName: string | null) => Promise<{
+        success: boolean;
+        error?: string;
+      }>;
       // EA Battlefront 2 (2017) Settings API
       bf2GetSettings: () => Promise<{
         success: boolean;

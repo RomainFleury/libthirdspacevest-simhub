@@ -20,10 +20,11 @@ export function StarCitizenIntegrationPanel() {
     stop,
     clearEvents,
     browseLogPath,
+    logPath,
+    setLogPath,
+    playerName,
+    setPlayerName,
   } = useStarCitizenIntegration();
-
-  const [logPath, setLogPath] = useState<string>('');
-  const [playerName, setPlayerName] = useState<string>('');
 
   const formatTime = (ts: number) => {
     const date = new Date(ts * 1000);
@@ -39,10 +40,7 @@ export function StarCitizenIntegrationPanel() {
   };
 
   const handleBrowse = async () => {
-    const selectedPath = await browseLogPath();
-    if (selectedPath) {
-      setLogPath(selectedPath);
-    }
+    await browseLogPath();
   };
 
   return (
