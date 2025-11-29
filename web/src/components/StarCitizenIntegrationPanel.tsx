@@ -36,6 +36,25 @@ export function StarCitizenIntegrationPanel() {
     return name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
+  const formatEventDetails = (event: { event: string; params?: any }): string => {
+    const params = event.params;
+    if (!params) return "";
+
+    if (event.event === "player_death" && params.victim_name) {
+      return `${params.victim_name} → ${params.killer_name || 'Unknown'}`;
+    }
+    if (event.event === "player_kill" && params.victim_name) {
+      return params.victim_name;
+    }
+    if (event.event === "ship_hit") {
+      const parts: string[] = [];
+      if (params.attacker) parts.push(params.attacker);
+      if (params.ship) parts.push(params.ship);
+      return parts.length > 0 ? parts.join(" → ") : "";
+    }
+    return "";
+  };
+
   const handleStart = () => {
     start(logPath || undefined, playerName || undefined);
   };
@@ -141,72 +160,57 @@ export function StarCitizenIntegrationPanel() {
         >
           {isLoading ? 'Loading...' : status.enabled ? 'Stop' : 'Start'}
         </button>
-        {gameEvents.length > 0 && (
-          <button
-            onClick={clearEvents}
-            className="px-4 py-2 rounded-lg border border-slate-600 bg-slate-700/50 hover:bg-slate-700 text-slate-300 transition-colors"
-          >
-            Clear Events
-          </button>
-        )}
       </div>
 
-      {/* Game Events Log */}
-      {gameEvents.length > 0 && (
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="text-sm font-semibold text-slate-300">Recent Events</h4>
-            <span className="text-xs text-slate-500">{gameEvents.length} events</span>
-          </div>
-          <div className="rounded-lg bg-slate-900/50 border border-slate-700 max-h-64 overflow-y-auto">
-            <ul className="divide-y divide-slate-800">
-              {gameEvents.map((event, idx) => (
-                <li key={idx} className="px-4 py-2 hover:bg-slate-800/50 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg">
+      {/* Live Events */}
+      <div className="rounded-xl bg-slate-900/50 p-3">
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="text-sm font-medium text-slate-300">Live Events</h3>
+          {gameEvents.length > 0 && (
+            <button
+              onClick={clearEvents}
+              className="text-xs text-slate-500 hover:text-slate-300 transition"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+
+        <div className="max-h-48 overflow-y-auto">
+          {gameEvents.length === 0 ? (
+            <p className="text-sm text-slate-500 py-4 text-center">
+              {status.enabled
+                ? "Waiting for Star Citizen events..."
+                : "Start watching to see live events"}
+            </p>
+          ) : (
+            <ul className="space-y-1">
+              {gameEvents.map((event, idx) => {
+                const details = formatEventDetails(event);
+                return (
+                  <li
+                    key={idx}
+                    className="flex items-center gap-2 rounded-lg bg-slate-800/50 px-2 py-1.5 text-sm"
+                  >
+                    <span className="text-base">
                       {EVENT_ICONS[event.event] || '📋'}
                     </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-white">
-                          {formatEventName(event.event)}
-                        </span>
-                        {event.params?.victim_name && (
-                          <span className="text-xs text-slate-400">
-                            {event.params.victim_name}
-                          </span>
-                        )}
-                        {event.params?.killer_name && event.params.killer_name !== event.params?.victim_name && (
-                          <>
-                            <span className="text-xs text-slate-500">→</span>
-                            <span className="text-xs text-slate-400">
-                              {event.params.killer_name}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                      {event.params?.weapon && (
-                        <div className="text-xs text-slate-500 mt-1">
-                          {event.params.weapon}
-                          {event.params.damage_type && ` • ${event.params.damage_type}`}
-                        </div>
-                      )}
-                      {event.params?.direction && (
-                        <div className="text-xs text-slate-500 mt-1">
-                          Direction: ({event.params.direction.x.toFixed(2)}, {event.params.direction.y.toFixed(2)}, {event.params.direction.z.toFixed(2)})
-                        </div>
-                      )}
-                    </div>
-                    <span className="text-xs text-slate-500 whitespace-nowrap">
+                    <span className="font-medium text-white">
+                      {formatEventName(event.event)}
+                    </span>
+                    {details && (
+                      <span className="text-slate-400">({details})</span>
+                    )}
+                    <span className="ml-auto text-xs text-slate-500">
                       {formatTime(event.timestamp)}
                     </span>
-                  </div>
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
-          </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Info */}
       <details className="mt-6">
