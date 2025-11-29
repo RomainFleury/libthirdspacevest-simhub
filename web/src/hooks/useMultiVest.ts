@@ -1,5 +1,5 @@
 /**
- * Hook for managing multiple vests and player assignments.
+ * Hook for managing multiple vests.
  */
 
 import { useState, useEffect, useCallback } from "react";
@@ -24,7 +24,6 @@ export interface Player {
 
 export function useMultiVest() {
   const [devices, setDevices] = useState<ConnectedDevice[]>([]);
-  const [players, setPlayers] = useState<Player[]>([]);
   const [mainDeviceId, setMainDeviceId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,24 +41,6 @@ export function useMultiVest() {
         setMainDeviceId(main?.device_id || null);
       } else {
         setError(result?.error || "Failed to fetch devices");
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Fetch players
-  const fetchPlayers = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const result = await bridge?.listPlayers?.();
-      if (result?.success && result.devices) {
-        setPlayers(result.devices);
-      } else {
-        setError(result?.error || "Failed to fetch players");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
@@ -104,61 +85,7 @@ export function useMultiVest() {
     }
   }, [fetchDevices]);
 
-  // Create player
-  const createPlayer = useCallback(async (playerId: string, name?: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const result = await bridge?.createPlayer?.(playerId, name);
-      if (result?.success) {
-        await fetchPlayers();
-      } else {
-        setError(result?.error || "Failed to create player");
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchPlayers]);
-
-  // Assign player to device
-  const assignPlayer = useCallback(async (playerId: string, deviceId: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const result = await bridge?.assignPlayer?.(playerId, deviceId);
-      if (result?.success) {
-        await fetchPlayers();
-      } else {
-        setError(result?.error || "Failed to assign player");
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchPlayers]);
-
-  // Unassign player
-  const unassignPlayer = useCallback(async (playerId: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const result = await bridge?.unassignPlayer?.(playerId);
-      if (result?.success) {
-        await fetchPlayers();
-      } else {
-        setError(result?.error || "Failed to unassign player");
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchPlayers]);
-
-    // Subscribe to daemon events
+  // Subscribe to daemon events
     useEffect(() => {
       const unsubscribe = bridge?.onDaemonEvent?.((event: any) => {
         // Handle device events
@@ -169,21 +96,18 @@ export function useMultiVest() {
           fetchDevices();
         } else if (event.event === "main_device_changed") {
           fetchDevices();
-        } else if (event.event === "player_assigned" || event.event === "player_unassigned") {
-          fetchPlayers();
         }
       });
 
       return () => {
         unsubscribe?.();
       };
-    }, [fetchDevices, fetchPlayers]);
+    }, [fetchDevices]);
 
   // Initial fetch
   useEffect(() => {
     fetchDevices();
-    fetchPlayers();
-  }, [fetchDevices, fetchPlayers]);
+  }, [fetchDevices]);
 
   // Create mock device
   const createMockDevice = useCallback(async () => {
@@ -223,17 +147,12 @@ export function useMultiVest() {
 
   return {
     devices,
-    players,
     mainDeviceId,
     loading,
     error,
     fetchDevices,
-    fetchPlayers,
     setMainDevice,
     disconnectDevice,
-    createPlayer,
-    assignPlayer,
-    unassignPlayer,
     createMockDevice,
     removeMockDevice,
   };
