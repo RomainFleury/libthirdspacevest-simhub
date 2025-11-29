@@ -68,6 +68,12 @@ DEATH_PATTERN = re.compile(
     r"\s+\[Team_ActorTech\]\[Actor\]$"
 )
 
+# Ship hit event pattern
+# Format: [OnHandleHit] Hit FROM <attacker> TO <ship>. Being sent to child <player_name>
+SHIP_HIT_PATTERN = re.compile(
+    r"\[OnHandleHit\]\s+Hit\s+FROM\s+(?P<attacker>[^\s]+)\s+TO\s+(?P<ship>[^\s]+)\.\s+Being sent to child\s+(?P<player>[^\s]+)"
+)
+
 
 def parse_death_line(line: str, player_name: Optional[str] = None) -> Optional[StarCitizenEvent]:
     """
@@ -140,6 +146,48 @@ def parse_death_line(line: str, player_name: Optional[str] = None) -> Optional[S
     }
     
     return StarCitizenEvent(type=event_type, raw=line, params=params)
+
+
+def parse_ship_hit_line(line: str, player_name: Optional[str] = None) -> Optional[StarCitizenEvent]:
+    """
+    Parse a ship hit event line from Game.log.
+    
+    Args:
+        line: Log line to parse
+        player_name: Optional player name to identify player events
+        
+    Returns:
+        StarCitizenEvent if valid, None otherwise
+    """
+    match = SHIP_HIT_PATTERN.search(line)
+    if not match:
+        return None
+    
+    attacker = match.group("attacker")
+    ship = match.group("ship")
+    player = match.group("player")
+    
+    # Check if this is the player's ship
+    if player_name:
+        is_player_ship = player_name.lower() in player.lower()
+    else:
+        # Without player name, assume any ship hit is the player's
+        is_player_ship = True
+    
+    if not is_player_ship:
+        return None
+    
+    # Determine if attacker is NPC or player
+    is_npc_attacker = attacker.startswith("PU_") or "NPC" in attacker.upper() or "Vanduul" in attacker or "Pirate" in attacker
+    
+    params = {
+        "attacker": attacker,
+        "ship": ship,
+        "player": player,
+        "is_npc_attacker": is_npc_attacker,
+    }
+    
+    return StarCitizenEvent(type="ship_hit", raw=line, params=params)
 
 
 # =============================================================================
@@ -281,6 +329,24 @@ def map_event_to_haptics(event: StarCitizenEvent) -> List[Tuple[int, int]]:
         for cell in ALL_CELLS:
             commands.append((cell, 6))
     
+    elif event.type == "ship_hit":
+        # Ship hit - strong vibration, front or back based on context
+        # Since we don't have direction info, use front cells for ship hits
+        # (feels like impact from the front)
+        attacker = event.params.get("attacker", "")
+        is_npc = event.params.get("is_npc_attacker", False)
+        
+        # Stronger for NPC attacks (combat), medium for other hits
+        if is_npc:
+            speed = 8  # Strong impact
+        else:
+            speed = 6  # Medium impact
+        
+        # Use front cells to simulate impact
+        cells = FRONT_CELLS
+        for cell in cells:
+            commands.append((cell, speed))
+    
     else:
         # Generic death - medium intensity
         cells = direction_to_cells(dir_x, dir_y, dir_z)
@@ -393,8 +459,15 @@ class GameLogWatcher:
                 self._last_position = f.tell()
             
             for line in new_content.splitlines():
+                # Check for death events
                 if "<Actor Death>" in line:
                     event = parse_death_line(line, self.player_name)
+                    if event:
+                        self.on_event(event)
+                
+                # Check for ship hit events
+                if "[OnHandleHit]" in line:
+                    event = parse_ship_hit_line(line, self.player_name)
                     if event:
                         self.on_event(event)
         

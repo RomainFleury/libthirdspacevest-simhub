@@ -8,6 +8,7 @@ const EVENT_ICONS: Record<string, string> = {
   npc_death: '🤖',
   suicide: '💔',
   death: '💀',
+  ship_hit: '🚀',
 };
 
 export function StarCitizenIntegrationPanel() {
