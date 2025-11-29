@@ -19,6 +19,7 @@ export function StarCitizenIntegrationPanel() {
     start,
     stop,
     clearEvents,
+    browseLogPath,
   } = useStarCitizenIntegration();
 
   const [logPath, setLogPath] = useState<string>('');
@@ -35,6 +36,13 @@ export function StarCitizenIntegrationPanel() {
 
   const handleStart = () => {
     start(logPath || undefined, playerName || undefined);
+  };
+
+  const handleBrowse = async () => {
+    const selectedPath = await browseLogPath();
+    if (selectedPath) {
+      setLogPath(selectedPath);
+    }
   };
 
   return (
@@ -88,13 +96,23 @@ export function StarCitizenIntegrationPanel() {
             <label className="block text-sm font-medium text-slate-300 mb-2">
               Game.log Path (optional - auto-detect if empty)
             </label>
-            <input
-              type="text"
-              value={logPath}
-              onChange={(e) => setLogPath(e.target.value)}
-              placeholder="C:/Program Files/Roberts Space Industries/StarCitizen/LIVE/Game.log"
-              className="w-full px-3 py-2 rounded-lg border border-slate-600 bg-slate-900/50 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={logPath}
+                onChange={(e) => setLogPath(e.target.value)}
+                placeholder="C:/Program Files/Roberts Space Industries/StarCitizen/LIVE/Game.log"
+                className="flex-1 px-3 py-2 rounded-lg border border-slate-600 bg-slate-900/50 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                onClick={handleBrowse}
+                disabled={isLoading}
+                className="px-4 py-2 rounded-lg border border-slate-600 bg-slate-700/50 hover:bg-slate-700 text-slate-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Browse for Game.log file"
+              >
+                Browse
+              </button>
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">

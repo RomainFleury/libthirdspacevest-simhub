@@ -101,6 +101,21 @@ export function useStarCitizenIntegration() {
     setGameEvents([]);
   }, []);
 
+  // Browse for Game.log file
+  const browseLogPath = useCallback(async () => {
+    try {
+      // @ts-ignore - window.vestBridge
+      const result = await window.vestBridge?.starcitizenBrowseLogPath?.();
+      if (result?.success && result.path) {
+        return result.path;
+      }
+      return null;
+    } catch (err) {
+      console.error('Failed to browse for Game.log:', err);
+      return null;
+    }
+  }, []);
+
   // Subscribe to daemon events
   useEffect(() => {
     // @ts-ignore - window.vestBridge
@@ -150,6 +165,7 @@ export function useStarCitizenIntegration() {
     stop,
     clearEvents,
     refreshStatus,
+    browseLogPath,
   };
 }
 

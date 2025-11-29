@@ -73,6 +73,7 @@ contextBridge.exposeInMainWorld("vestBridge", {
   starcitizenStart: (logPath, playerName) => ipcRenderer.invoke("starcitizen:start", logPath, playerName),
   starcitizenStop: () => ipcRenderer.invoke("starcitizen:stop"),
   starcitizenStatus: () => ipcRenderer.invoke("starcitizen:status"),
+  starcitizenBrowseLogPath: () => ipcRenderer.invoke("starcitizen:browseLogPath"),
 
   // Predefined Effects Library API
   playEffect: (effectName) => ipcRenderer.invoke("effects:play", effectName),

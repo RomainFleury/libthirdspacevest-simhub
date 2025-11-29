@@ -242,6 +242,12 @@ declare global {
         log_path?: string | null;
         error?: string;
       }>;
+      starcitizenBrowseLogPath: () => Promise<{
+        success: boolean;
+        path?: string;
+        canceled?: boolean;
+        error?: string;
+      }>;
       // EA Battlefront 2 (2017) Settings API
       bf2GetSettings: () => Promise<{
         success: boolean;

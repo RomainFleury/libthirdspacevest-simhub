@@ -43,7 +43,7 @@ function registerAllHandlers(getDaemonBridge, getMainWindow, reconnectToDaemon) 
   registerPistolWhipHandlers();
 
   // Star Citizen integration handlers
-  registerStarCitizenHandlers();
+  registerStarCitizenHandlers(getMainWindow);
 
   // Predefined effects library handlers
   registerEffectsHandlers();
