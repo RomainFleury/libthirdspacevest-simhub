@@ -769,6 +769,64 @@ class DaemonBridge extends EventEmitter {
   }
 
   // -------------------------------------------------------------------------
+  // Star Citizen Integration API
+  // -------------------------------------------------------------------------
+
+  /**
+   * Start Star Citizen integration (watch Game.log).
+   * @param {string} [logPath] - Optional path to Game.log (auto-detect if not provided)
+   * @param {string} [playerName] - Optional player name to identify player events
+   */
+  async starcitizenStart(logPath, playerName) {
+    try {
+      const response = await this.sendCommand("starcitizen_start", {
+        log_path: logPath,
+        message: playerName, // Using message field for player name
+      });
+      return {
+        success: response.success ?? true,
+        log_path: response.log_path,
+        error: response.message,
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Stop Star Citizen integration.
+   */
+  async starcitizenStop() {
+    try {
+      await this.sendCommand("starcitizen_stop");
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Get Star Citizen integration status.
+   */
+  async starcitizenStatus() {
+    try {
+      const response = await this.sendCommand("starcitizen_status");
+      return {
+        enabled: response.running ?? false,
+        events_received: response.events_received ?? 0,
+        last_event_ts: response.last_event_ts ?? null,
+        last_event_type: response.last_event_type ?? null,
+        log_path: response.log_path ?? null,
+      };
+    } catch (error) {
+      return {
+        enabled: false,
+        error: error.message,
+      };
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Predefined Effects Library API
   // -------------------------------------------------------------------------
 

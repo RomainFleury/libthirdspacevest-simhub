@@ -76,6 +76,10 @@ class CommandType(Enum):
     PISTOLWHIP_START = "pistolwhip_start"
     PISTOLWHIP_STOP = "pistolwhip_stop"
     PISTOLWHIP_STATUS = "pistolwhip_status"
+    # Star Citizen integration
+    STARCITIZEN_START = "starcitizen_start"
+    STARCITIZEN_STOP = "starcitizen_stop"
+    STARCITIZEN_STATUS = "starcitizen_status"
     # Predefined effects
     PLAY_EFFECT = "play_effect"
     LIST_EFFECTS = "list_effects"
@@ -131,6 +135,10 @@ class EventType(Enum):
     PISTOLWHIP_STARTED = "pistolwhip_started"
     PISTOLWHIP_STOPPED = "pistolwhip_stopped"
     PISTOLWHIP_GAME_EVENT = "pistolwhip_game_event"
+    # Star Citizen events
+    STARCITIZEN_STARTED = "starcitizen_started"
+    STARCITIZEN_STOPPED = "starcitizen_stopped"
+    STARCITIZEN_GAME_EVENT = "starcitizen_game_event"
     # Predefined effects
     EFFECT_STARTED = "effect_started"
     EFFECT_COMPLETED = "effect_completed"
@@ -152,6 +160,8 @@ class Command:
     gsi_port: Optional[int] = None
     # Half-Life: Alyx params
     log_path: Optional[str] = None
+    # Star Citizen params
+    message: Optional[str] = None  # Used for player name in Star Citizen
     # SUPERHOT VR params
     event: Optional[str] = None  # Event name (death, pistol_recoil, etc.)
     hand: Optional[str] = None   # "left" or "right"
@@ -182,6 +192,7 @@ class Command:
             speed=data.get("speed"),
             gsi_port=data.get("gsi_port"),
             log_path=data.get("log_path"),
+            message=data.get("message"),
             event=data.get("event"),
             hand=data.get("hand"),
             priority=data.get("priority"),
@@ -442,11 +453,13 @@ def response_list_connected_devices(devices: List[Dict[str, Any]], req_id: Optio
 
 def response_set_main_device(success: bool, device_id: Optional[str] = None, error: Optional[str] = None, req_id: Optional[str] = None) -> Response:
     """Response for set_main_device command."""
+    # Create device dict if device_id is provided
+    device = {"device_id": device_id} if device_id else None
     return Response(
         response="set_main_device",
         req_id=req_id,
         success=success,
-        device_id=device_id,
+        device=device,
         message=error,
     )
 
@@ -879,6 +892,83 @@ def response_pistolwhip_status(
         events_received=events_received,
         last_event_ts=last_event_ts,
         last_event_type=last_event_type,
+    )
+
+
+# =============================================================================
+# Star Citizen Integration Protocol
+# =============================================================================
+
+def event_starcitizen_started(log_path: str) -> Event:
+    """Event when Star Citizen integration starts."""
+    return Event(event=EventType.STARCITIZEN_STARTED.value, log_path=log_path)
+
+
+def event_starcitizen_stopped() -> Event:
+    """Event when Star Citizen integration stops."""
+    return Event(event=EventType.STARCITIZEN_STOPPED.value)
+
+
+def event_starcitizen_game_event(
+    event_type: str,
+    params: Optional[Dict[str, Any]] = None,
+) -> Event:
+    """
+    Star Citizen game event (player_death, player_kill, npc_death, suicide).
+    
+    Args:
+        event_type: Type of event ("player_death", "player_kill", "npc_death", "suicide")
+        params: Event parameters (victim_name, killer_name, weapon, direction, etc.)
+    """
+    return Event(
+        event=EventType.STARCITIZEN_GAME_EVENT.value,
+        event_type=event_type,
+        params=params,
+    )
+
+
+def response_starcitizen_start(
+    success: bool,
+    log_path: Optional[str] = None,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to starcitizen_start command."""
+    return Response(
+        response="starcitizen_start",
+        req_id=req_id,
+        success=success,
+        log_path=log_path,
+        message=error,
+    )
+
+
+def response_starcitizen_stop(success: bool, req_id: Optional[str] = None) -> Response:
+    """Response to starcitizen_stop command."""
+    return Response(
+        response="starcitizen_stop",
+        req_id=req_id,
+        success=success,
+    )
+
+
+def response_starcitizen_status(
+    enabled: bool,
+    events_received: int = 0,
+    last_event_ts: Optional[float] = None,
+    last_event_type: Optional[str] = None,
+    log_path: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to starcitizen_status command."""
+    return Response(
+        response="starcitizen_status",
+        req_id=req_id,
+        running=enabled,
+        events_received=events_received,
+        last_event_ts=last_event_ts,
+        last_event_type=last_event_type,
+        log_path=log_path,
     )
 
 

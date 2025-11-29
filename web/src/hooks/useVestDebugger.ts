@@ -14,8 +14,11 @@ import {
   defaultEffects,
 } from "../data/effects";
 import { LogEntry, VestEffect, VestStatus } from "../types";
-import { playEffectSound, getPlaySoundPreference } from "../utils/sound";
+import { getPlaySoundPreference, playSound } from "../utils/sound";
 import { useMultiVest } from "./useMultiVest";
+
+// Module-level Set to track processed sound events (shared across all hook instances)
+const processedSoundEvents = new Set<string>();
 
 const FALLBACK_STATUS: VestStatus = {
   connected: false,
@@ -247,7 +250,7 @@ export function useVestDebugger() {
 
     try {
       // Subscribe to daemon events
-      unsubscribeEvents = subscribeToDaemonEvents((event) => {
+      unsubscribeEvents = subscribeToDaemonEvents((event: DaemonEvent) => {
         const formatted = formatDaemonEvent(event);
         const level = isErrorEvent(event) ? "error" : "info";
         pushLog(formatted.message, level, {
@@ -267,14 +270,28 @@ export function useVestDebugger() {
           
           // Play sound if enabled and effect is on main device
           const device_id = (event as any).device_id;
+          const eventKey = `${event.ts}_${event.cell}_${device_id || 'none'}`;
+          
           if (getPlaySoundPreference() && device_id === mainDeviceId) {
-            playEffectSound();
+            // Use module-level Set to prevent duplicate plays across all hook instances
+            if (!processedSoundEvents.has(eventKey)) {
+              processedSoundEvents.add(eventKey);
+              
+              // Clean up old entries (keep only last 10)
+              if (processedSoundEvents.size > 10) {
+                const entries = Array.from(processedSoundEvents);
+                processedSoundEvents.clear();
+                entries.slice(-10).forEach(e => processedSoundEvents.add(e));
+              }
+              
+              playSound("mp3");
+            }
           }
         }
       });
 
       // Subscribe to daemon connection status
-      unsubscribeStatus = subscribeToDaemonStatus((status) => {
+      unsubscribeStatus = subscribeToDaemonStatus((status: { connected: boolean }) => {
         setDaemonConnected(status.connected);
         if (status.connected) {
           pushLog("🟢 Connected to daemon");
@@ -294,7 +311,7 @@ export function useVestDebugger() {
       unsubscribeEvents?.();
       unsubscribeStatus?.();
     };
-  }, [pushLog, refreshStatus, flashCell]);
+  }, [pushLog, refreshStatus, flashCell, mainDeviceId]);
 
   // Initial fetch
   useEffect(() => {
