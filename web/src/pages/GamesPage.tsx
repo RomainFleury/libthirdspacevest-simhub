@@ -2,6 +2,7 @@ import { CS2IntegrationPanel } from "../components/CS2IntegrationPanel";
 import { AlyxIntegrationPanel } from "../components/AlyxIntegrationPanel";
 import { SuperHotIntegrationPanel } from "../components/SuperHotIntegrationPanel";
 import { PistolWhipIntegrationPanel } from "../components/PistolWhipIntegrationPanel";
+import { StarCitizenIntegrationPanel } from "../components/StarCitizenIntegrationPanel";
 import { BF2SettingsPanel } from "../components/BF2SettingsPanel";
 
 export function GamesPage() {
@@ -20,6 +21,7 @@ export function GamesPage() {
         <AlyxIntegrationPanel />
         <SuperHotIntegrationPanel />
         <PistolWhipIntegrationPanel />
+        <StarCitizenIntegrationPanel />
       </div>
 
       {/* EA Battlefront 2 (2017) Settings */}

@@ -227,6 +227,21 @@ declare global {
         last_event_type?: string | null;
         error?: string;
       }>;
+      // Star Citizen Integration API
+      starcitizenStart: (logPath?: string, playerName?: string) => Promise<{
+        success: boolean;
+        log_path?: string;
+        error?: string;
+      }>;
+      starcitizenStop: () => Promise<{ success: boolean; error?: string }>;
+      starcitizenStatus: () => Promise<{
+        enabled: boolean;
+        events_received?: number;
+        last_event_ts?: number | null;
+        last_event_type?: string | null;
+        log_path?: string | null;
+        error?: string;
+      }>;
       // EA Battlefront 2 (2017) Settings API
       bf2GetSettings: () => Promise<{
         success: boolean;

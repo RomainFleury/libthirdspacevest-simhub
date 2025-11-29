@@ -76,6 +76,7 @@ from .alyx_manager import AlyxManager, get_mod_info as get_alyx_mod_info
 from .superhot_manager import SuperHotManager
 from .gtav_manager import GTAVManager
 from .pistolwhip_manager import PistolWhipManager
+from .starcitizen_manager import StarCitizenManager
 from .protocol import (
     event_alyx_started,
     event_alyx_stopped,
@@ -96,6 +97,12 @@ from .protocol import (
     event_pistolwhip_stopped,
     event_pistolwhip_game_event,
     response_pistolwhip_status,
+    event_starcitizen_started,
+    event_starcitizen_stopped,
+    event_starcitizen_game_event,
+    response_starcitizen_start,
+    response_starcitizen_stop,
+    response_starcitizen_status,
     # Predefined effects
     event_effect_started,
     event_effect_completed,
@@ -160,6 +167,12 @@ class VestDaemon:
         self._pistolwhip_manager = PistolWhipManager()
         self._pistolwhip_manager.set_event_callback(self._on_pistolwhip_game_event)
         self._pistolwhip_manager.set_trigger_callback(self._on_pistolwhip_trigger)
+        
+        # Star Citizen manager
+        self._starcitizen_manager = StarCitizenManager(
+            on_game_event=self._on_starcitizen_game_event,
+            on_trigger=self._on_starcitizen_trigger,
+        )
         
         self._loop: Optional[asyncio.AbstractEventLoop] = None
     
@@ -434,6 +447,16 @@ class VestDaemon:
         
         if cmd_type == CommandType.PISTOLWHIP_STATUS:
             return await self._cmd_pistolwhip_status(command)
+        
+        # Star Citizen commands
+        if cmd_type == CommandType.STARCITIZEN_START:
+            return await self._cmd_starcitizen_start(command)
+        
+        if cmd_type == CommandType.STARCITIZEN_STOP:
+            return await self._cmd_starcitizen_stop(command)
+        
+        if cmd_type == CommandType.STARCITIZEN_STATUS:
+            return await self._cmd_starcitizen_status(command)
         
         # Predefined effects commands
         if cmd_type == CommandType.PLAY_EFFECT:
@@ -1431,6 +1454,93 @@ class VestDaemon:
             last_event_type=status.get("last_event_type"),
             req_id=command.req_id,
         )
+    
+    # -------------------------------------------------------------------------
+    # Star Citizen commands
+    # -------------------------------------------------------------------------
+    
+    async def _cmd_starcitizen_start(self, command: Command) -> Response:
+        """Start watching Star Citizen Game.log."""
+        log_path = command.log_path
+        player_name = command.message  # Using message field for player name
+        
+        success, error = self._starcitizen_manager.start(
+            log_path=log_path,
+            player_name=player_name,
+        )
+        
+        if success:
+            log_path_str = str(self._starcitizen_manager.log_path) if self._starcitizen_manager.log_path else None
+            await self._clients.broadcast(event_starcitizen_started(log_path_str or ""))
+            return response_starcitizen_start(
+                success=True,
+                log_path=log_path_str,
+                req_id=command.req_id,
+            )
+        else:
+            return response_starcitizen_start(
+                success=False,
+                error=error,
+                req_id=command.req_id,
+            )
+    
+    async def _cmd_starcitizen_stop(self, command: Command) -> Response:
+        """Stop watching Star Citizen Game.log."""
+        success = self._starcitizen_manager.stop()
+        if success:
+            await self._clients.broadcast(event_starcitizen_stopped())
+        return response_starcitizen_stop(success=success, req_id=command.req_id)
+    
+    async def _cmd_starcitizen_status(self, command: Command) -> Response:
+        """Get Star Citizen integration status."""
+        log_path_str = str(self._starcitizen_manager.log_path) if self._starcitizen_manager.log_path else None
+        return response_starcitizen_status(
+            enabled=self._starcitizen_manager.is_running,
+            events_received=self._starcitizen_manager.events_received,
+            last_event_ts=self._starcitizen_manager.last_event_ts,
+            last_event_type=self._starcitizen_manager.last_event_type,
+            log_path=log_path_str,
+            req_id=command.req_id,
+        )
+    
+    # -------------------------------------------------------------------------
+    # Star Citizen callbacks
+    # -------------------------------------------------------------------------
+    
+    def _on_starcitizen_game_event(self, event_type: str, params: dict):
+        """
+        Called when Star Citizen manager processes a game event.
+        
+        Broadcasts the event to all connected clients for UI display.
+        """
+        if self._loop is None:
+            return
+        
+        # Schedule broadcast in event loop
+        asyncio.run_coroutine_threadsafe(
+            self._clients.broadcast(event_starcitizen_game_event(event_type, params)),
+            self._loop,
+        )
+    
+    def _on_starcitizen_trigger(self, cell: int, speed: int):
+        """
+        Called when Star Citizen manager wants to trigger a haptic effect.
+        
+        Triggers the effect on the main device.
+        """
+        main_device_id = self._registry.get_main_device_id()
+        if main_device_id:
+            controller = self._registry.get_controller(main_device_id)
+            if controller:
+                controller.trigger_effect(cell, speed)
+                # Broadcast effect event
+                if self._loop:
+                    asyncio.run_coroutine_threadsafe(
+                        self._clients.broadcast(
+                            event_effect_triggered(cell, speed, device_id=main_device_id)
+                        ),
+                        self._loop,
+                    )
     
     # -------------------------------------------------------------------------
     # Pistol Whip callbacks

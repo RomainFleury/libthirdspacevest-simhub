@@ -69,6 +69,11 @@ contextBridge.exposeInMainWorld("vestBridge", {
   pistolwhipStop: () => ipcRenderer.invoke("pistolwhip:stop"),
   pistolwhipStatus: () => ipcRenderer.invoke("pistolwhip:status"),
 
+  // Star Citizen Integration API
+  starcitizenStart: (logPath, playerName) => ipcRenderer.invoke("starcitizen:start", logPath, playerName),
+  starcitizenStop: () => ipcRenderer.invoke("starcitizen:stop"),
+  starcitizenStatus: () => ipcRenderer.invoke("starcitizen:status"),
+
   // Predefined Effects Library API
   playEffect: (effectName) => ipcRenderer.invoke("effects:play", effectName),
   listEffectsLibrary: () => ipcRenderer.invoke("effects:list"),
