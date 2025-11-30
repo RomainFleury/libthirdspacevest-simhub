@@ -196,13 +196,18 @@ export function DeviceSelector({ onDeviceChange, disabled }: Props) {
             <select
               value={
                 selectedDevice
-                  ? `${selectedDevice.bus}-${selectedDevice.address}`
+                  ? selectedDevice.serial_number && selectedDevice.serial_number !== "sorry-bro"
+                    ? selectedDevice.serial_number
+                    : `${selectedDevice.bus}-${selectedDevice.address}`
                   : ""
               }
               onChange={(e) => {
-                const [bus, address] = e.target.value.split("-").map(Number);
+                const value = e.target.value;
+                // Try to find by serial number first, then by bus-address
                 const device = devices.find(
-                  (d) => d.bus === bus && d.address === address
+                  (d) => 
+                    (d.serial_number && d.serial_number !== "sorry-bro" && d.serial_number === value) ||
+                    (`${d.bus}-${d.address}` === value)
                 );
                 if (device) {
                   setSelectedDevice(device);
@@ -212,15 +217,29 @@ export function DeviceSelector({ onDeviceChange, disabled }: Props) {
               disabled={disabled || loading}
               className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white focus:border-vest-accent/40 focus:outline-none focus:ring-2 focus:ring-vest-accent/20 disabled:opacity-50"
             >
-              {devices.map((device) => (
-                <option
-                  key={`${device.bus}-${device.address}`}
-                  value={`${device.bus}-${device.address}`}
-                >
-                  {formatDeviceLabel(device)}
-                  {device.serial_number === "sorry-bro" && " (PyUSB not installed)"}
-                </option>
-              ))}
+              {devices.map((device, index) => {
+                // Use serial_number as key/value if available, otherwise use bus-address, fallback to index
+                const key = device.serial_number && device.serial_number !== "sorry-bro"
+                  ? device.serial_number
+                  : (device.bus !== null && device.bus !== undefined && device.address !== null && device.address !== undefined)
+                    ? `${device.bus}-${device.address}`
+                    : `device-${index}`;
+                const value = device.serial_number && device.serial_number !== "sorry-bro"
+                  ? device.serial_number
+                  : (device.bus !== null && device.bus !== undefined && device.address !== null && device.address !== undefined)
+                    ? `${device.bus}-${device.address}`
+                    : `device-${index}`;
+                
+                return (
+                  <option
+                    key={key}
+                    value={value}
+                  >
+                    {formatDeviceLabel(device)}
+                    {device.serial_number === "sorry-bro" && " (PyUSB not installed)"}
+                  </option>
+                );
+              })}
             </select>
           </div>
 

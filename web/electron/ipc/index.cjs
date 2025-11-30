@@ -14,6 +14,7 @@ const { registerSuperHotHandlers } = require("./superhotHandlers.cjs");
 const { registerPistolWhipHandlers } = require("./pistolwhipHandlers.cjs");
 const { registerEffectsHandlers } = require("./effectsHandlers.cjs");
 const { registerBF2Handlers } = require("./bf2Handlers.cjs");
+const { registerMultiVestHandlers } = require("./multiVestHandlers.cjs");
 
 /**
  * Register all IPC handlers.
@@ -45,6 +46,9 @@ function registerAllHandlers(getDaemonBridge, getMainWindow, reconnectToDaemon) 
 
   // EA Battlefront 2 (2017) settings handlers
   registerBF2Handlers();
+
+  // Multi-vest management handlers
+  registerMultiVestHandlers(getDaemonBridge);
 
   console.log("✓ IPC handlers registered");
 }
