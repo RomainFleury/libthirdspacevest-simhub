@@ -77,6 +77,7 @@ from .superhot_manager import SuperHotManager
 from .gtav_manager import GTAVManager
 from .pistolwhip_manager import PistolWhipManager
 from .starcitizen_manager import StarCitizenManager
+from .l4d2_manager import L4D2Manager
 from .protocol import (
     event_alyx_started,
     event_alyx_stopped,
@@ -103,6 +104,12 @@ from .protocol import (
     response_starcitizen_start,
     response_starcitizen_stop,
     response_starcitizen_status,
+    event_l4d2_started,
+    event_l4d2_stopped,
+    event_l4d2_game_event,
+    response_l4d2_start,
+    response_l4d2_stop,
+    response_l4d2_status,
     # Predefined effects
     event_effect_started,
     event_effect_completed,
@@ -172,6 +179,12 @@ class VestDaemon:
         self._starcitizen_manager = StarCitizenManager(
             on_game_event=self._on_starcitizen_game_event,
             on_trigger=self._on_starcitizen_trigger,
+        )
+        
+        # Left 4 Dead 2 manager
+        self._l4d2_manager = L4D2Manager(
+            on_game_event=self._on_l4d2_game_event,
+            on_trigger=self._on_l4d2_trigger,
         )
         
         self._loop: Optional[asyncio.AbstractEventLoop] = None
@@ -457,6 +470,16 @@ class VestDaemon:
         
         if cmd_type == CommandType.STARCITIZEN_STATUS:
             return await self._cmd_starcitizen_status(command)
+        
+        # Left 4 Dead 2 commands
+        if cmd_type == CommandType.L4D2_START:
+            return await self._cmd_l4d2_start(command)
+        
+        if cmd_type == CommandType.L4D2_STOP:
+            return await self._cmd_l4d2_stop(command)
+        
+        if cmd_type == CommandType.L4D2_STATUS:
+            return await self._cmd_l4d2_status(command)
         
         # Predefined effects commands
         if cmd_type == CommandType.PLAY_EFFECT:
@@ -1545,19 +1568,86 @@ class VestDaemon:
         
         Triggers the effect on the main device.
         """
-        main_device_id = self._registry.get_main_device_id()
-        if main_device_id:
-            controller = self._registry.get_controller(main_device_id)
-            if controller:
-                controller.trigger_effect(cell, speed)
-                # Broadcast effect event
-                if self._loop:
-                    asyncio.run_coroutine_threadsafe(
-                        self._clients.broadcast(
-                            event_effect_triggered(cell, speed, device_id=main_device_id)
-                        ),
-                        self._loop,
-                    )
+        if self._loop is None:
+            return
+        
+        # Schedule trigger in event loop
+        asyncio.run_coroutine_threadsafe(
+            self._trigger_main_device(cell, speed),
+            self._loop,
+        )
+    
+    # -------------------------------------------------------------------------
+    # Left 4 Dead 2 commands
+    # -------------------------------------------------------------------------
+    
+    async def _cmd_l4d2_start(self, command: Command) -> Response:
+        """Start watching Left 4 Dead 2 console.log."""
+        logger.info(f"[L4D2] Received start command: log_path={command.log_path}, player_name={command.message}")
+        log_path = command.log_path
+        player_name = command.message  # Using message field for player name
+        
+        success, error = self._l4d2_manager.start(log_path=log_path, player_name=player_name)
+        
+        if success:
+            log_path_str = str(self._l4d2_manager.log_path) if self._l4d2_manager.log_path else None
+            await self._clients.broadcast(event_l4d2_started(log_path_str or ""))
+            return response_l4d2_start(success=True, log_path=log_path_str, req_id=command.req_id)
+        else:
+            return response_l4d2_start(success=False, error=error, req_id=command.req_id)
+    
+    async def _cmd_l4d2_stop(self, command: Command) -> Response:
+        """Stop watching Left 4 Dead 2 console.log."""
+        success = self._l4d2_manager.stop()
+        if success:
+            await self._clients.broadcast(event_l4d2_stopped())
+        return response_l4d2_stop(success=success, req_id=command.req_id)
+    
+    async def _cmd_l4d2_status(self, command: Command) -> Response:
+        """Get Left 4 Dead 2 integration status."""
+        log_path_str = str(self._l4d2_manager.log_path) if self._l4d2_manager.log_path else None
+        return response_l4d2_status(
+            running=self._l4d2_manager.is_running,
+            events_received=self._l4d2_manager.events_received,
+            last_event_ts=self._l4d2_manager.last_event_ts,
+            last_event_type=None,  # L4D2 manager doesn't track last event type yet
+            log_path=log_path_str,
+            req_id=command.req_id,
+        )
+    
+    # -------------------------------------------------------------------------
+    # Left 4 Dead 2 callbacks
+    # -------------------------------------------------------------------------
+    
+    def _on_l4d2_game_event(self, event_type: str, params: dict):
+        """
+        Called when Left 4 Dead 2 manager processes a game event.
+        
+        Broadcasts the event to all connected clients for UI display.
+        """
+        if self._loop is None:
+            return
+        
+        # Schedule broadcast in event loop
+        asyncio.run_coroutine_threadsafe(
+            self._clients.broadcast(event_l4d2_game_event(event_type, params)),
+            self._loop,
+        )
+    
+    def _on_l4d2_trigger(self, cell: int, speed: int):
+        """
+        Called when Left 4 Dead 2 manager wants to trigger a haptic effect.
+        
+        Triggers the effect on the main device.
+        """
+        if self._loop is None:
+            return
+        
+        # Schedule trigger in event loop
+        asyncio.run_coroutine_threadsafe(
+            self._trigger_main_device(cell, speed),
+            self._loop,
+        )
     
     # -------------------------------------------------------------------------
     # Pistol Whip callbacks

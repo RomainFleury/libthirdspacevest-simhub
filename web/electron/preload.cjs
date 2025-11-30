@@ -78,6 +78,15 @@ contextBridge.exposeInMainWorld("vestBridge", {
   starcitizenSetLogPath: (logPath) => ipcRenderer.invoke("starcitizen:setLogPath", logPath),
   starcitizenSetPlayerName: (playerName) => ipcRenderer.invoke("starcitizen:setPlayerName", playerName),
 
+  // Left 4 Dead 2 Integration API
+  l4d2Start: (logPath, playerName) => ipcRenderer.invoke("l4d2:start", logPath, playerName),
+  l4d2Stop: () => ipcRenderer.invoke("l4d2:stop"),
+  l4d2Status: () => ipcRenderer.invoke("l4d2:status"),
+  l4d2BrowseLogPath: () => ipcRenderer.invoke("l4d2:browseLogPath"),
+  l4d2GetSettings: () => ipcRenderer.invoke("l4d2:getSettings"),
+  l4d2SetLogPath: (logPath) => ipcRenderer.invoke("l4d2:setLogPath", logPath),
+  l4d2SetPlayerName: (playerName) => ipcRenderer.invoke("l4d2:setPlayerName", playerName),
+
   // Predefined Effects Library API
   playEffect: (effectName) => ipcRenderer.invoke("effects:play", effectName),
   listEffectsLibrary: () => ipcRenderer.invoke("effects:list"),

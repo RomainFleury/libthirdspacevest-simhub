@@ -262,6 +262,36 @@ declare global {
         success: boolean;
         error?: string;
       }>;
+      // Left 4 Dead 2 Integration API
+      l4d2Start: (logPath?: string, playerName?: string) => Promise<{
+        success: boolean;
+        log_path?: string;
+        error?: string;
+      }>;
+      l4d2Stop: () => Promise<{ success: boolean; error?: string }>;
+      l4d2Status: () => Promise<{
+        success: boolean;
+        running: boolean;
+        events_received?: number;
+        last_event_ts?: number | null;
+        last_event_type?: string | null;
+        log_path?: string | null;
+        error?: string;
+      }>;
+      l4d2BrowseLogPath: () => Promise<{
+        success: boolean;
+        logPath?: string;
+        canceled?: boolean;
+        error?: string;
+      }>;
+      l4d2GetSettings: () => Promise<{
+        success: boolean;
+        logPath?: string | null;
+        playerName?: string | null;
+        error?: string;
+      }>;
+      l4d2SetLogPath: (logPath: string | null) => Promise<{ success: boolean; error?: string }>;
+      l4d2SetPlayerName: (playerName: string | null) => Promise<{ success: boolean; error?: string }>;
       // EA Battlefront 2 (2017) Settings API
       bf2GetSettings: () => Promise<{
         success: boolean;

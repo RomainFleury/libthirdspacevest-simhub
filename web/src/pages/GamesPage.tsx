@@ -3,6 +3,7 @@ import { AlyxIntegrationPanel } from "../components/AlyxIntegrationPanel";
 import { SuperHotIntegrationPanel } from "../components/SuperHotIntegrationPanel";
 import { PistolWhipIntegrationPanel } from "../components/PistolWhipIntegrationPanel";
 import { StarCitizenIntegrationPanel } from "../components/StarCitizenIntegrationPanel";
+import { Left4Dead2IntegrationPanel } from "../components/Left4Dead2IntegrationPanel";
 import { BF2SettingsPanel } from "../components/BF2SettingsPanel";
 
 export function GamesPage() {
@@ -22,6 +23,7 @@ export function GamesPage() {
         <SuperHotIntegrationPanel />
         <PistolWhipIntegrationPanel />
         <StarCitizenIntegrationPanel />
+        <Left4Dead2IntegrationPanel />
       </div>
 
       {/* EA Battlefront 2 (2017) Settings */}

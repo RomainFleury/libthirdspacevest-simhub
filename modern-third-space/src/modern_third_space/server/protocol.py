@@ -80,6 +80,10 @@ class CommandType(Enum):
     STARCITIZEN_START = "starcitizen_start"
     STARCITIZEN_STOP = "starcitizen_stop"
     STARCITIZEN_STATUS = "starcitizen_status"
+    # Left 4 Dead 2 integration
+    L4D2_START = "l4d2_start"
+    L4D2_STOP = "l4d2_stop"
+    L4D2_STATUS = "l4d2_status"
     # Predefined effects
     PLAY_EFFECT = "play_effect"
     LIST_EFFECTS = "list_effects"
@@ -139,6 +143,10 @@ class EventType(Enum):
     STARCITIZEN_STARTED = "starcitizen_started"
     STARCITIZEN_STOPPED = "starcitizen_stopped"
     STARCITIZEN_GAME_EVENT = "starcitizen_game_event"
+    # Left 4 Dead 2 integration
+    L4D2_STARTED = "l4d2_started"
+    L4D2_STOPPED = "l4d2_stopped"
+    L4D2_GAME_EVENT = "l4d2_game_event"
     # Predefined effects
     EFFECT_STARTED = "effect_started"
     EFFECT_COMPLETED = "effect_completed"
@@ -969,6 +977,88 @@ def response_starcitizen_status(
         last_event_ts=last_event_ts,
         last_event_type=last_event_type,
         log_path=log_path,
+    )
+
+
+# =============================================================================
+# Left 4 Dead 2 Integration Protocol
+# =============================================================================
+
+def event_l4d2_started(log_path: str) -> Event:
+    """Event when Left 4 Dead 2 integration starts."""
+    return Event(event=EventType.L4D2_STARTED.value, log_path=log_path)
+
+
+def event_l4d2_stopped() -> Event:
+    """Event when Left 4 Dead 2 integration stops."""
+    return Event(event=EventType.L4D2_STOPPED.value)
+
+
+def event_l4d2_game_event(
+    event_type: str,
+    params: Optional[Dict[str, Any]] = None,
+) -> Event:
+    """
+    Left 4 Dead 2 game event (player_damage, player_death, weapon_fire, etc.).
+    
+    Args:
+        event_type: Type of event ("player_damage", "player_death", "weapon_fire", etc.)
+        params: Event parameters (victim, attacker, damage, weapon, etc.)
+    """
+    return Event(
+        event=EventType.L4D2_GAME_EVENT.value,
+        event_type=event_type,
+        params=params,
+    )
+
+
+def response_l4d2_start(
+    success: bool,
+    log_path: Optional[str] = None,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to l4d2_start command."""
+    return Response(
+        response="l4d2_start",
+        req_id=req_id,
+        success=success,
+        log_path=log_path,
+        message=error,
+    )
+
+
+def response_l4d2_stop(
+    success: bool,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to l4d2_stop command."""
+    return Response(
+        response="l4d2_stop",
+        req_id=req_id,
+        success=success,
+        message=error,
+    )
+
+
+def response_l4d2_status(
+    running: bool,
+    log_path: Optional[str] = None,
+    events_received: int = 0,
+    last_event_ts: Optional[float] = None,
+    last_event_type: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to l4d2_status command."""
+    return Response(
+        response="l4d2_status",
+        req_id=req_id,
+        running=running,
+        log_path=log_path,
+        events_received=events_received,
+        last_event_ts=last_event_ts,
+        last_event_type=last_event_type,
     )
 
 

@@ -1,0 +1,122 @@
+https://forums.alliedmods.net/showthread.php?t=85330
+
+/*
+l4d_events.sp
+Description:
+Prints l4devents to chat and server console for debugging.
+*/
+ 
+#include <sourcemod>
+#define Version "1.0.0"
+#define BasicEvents 1
+#define Custom 1  //set to 0 to disable custom events
+new Handle:ESpam;
+new Handle:PSpam;
+ 
+ 
+public Plugin:myinfo = 
+{
+    name = "L4D Event Debugger",
+    author = "-pk-",
+    description = "Displays triggered events.",
+    version = Version,
+};
+ 
+public OnPluginStart()
+{
+    decl String:ModName[50];
+    GetGameFolderName(ModName, sizeof(ModName));
+ 
+    if(!StrEqual(ModName, "left4dead", false))
+    {
+        SetFailState("Use this in Left 4 Dead only.");
+    }
+ 
+    ESpam = CreateConVar("l4d_events_spam", "0", "Log events that have a tendency to spam (Checkpoints, etc).  0=Disable, 1=Enable");
+    PSpam = CreateConVar("l4d_events_player", "0", "Log player events (Spawns, etc).  0=Disable, 1=Enable");
+ 
+    AutoExecConfig(true, "l4d_events");
+ 
+ 
+    //Events we need to hook
+    #if BasicEvents
+    HookEvent("player_left_start_area", GameEvents, EventHookMode_PostNoCopy);
+    HookEvent("success_checkpoint_button_used", GameEvents, EventHookMode_PostNoCopy);
+    HookEvent("rescue_door_open", GameEvents, EventHookMode_PostNoCopy);
+    HookEvent("mission_lost", GameEvents, EventHookMode_PostNoCopy);
+    HookEvent("map_transition", GameEvents, EventHookMode_PostNoCopy);
+    HookEvent("finale_radio_start", GameEvents, EventHookMode_PostNoCopy);
+    HookEvent("finale_radio_damaged", GameEvents, EventHookMode_PostNoCopy);
+    HookEvent("finale_start", GameEvents, EventHookMode_PostNoCopy);
+    HookEvent("finale_rush", GameEvents, EventHookMode_PostNoCopy);
+    HookEvent("finale_escape_start", GameEvents, EventHookMode_PostNoCopy);
+    HookEvent("finale_vehicle_ready", GameEvents, EventHookMode_PostNoCopy);
+    HookEvent("finale_vehicle_leaving", GameEvents, EventHookMode_PostNoCopy);
+    HookEvent("finale_win", GameEvents, EventHookMode_PostNoCopy);
+    HookEvent("final_reportscreen", GameEvents, EventHookMode_PostNoCopy);
+    HookEvent("round_end_message", GameEvents, EventHookMode_PostNoCopy);
+    HookEvent("round_start_pre_entity", GameEvents, EventHookMode_PostNoCopy);
+    HookEvent("round_start_post_nav", GameEvents, EventHookMode_PostNoCopy);
+    HookEvent("round_freeze_end", GameEvents, EventHookMode_PostNoCopy);
+    HookEvent("round_start", GameEvents, EventHookMode_PostNoCopy);
+    HookEvent("round_end", GameEvents, EventHookMode_PostNoCopy);
+    HookEvent("game_newmap", GameEvents, EventHookMode_PostNoCopy);
+    HookEvent("game_start", GameEvents, EventHookMode_PostNoCopy);
+    HookEvent("game_end", GameEvents, EventHookMode_PostNoCopy);
+    HookEvent("game_message", GameEvents, EventHookMode_PostNoCopy);
+ 
+    //EventSpam
+    HookEvent("player_entered_start_area", EventSpam, EventHookMode_PostNoCopy);
+    HookEvent("player_entered_checkpoint", EventSpam, EventHookMode_PostNoCopy);
+    HookEvent("player_left_checkpoint", EventSpam, EventHookMode_PostNoCopy);
+ 
+    //PlayerSpam
+    HookEvent("player_first_spawn", PlayerSpam, EventHookMode_PostNoCopy);
+    HookEvent("player_death", PlayerSpam, EventHookMode_PostNoCopy);
+    #endif
+ 
+ 
+    // Place your own events below for a private working space.
+    #if Custom
+ 
+    //HookEvent("", GameEvents, EventHookMode_PostNoCopy);
+ 
+    #endif
+}
+ 
+ 
+ 
+ 
+public GameEvents(Handle:event, const String:name[], bool:dontBroadcast)
+{
+    LogMessage("EVENT TRIGGERED ::::: \"%s\" ", name); // Add events to the sourcemod logs, helps find silent events
+    PrintToChatAll("event \"%s\" ", name);   // Helps find events that could be used to display information to players
+}
+ 
+public EventSpam(Handle:event, const String:name[], bool:dontBroadcast)
+{
+  if (GetConVarInt(ESpam) >= 1)
+    {
+        LogMessage("EVENT TRIGGERED ::::: \"%s\" ", name);
+        PrintToChatAll("event \"%s\" ", name);
+    }
+}
+ 
+public PlayerSpam(Handle:event, const String:name[], bool:dontBroadcast)
+{
+    if (GetConVarInt(PSpam) >= 1)
+    {
+        LogMessage("EVENT TRIGGERED ::::: \"%s\" ", name);
+        PrintToChatAll("event \"%s\" ", name);
+    }
+}
+ 
+ 
+ 
+ 
+public OnMapStart()
+{
+}
+public OnMapEnd()
+{
+}
