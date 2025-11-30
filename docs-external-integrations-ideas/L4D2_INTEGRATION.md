@@ -151,12 +151,14 @@ Since vanilla L4D2 doesn't output damage to console.log, we created a VScript mo
 ```
 [L4D2Haptics] {PlayerHurt|damage|attacker|angle|damage_type|victim}
 [L4D2Haptics] {PlayerDeath|killer|weapon|victim}
-[L4D2Haptics] {WeaponFire|weapon|player}
+[L4D2Haptics] {WeaponFire|weapon|player}  # Currently disabled (too frequent)
 [L4D2Haptics] {HealthPickup|item|player}
 [L4D2Haptics] {AmmoPickup|player}
 [L4D2Haptics] {InfectedHit|infected|damage|attacker}
 [L4D2Haptics] {PlayerHealed|amount|player}
 ```
+
+**Note:** `WeaponFire` events are currently disabled in the mod to reduce log spam and resource usage. The code is preserved (commented out) and can be re-enabled if needed.
 
 **Mod Location:**
 - `misc-documentations/bhaptics-svg-24-nov/l4d2/third-space-vest-mod/scripts/vscripts/thirdspacevest_haptics.nut`

@@ -21,10 +21,10 @@ function WriteHapticEvent(eventType, params = {}) {
     
     // Format: [L4D2Haptics] {EventType|param1|param2|...}
     local eventLine = format("[L4D2Haptics] {%s|%s}", eventType, paramStr);
-    print(eventLine);
+    print(eventLine + "\n");  // Add newline so each event appears on a separate line
     
     if (ENABLE_DEBUG) {
-        print(format("[L4D2Haptics Debug] Event: %s, Params: %s", eventType, paramStr));
+        print(format("[L4D2Haptics Debug] Event: %s, Params: %s\n", eventType, paramStr));
     }
 }
 
@@ -70,6 +70,13 @@ function GetEntityName(entity) {
     return "unknown";
 }
 
+// Helper to normalize a vector (L4D2 VScript doesn't have Vector.Normalize())
+function NormalizeVector(vec) {
+    local length = sqrt(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
+    if (length == 0) return Vector(0, 0, 0);
+    return Vector(vec.x / length, vec.y / length, vec.z / length);
+}
+
 // Helper to calculate damage angle (relative to player view)
 function GetDamageAngle(victim, attacker) {
     if (!victim || !victim.IsValid() || !victim.IsPlayer()) return 0;
@@ -84,11 +91,14 @@ function GetDamageAngle(victim, attacker) {
     
     // Calculate direction from victim to attacker
     local toAttacker = attackerPos - victimPos;
-    toAttacker.Normalize();
+    toAttacker = NormalizeVector(toAttacker);
     
     // Calculate angle between victim's view and attacker direction
     // Dot product gives us the angle
     local dot = victimForward.Dot(toAttacker);
+    // Clamp dot product to [-1, 1] to avoid acos domain errors
+    if (dot > 1.0) dot = 1.0;
+    if (dot < -1.0) dot = -1.0;
     local angle = acos(dot) * (180.0 / 3.14159); // Convert to degrees
     
     // Determine if attacker is to the left or right
@@ -253,181 +263,217 @@ function InitializeHapticsMod() {
     print("[L4D2Haptics] Make sure you launched the game with -condebug flag");
     print("[L4D2Haptics] Events will be written to console.log");
     
-    // Note: In L4D2, we need to hook into game events using ListenToGameEvent
-    // The OnTakeDamage hook may need to be set up differently depending on L4D2's VScript API
+    // L4D2 VScript uses OnGameEvent_* callback functions with __CollectGameEventCallbacks
+    // These only work when Scripted Mode is enabled (via Mode Script like coop.nut)
     
-    // Try to hook into game events
-    if ("ListenToGameEvent" in this) {
-        // Hook player_hurt event
-        // Note: EntIndexToHScript may need to be GetPlayerFromUserID or similar depending on L4D2 version
-        // If events don't work, check the L4D2 VScript API documentation
-        ListenToGameEvent("player_hurt", function(event) {
-            local victim = null;
-            local attacker = null;
-            
-            // Try different methods to get entity from userid
-            if ("EntIndexToHScript" in this) {
-                victim = EntIndexToHScript(event.userid);
-                attacker = EntIndexToHScript(event.attacker);
-            } else if ("GetPlayerFromUserID" in this) {
-                victim = GetPlayerFromUserID(event.userid);
-                attacker = GetPlayerFromUserID(event.attacker);
-            } else {
-                // Fallback: try direct access
-                victim = event.userid;
-                attacker = event.attacker;
-            }
-            local damage = event.dmg_health;
-            local damageType = event.type;
-            
-            if (victim && victim.IsValid() && victim.IsPlayer()) {
-                local victimName = GetEntityName(victim);
-                local attackerName = "unknown";
-                local damageTypeName = GetDamageTypeName(damageType);
-                local angle = 0;
-                
-                if (attacker && attacker.IsValid()) {
-                    attackerName = GetEntityName(attacker);
-                    angle = GetDamageAngle(victim, attacker);
-                }
-                
-                WriteHapticEvent("PlayerHurt", {
-                    damage = damage,
-                    attacker = attackerName,
-                    angle = angle,
-                    damage_type = damageTypeName,
-                    victim = victimName
-                });
-            }
-        }, null);
-        
-        // Hook player_death event
-        ListenToGameEvent("player_death", function(event) {
-            local victim = null;
-            local attacker = null;
-            
-            if ("EntIndexToHScript" in this) {
-                victim = EntIndexToHScript(event.userid);
-                attacker = EntIndexToHScript(event.attacker);
-            } else if ("GetPlayerFromUserID" in this) {
-                victim = GetPlayerFromUserID(event.userid);
-                attacker = GetPlayerFromUserID(event.attacker);
-            } else {
-                victim = event.userid;
-                attacker = event.attacker;
-            }
-            local weapon = event.weapon;
-            
-            if (victim && victim.IsValid() && victim.IsPlayer()) {
-                local victimName = GetEntityName(victim);
-                local attackerName = "unknown";
-                
-                if (attacker && attacker.IsValid()) {
-                    attackerName = GetEntityName(attacker);
-                }
-                
-                WriteHapticEvent("PlayerDeath", {
-                    killer = attackerName,
-                    weapon = weapon,
-                    victim = victimName
-                });
-            }
-        }, null);
-        
-        // Hook weapon_fire event
-        ListenToGameEvent("weapon_fire", function(event) {
-            local player = null;
-            
-            if ("EntIndexToHScript" in this) {
-                player = EntIndexToHScript(event.userid);
-            } else if ("GetPlayerFromUserID" in this) {
-                player = GetPlayerFromUserID(event.userid);
-            } else {
-                player = event.userid;
-            }
-            local weapon = event.weapon;
-            
-            if (player && player.IsValid() && player.IsPlayer()) {
-                local playerName = GetEntityName(player);
-                WriteHapticEvent("WeaponFire", {
-                    weapon = weapon,
-                    player = playerName
-                });
-            }
-        }, null);
-        
-        // Hook item_pickup event
-        ListenToGameEvent("item_pickup", function(event) {
-            local player = null;
-            
-            if ("EntIndexToHScript" in this) {
-                player = EntIndexToHScript(event.userid);
-            } else if ("GetPlayerFromUserID" in this) {
-                player = GetPlayerFromUserID(event.userid);
-            } else {
-                player = event.userid;
-            }
-            local item = event.item;
-            
-            if (player && player.IsValid() && player.IsPlayer()) {
-                local playerName = GetEntityName(player);
-                
-                // Check item type
-                if (item.find("first_aid") != null || 
-                    item.find("pain_pills") != null ||
-                    item.find("adrenaline") != null) {
-                    WriteHapticEvent("HealthPickup", {
-                        item = item,
-                        player = playerName
-                    });
-                } else if (item.find("ammo") != null) {
-                    WriteHapticEvent("AmmoPickup", {
-                        player = playerName
-                    });
-                }
-            }
-        }, null);
-        
-        // Hook infected_hit event (when player hits infected)
-        ListenToGameEvent("infected_hit", function(event) {
-            local attacker = null;
-            local infected = null;
-            
-            if ("EntIndexToHScript" in this) {
-                attacker = EntIndexToHScript(event.attacker);
-                infected = EntIndexToHScript(event.entity);
-            } else if ("GetPlayerFromUserID" in this) {
-                attacker = GetPlayerFromUserID(event.attacker);
-                infected = EntIndexToHScript(event.entity);  // Entity, not userid
-            } else {
-                attacker = event.attacker;
-                infected = event.entity;
-            }
-            local damage = event.damage;
-            
-            if (attacker && attacker.IsValid() && attacker.IsPlayer()) {
-                local attackerName = GetEntityName(attacker);
-                local infectedName = "unknown";
-                
-                if (infected && infected.IsValid()) {
-                    infectedName = GetEntityName(infected);
-                }
-                
-                WriteHapticEvent("InfectedHit", {
-                    infected = infectedName,
-                    damage = damage,
-                    attacker = attackerName
-                });
-            }
-        }, null);
-        
-        print("[L4D2Haptics] Game event listeners registered successfully!");
+    // Check if we're in Scripted Mode (game event callbacks available)
+    if ("__CollectGameEventCallbacks" in this) {
+        // Register game event callbacks using L4D2's proper API
+        __CollectGameEventCallbacks(this);
+        print("[L4D2Haptics] Game event callbacks registered!");
     } else {
-        print("[L4D2Haptics] WARNING: ListenToGameEvent not available in this L4D2 version.");
-        print("[L4D2Haptics] The mod loaded but advanced event hooks are not working.");
+        print("[L4D2Haptics] WARNING: Scripted Mode not enabled!");
+        print("[L4D2Haptics] Game event callbacks require Scripted Mode.");
+        print("[L4D2Haptics] To enable Scripted Mode, create a Mode Script (e.g., coop.nut) that includes this script.");
         print("[L4D2Haptics] The integration will fall back to Phase 1 (basic console.log parsing).");
         print("[L4D2Haptics] This will still detect attack events and other basic game events.");
     }
+}
+
+// Game event callback functions (only work in Scripted Mode)
+// These are automatically called by the game when events occur
+
+function OnGameEvent_player_hurt(params) {
+    // Check required parameters
+    if (!("userid" in params) || !("dmg_health" in params)) {
+        return; // Skip if missing required data
+    }
+    
+    local victim = GetPlayerFromUserID(params.userid);
+    local attacker = null;
+    local damage = params.dmg_health;
+    local damageType = 0;
+    
+    // Get attacker if available
+    if ("attacker" in params) {
+        attacker = GetPlayerFromUserID(params.attacker);
+    }
+    
+    // Get damage type if available
+    if ("type" in params) {
+        damageType = params.type;
+    }
+    
+    if (victim && victim.IsValid() && victim.IsPlayer()) {
+        local victimName = GetEntityName(victim);
+        local attackerName = "unknown";
+        local damageTypeName = GetDamageTypeName(damageType);
+        local angle = 0;
+        
+        if (attacker && attacker.IsValid()) {
+            attackerName = GetEntityName(attacker);
+            angle = GetDamageAngle(victim, attacker);
+        }
+        
+        WriteHapticEvent("PlayerHurt", {
+            damage = damage,
+            attacker = attackerName,
+            angle = angle,
+            damage_type = damageTypeName,
+            victim = victimName
+        });
+    }
+}
+
+function OnGameEvent_player_death(params) {
+    // Check if userid exists (may not exist for infected deaths)
+    if (!("userid" in params)) {
+        return; // Skip if no userid (likely infected death, not player)
+    }
+    
+    local victim = GetPlayerFromUserID(params.userid);
+    local attacker = null;
+    local weapon = "unknown";
+    
+    // Get attacker if available
+    if ("attacker" in params) {
+        attacker = GetPlayerFromUserID(params.attacker);
+    }
+    
+    // Get weapon if available
+    if ("weapon" in params) {
+        weapon = params.weapon;
+    }
+    
+    if (victim && victim.IsValid() && victim.IsPlayer()) {
+        local victimName = GetEntityName(victim);
+        local attackerName = "unknown";
+        
+        if (attacker && attacker.IsValid()) {
+            attackerName = GetEntityName(attacker);
+        }
+        
+        WriteHapticEvent("PlayerDeath", {
+            killer = attackerName,
+            weapon = weapon,
+            victim = victimName
+        });
+    }
+}
+
+// Weapon fire event handler - DISABLED to reduce log spam and resource usage
+// Uncomment this function to re-enable weapon fire event logging
+/*
+function OnGameEvent_weapon_fire(params) {
+    if (!("userid" in params)) {
+        return;
+    }
+    
+    local player = GetPlayerFromUserID(params.userid);
+    local weapon = "unknown";
+    
+    if ("weapon" in params) {
+        weapon = params.weapon;
+    }
+    
+    if (player && player.IsValid() && player.IsPlayer()) {
+        local playerName = GetEntityName(player);
+        WriteHapticEvent("WeaponFire", {
+            weapon = weapon,
+            player = playerName
+        });
+    }
+}
+*/
+
+function OnGameEvent_item_pickup(params) {
+    if (!("userid" in params) || !("item" in params)) {
+        return;
+    }
+    
+    local player = GetPlayerFromUserID(params.userid);
+    local item = params.item;
+    
+    if (player && player.IsValid() && player.IsPlayer()) {
+        local playerName = GetEntityName(player);
+        
+        // Check item type
+        if (item.find("first_aid") != null || 
+            item.find("pain_pills") != null ||
+            item.find("adrenaline") != null) {
+            WriteHapticEvent("HealthPickup", {
+                item = item,
+                player = playerName
+            });
+        } else if (item.find("ammo") != null) {
+            WriteHapticEvent("AmmoPickup", {
+                player = playerName
+            });
+        }
+    }
+}
+
+function OnGameEvent_infected_hit(params) {
+    if (!("attacker" in params) || !("damage" in params)) {
+        return;
+    }
+    
+    local attacker = GetPlayerFromUserID(params.attacker);
+    local infected = null;
+    local damage = params.damage;
+    
+    // Try to get infected entity
+    if ("EntIndexToHScript" in this && "entity" in params) {
+        infected = EntIndexToHScript(params.entity);
+    }
+    
+    if (attacker && attacker.IsValid() && attacker.IsPlayer()) {
+        local attackerName = GetEntityName(attacker);
+        local infectedName = "unknown";
+        
+        if (infected && infected.IsValid()) {
+            infectedName = GetEntityName(infected);
+        }
+        
+        WriteHapticEvent("InfectedHit", {
+            infected = infectedName,
+            damage = damage,
+            attacker = attackerName
+        });
+    }
+}
+
+// AllowTakeDamage hook - called on ALL damage events (requires Scripted Mode)
+function AllowTakeDamage(damageTable) {
+    local victim = damageTable.Victim;
+    local attacker = damageTable.Attacker;
+    local damage = damageTable.DamageDone;
+    local damageType = damageTable.DamageType;
+    
+    // Only process player damage
+    if (victim && victim.IsValid() && victim.IsPlayer()) {
+        local victimName = GetEntityName(victim);
+        local attackerName = "unknown";
+        local damageTypeName = GetDamageTypeName(damageType);
+        local angle = 0;
+        
+        if (attacker && attacker.IsValid()) {
+            attackerName = GetEntityName(attacker);
+            angle = GetDamageAngle(victim, attacker);
+        }
+        
+        // Output damage event
+        WriteHapticEvent("PlayerHurt", {
+            damage = damage.tointeger(),
+            attacker = attackerName,
+            angle = angle,
+            damage_type = damageTypeName,
+            victim = victimName
+        });
+    }
+    
+    // Return true to allow damage, false to prevent it
+    return true;
 }
 
 // Auto-initialize when script loads

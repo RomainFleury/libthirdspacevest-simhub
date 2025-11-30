@@ -16,19 +16,22 @@ This VScript mod enables haptic feedback integration for Left 4 Dead 2 by output
    scripts/vscripts/
    ```
 
-3. **Copy the mod file:**
+3. **Copy the mod files:**
    - Copy `thirdspacevest_haptics.nut` to: `scripts/vscripts/thirdspacevest_haptics.nut`
+   - Copy `coop.nut` to: `scripts/vscripts/coop.nut` (enables Scripted Mode for campaign)
 
-4. **Create a map script or auto-exec script to load it:**
+4. **How it works:**
    
-   **Option A: Create an auto-exec script** (runs on every map):
-   - Create file: `cfg/autoexec.cfg`
-   - Add line: `script_execute scripts/vscripts/thirdspacevest_haptics.nut`
+   **Automatic (Recommended):**
+   - The `coop.nut` file is a Mode Script that auto-loads when you start a campaign
+   - It enables Scripted Mode (required for game event hooks)
+   - It automatically loads `thirdspacevest_haptics.nut`
+   - **No manual loading needed!** Just start a campaign game.
    
-   **Option B: Load manually in-game (RECOMMENDED):**
+   **Manual loading (if needed):**
    - Open console (enable in game settings, press `~`)
-   - Type: `script_execute thirdspacevest_haptics` (no path, no .nut extension)
-   - You should see: `[L4D2Haptics] Third Space Vest integration mod loaded!`
+   - Type: `script_execute coop` (this loads the mode script which enables Scripted Mode)
+   - Or type: `script_execute thirdspacevest_haptics` (loads just the haptics script, but Scripted Mode won't be enabled)
 
 ### Method 2: VPK Package (Advanced)
 
@@ -48,11 +51,12 @@ This VScript mod enables haptic feedback integration for Left 4 Dead 2 by output
    - Press `~` (tilde) to open console
 
 3. **Load the mod:**
-   - Launch the game and start a map (single-player or local server)
-   - Open console (`~`)
-   - Type: `script_execute thirdspacevest_haptics`
+   - Launch the game and start a campaign (single-player or local server)
+   - The `coop.nut` Mode Script will auto-load, enabling Scripted Mode
+   - Open console (`~`) to verify
    - You should see: `[L4D2Haptics] Third Space Vest integration mod loaded!`
-   - **Note:** If you see `ERROR: ListenToGameEvent not available`, the mod is loaded but event hooks may not work. See Troubleshooting section.
+   - You should see: `[L4D2Haptics] Game event callbacks registered!`
+   - **Note:** If you see `WARNING: Scripted Mode not enabled!`, make sure `coop.nut` is in the `scripts/vscripts/` folder
 
 ## Event Format
 
@@ -64,15 +68,17 @@ The mod outputs events to `console.log` in this format:
 
 ### Available Events
 
-| Event | Format | Description |
-|-------|--------|-------------|
-| `PlayerHurt` | `{PlayerHurt\|damage\|attacker\|angle\|damage_type\|victim}` | Player took damage |
-| `PlayerDeath` | `{PlayerDeath\|killer\|weapon\|victim}` | Player died |
-| `WeaponFire` | `{WeaponFire\|weapon\|player}` | Player fired weapon |
-| `HealthPickup` | `{HealthPickup\|item\|player}` | Player picked up health item |
-| `AmmoPickup` | `{AmmoPickup\|player}` | Player picked up ammo |
-| `InfectedHit` | `{InfectedHit\|infected\|damage\|attacker}` | Player hit infected |
-| `PlayerHealed` | `{PlayerHealed\|amount\|player}` | Player was healed |
+| Event | Format | Description | Status |
+|-------|--------|-------------|--------|
+| `PlayerHurt` | `{PlayerHurt\|damage\|attacker\|angle\|damage_type\|victim}` | Player took damage | ✅ Active |
+| `PlayerDeath` | `{PlayerDeath\|killer\|weapon\|victim}` | Player died | ✅ Active |
+| `WeaponFire` | `{WeaponFire\|weapon\|player}` | Player fired weapon | ⏸️ Disabled (too frequent) |
+| `HealthPickup` | `{HealthPickup\|item\|player}` | Player picked up health item | ✅ Active |
+| `AmmoPickup` | `{AmmoPickup\|player}` | Player picked up ammo | ✅ Active |
+| `InfectedHit` | `{InfectedHit\|infected\|damage\|attacker}` | Player hit infected | ✅ Active |
+| `PlayerHealed` | `{PlayerHealed\|amount\|player}` | Player was healed | ✅ Active |
+
+**Note:** `WeaponFire` events are currently disabled to reduce log spam and resource usage. The code is preserved in the script (commented out) and can be re-enabled by uncommenting the `OnGameEvent_weapon_fire()` function.
 
 ### Example Output
 
@@ -115,11 +121,12 @@ The mod outputs events to `console.log` in this format:
 - **Use the correct console command:** `script_execute thirdspacevest_haptics` (no path, no .nut extension)
 - The file must be in: `<L4D2>/left4dead2/scripts/vscripts/thirdspacevest_haptics.nut`
 
-### ListenToGameEvent not available error
-- **Status:** This is a known limitation - L4D2's VScript API may not support `ListenToGameEvent` in all versions
-- **Current workaround:** The mod will still output basic events, but advanced event hooks may not work
-- **Alternative:** We're working on entity-level hooks as an alternative (future update)
-- **Phase 1 fallback:** The integration will still work with vanilla console.log parsing (attack events, etc.)
+### Scripted Mode not enabled error
+- **Cause:** The mod requires Scripted Mode to be enabled for game event hooks to work
+- **Solution:** Make sure `coop.nut` is in `scripts/vscripts/` folder
+- **How it works:** `coop.nut` is a Mode Script that auto-loads when you start a campaign, enabling Scripted Mode
+- **Alternative:** If you're not playing campaign mode, create a Mode Script for your game mode (e.g., `versus.nut`, `survival.nut`)
+- **Phase 1 fallback:** If Scripted Mode isn't enabled, the integration will still work with vanilla console.log parsing (attack events, etc.)
 
 ### No events in console.log
 - Ensure `-condebug` is in Steam launch options
