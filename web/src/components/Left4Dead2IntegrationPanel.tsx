@@ -11,6 +11,8 @@ const EVENT_ICONS: Record<string, string> = {
   health_pickup: '💚',
   ammo_pickup: '🔫',
   infected_spawn: '🧟',
+  infected_hit: '👊',
+  player_healed: '💉',
   teammate_death: '💀',
 };
 
@@ -39,18 +41,46 @@ export function Left4Dead2IntegrationPanel() {
     return name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
+  const getAngleDirection = (angle: number): string => {
+    if (angle <= 45 || angle >= 315) return '↑ Front';
+    if (angle > 45 && angle <= 135) return '→ Right';
+    if (angle > 135 && angle <= 225) return '↓ Back';
+    if (angle > 225 && angle < 315) return '← Left';
+    return '';
+  };
+
   const formatEventDetails = (event: { event: string; params?: any }): string => {
     const params = event.params;
     if (!params) return "";
 
     if (event.event === "player_death" && params.victim) {
-      return `${params.victim} → ${params.attacker || 'Unknown'}`;
+      const parts = [params.victim];
+      if (params.killer && params.killer !== "unknown") {
+        parts.push(`killed by ${params.killer}`);
+      }
+      if (params.weapon && params.weapon !== "unknown") {
+        parts.push(`(${params.weapon})`);
+      }
+      return parts.join(" ");
     }
     if (event.event === "player_kill" && params.victim) {
-      return params.victim;
+      return `Killed ${params.victim}`;
     }
-    if (event.event === "player_damage" && params.damage) {
-      return `${params.damage} damage from ${params.attacker || 'Unknown'}`;
+    if (event.event === "player_damage") {
+      const parts: string[] = [];
+      if (params.damage !== undefined) {
+        parts.push(`${params.damage} damage`);
+      }
+      if (params.attacker && params.attacker !== "unknown") {
+        parts.push(`from ${params.attacker}`);
+      }
+      if (params.damage_type && params.damage_type !== "unknown") {
+        parts.push(`(${params.damage_type})`);
+      }
+      if (params.angle !== undefined && params.angle !== 0) {
+        parts.push(`@ ${params.angle}°`);
+      }
+      return parts.join(" ");
     }
     if (event.event === "weapon_fire" && params.weapon) {
       return params.weapon;
@@ -58,14 +88,41 @@ export function Left4Dead2IntegrationPanel() {
     if (event.event === "player_attack" && params.target) {
       return `Attacked ${params.target}`;
     }
-    if (event.event === "health_pickup" && params.player) {
-      return params.player;
+    if (event.event === "health_pickup") {
+      const parts: string[] = [];
+      if (params.item) {
+        parts.push(params.item);
+      }
+      if (params.player) {
+        parts.push(`(${params.player})`);
+      }
+      return parts.join(" ");
     }
     if (event.event === "ammo_pickup" && params.player) {
       return params.player;
     }
     if (event.event === "infected_spawn" && params.infected) {
       return params.infected;
+    }
+    if (event.event === "infected_hit") {
+      const parts: string[] = [];
+      if (params.infected && params.infected !== "unknown") {
+        parts.push(params.infected);
+      }
+      if (params.damage !== undefined) {
+        parts.push(`${params.damage} damage`);
+      }
+      return parts.join(" ");
+    }
+    if (event.event === "player_healed") {
+      const parts: string[] = [];
+      if (params.amount !== undefined) {
+        parts.push(`+${params.amount} HP`);
+      }
+      if (params.player) {
+        parts.push(`(${params.player})`);
+      }
+      return parts.join(" ");
     }
     return "";
   };
@@ -190,29 +247,39 @@ export function Left4Dead2IntegrationPanel() {
             </button>
           </div>
           <div className="space-y-2 max-h-64 overflow-y-auto">
-            {gameEvents.map((event, idx) => (
-              <div
-                key={idx}
-                className="flex items-center gap-3 rounded-lg bg-slate-900/50 p-3 text-sm"
-              >
-                <span className="text-2xl">
-                  {EVENT_ICONS[event.event] || '📌'}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-white">
-                    {formatEventName(event.event)}
-                  </div>
-                  {formatEventDetails(event) && (
-                    <div className="text-xs text-slate-400 mt-0.5">
-                      {formatEventDetails(event)}
+            {gameEvents.map((event, idx) => {
+              const params = event.params || {};
+              const hasAngle = params.angle !== undefined && params.angle !== 0 && event.event === "player_damage";
+              
+              return (
+                <div
+                  key={idx}
+                  className="flex items-center gap-3 rounded-lg bg-slate-900/50 p-3 text-sm"
+                >
+                  <span className="text-2xl">
+                    {EVENT_ICONS[event.event] || '📌'}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-white flex items-center gap-2">
+                      {formatEventName(event.event)}
+                      {hasAngle && (
+                        <span className="text-xs text-blue-400 font-normal">
+                          {getAngleDirection(params.angle)}
+                        </span>
+                      )}
                     </div>
-                  )}
+                    {formatEventDetails(event) && (
+                      <div className="text-xs text-slate-400 mt-0.5">
+                        {formatEventDetails(event)}
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    {formatTime(event.timestamp)}
+                  </div>
                 </div>
-                <div className="text-xs text-slate-500">
-                  {formatTime(event.timestamp)}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -228,9 +295,13 @@ export function Left4Dead2IntegrationPanel() {
           <li>Start the integration before launching the game</li>
         </ol>
         <p className="mt-2 text-slate-400">
-          <strong>Current Limitations:</strong> Vanilla L4D2 only logs attack events to console.log (e.g., "Player attacked Target"). 
-          Damage amounts and types are not available without a mod. A VScript mod is planned for Phase 2.
+          <strong>Phase 2 Mod:</strong> Install the VScript mod for full damage/angle/type support:
         </p>
+        <ol className="list-decimal list-inside space-y-1 ml-2 mt-1">
+          <li>Copy <code className="bg-slate-800 px-1 rounded">coop.nut</code> and <code className="bg-slate-800 px-1 rounded">thirdspacevest_haptics.nut</code> to <code className="bg-slate-800 px-1 rounded">scripts/vscripts/</code></li>
+          <li>Start a campaign - the mod auto-loads and enables Scripted Mode</li>
+          <li>Events will include damage amounts, angles, and damage types!</li>
+        </ol>
       </div>
     </div>
   );

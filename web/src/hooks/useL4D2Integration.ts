@@ -14,9 +14,14 @@ interface L4D2GameEvent {
     victim?: string;
     attacker?: string;
     damage?: number;
+    angle?: number;
+    damage_type?: string;
     weapon?: string;
     player?: string;
     infected?: string;
+    item?: string;
+    amount?: number;
+    killer?: string;
   };
   timestamp: number;
 }
