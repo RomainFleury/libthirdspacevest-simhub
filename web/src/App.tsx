@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AppLayout } from "./components/layout/AppLayout";
 import { GamesPage } from "./pages/GamesPage";
+import { IntegrationPage } from "./pages/IntegrationPage";
 import { DebugPage } from "./pages/DebugPage";
 import { MiniGamesPage } from "./pages/MiniGamesPage";
 import { GamePage } from "./pages/GamePage";
@@ -13,6 +14,7 @@ function App() {
         <Route path="/" element={<AppLayout />}>
           <Route index element={<Navigate to="/games" replace />} />
           <Route path="games" element={<GamesPage />} />
+          <Route path="games/:gameId" element={<IntegrationPage />} />
           <Route path="debug" element={<DebugPage />} />
           <Route path="vests" element={<VestsPage />} />
           <Route path="mini-games" element={<MiniGamesPage />} />
