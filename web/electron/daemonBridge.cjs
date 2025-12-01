@@ -769,6 +769,128 @@ class DaemonBridge extends EventEmitter {
   }
 
   // -------------------------------------------------------------------------
+  // Star Citizen Integration API
+  // -------------------------------------------------------------------------
+
+  /**
+   * Start Star Citizen integration (watch Game.log).
+   * @param {string} [logPath] - Optional path to Game.log (auto-detect if not provided)
+   * @param {string} [playerName] - Optional player name to identify player events
+   */
+  async starcitizenStart(logPath, playerName) {
+    try {
+      const response = await this.sendCommand("starcitizen_start", {
+        log_path: logPath,
+        message: playerName, // Using message field for player name
+      });
+      return {
+        success: response.success ?? true,
+        log_path: response.log_path,
+        error: response.message,
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Stop Star Citizen integration.
+   */
+  async starcitizenStop() {
+    try {
+      await this.sendCommand("starcitizen_stop");
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Get Star Citizen integration status.
+   */
+  async starcitizenStatus() {
+    try {
+      const response = await this.sendCommand("starcitizen_status");
+      return {
+        enabled: response.running ?? false,
+        events_received: response.events_received ?? 0,
+        last_event_ts: response.last_event_ts ?? null,
+        last_event_type: response.last_event_type ?? null,
+        log_path: response.log_path ?? null,
+      };
+    } catch (error) {
+      return {
+        enabled: false,
+        error: error.message,
+      };
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Left 4 Dead 2 Integration API
+  // -------------------------------------------------------------------------
+
+  /**
+   * Start Left 4 Dead 2 console log watcher.
+   * @param {string} [logPath] - Optional path to console.log (auto-detect if not provided)
+   * @param {string} [playerName] - Optional player name to filter events
+   */
+  async l4d2Start(logPath, playerName) {
+    try {
+      const params = {};
+      if (logPath) {
+        params.log_path = logPath;
+      }
+      if (playerName) {
+        params.message = playerName; // Using message field for player name
+      }
+      const response = await this.sendCommand("l4d2_start", params);
+      return {
+        success: response.success ?? true,
+        log_path: response.log_path,
+        error: response.message,
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Stop Left 4 Dead 2 integration.
+   */
+  async l4d2Stop() {
+    try {
+      await this.sendCommand("l4d2_stop");
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Get Left 4 Dead 2 integration status.
+   */
+  async l4d2Status() {
+    try {
+      const response = await this.sendCommand("l4d2_status");
+      return {
+        success: true,
+        running: response.running ?? false,
+        events_received: response.events_received ?? 0,
+        last_event_ts: response.last_event_ts ?? null,
+        last_event_type: response.last_event_type ?? null,
+        log_path: response.log_path ?? null,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        running: false,
+        error: error.message,
+      };
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Predefined Effects Library API
   // -------------------------------------------------------------------------
 

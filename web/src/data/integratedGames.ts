@@ -72,6 +72,17 @@ export const integratedGames: IntegratedGameConfig[] = [
     requiresMod: true,
     tags: ["open-world", "action"],
   },
+  {
+    id: "l4d2",
+    name: "Left 4 Dead 2",
+    description: "Console log-based haptic feedback for zombie survival",
+    icon: "🧟",
+    steamAppId: 550,
+    steamLaunchOptions: "-condebug",
+    hasConfiguration: true,
+    hasSetupGuide: true,
+    tags: ["fps", "coop", "valve", "zombie"],
+  },
 ];
 
 /**
