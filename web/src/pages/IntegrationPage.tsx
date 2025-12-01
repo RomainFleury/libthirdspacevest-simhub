@@ -4,6 +4,7 @@ import {
   AlyxIntegrationPage,
   SuperHotIntegrationPage,
   PistolWhipIntegrationPage,
+  L4D2IntegrationPage,
 } from "./integrations";
 
 /**
@@ -14,6 +15,7 @@ const INTEGRATION_PAGES: Record<string, React.ComponentType> = {
   alyx: AlyxIntegrationPage,
   superhot: SuperHotIntegrationPage,
   pistolwhip: PistolWhipIntegrationPage,
+  l4d2: L4D2IntegrationPage,
   // Future integrations:
   // bf2: BF2IntegrationPage,
   // ultrakill: UltrakillIntegrationPage,

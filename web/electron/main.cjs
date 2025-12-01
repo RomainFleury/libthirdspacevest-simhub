@@ -51,7 +51,7 @@ async function createWindow() {
 
   if (isDev && process.env.VITE_DEV_SERVER_URL) {
     await mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
-    mainWindow.webContents.openDevTools();
+    // DevTools can be opened manually with Ctrl+Shift+I if needed
   } else {
     await mainWindow.loadFile(path.join(process.cwd(), "dist", "index.html"));
   }

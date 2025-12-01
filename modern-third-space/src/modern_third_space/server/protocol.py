@@ -76,6 +76,14 @@ class CommandType(Enum):
     PISTOLWHIP_START = "pistolwhip_start"
     PISTOLWHIP_STOP = "pistolwhip_stop"
     PISTOLWHIP_STATUS = "pistolwhip_status"
+    # Star Citizen integration
+    STARCITIZEN_START = "starcitizen_start"
+    STARCITIZEN_STOP = "starcitizen_stop"
+    STARCITIZEN_STATUS = "starcitizen_status"
+    # Left 4 Dead 2 integration
+    L4D2_START = "l4d2_start"
+    L4D2_STOP = "l4d2_stop"
+    L4D2_STATUS = "l4d2_status"
     # Predefined effects
     PLAY_EFFECT = "play_effect"
     LIST_EFFECTS = "list_effects"
@@ -131,6 +139,14 @@ class EventType(Enum):
     PISTOLWHIP_STARTED = "pistolwhip_started"
     PISTOLWHIP_STOPPED = "pistolwhip_stopped"
     PISTOLWHIP_GAME_EVENT = "pistolwhip_game_event"
+    # Star Citizen events
+    STARCITIZEN_STARTED = "starcitizen_started"
+    STARCITIZEN_STOPPED = "starcitizen_stopped"
+    STARCITIZEN_GAME_EVENT = "starcitizen_game_event"
+    # Left 4 Dead 2 integration
+    L4D2_STARTED = "l4d2_started"
+    L4D2_STOPPED = "l4d2_stopped"
+    L4D2_GAME_EVENT = "l4d2_game_event"
     # Predefined effects
     EFFECT_STARTED = "effect_started"
     EFFECT_COMPLETED = "effect_completed"
@@ -152,6 +168,8 @@ class Command:
     gsi_port: Optional[int] = None
     # Half-Life: Alyx params
     log_path: Optional[str] = None
+    # Star Citizen params
+    message: Optional[str] = None  # Used for player name in Star Citizen
     # SUPERHOT VR params
     event: Optional[str] = None  # Event name (death, pistol_recoil, etc.)
     hand: Optional[str] = None   # "left" or "right"
@@ -182,6 +200,7 @@ class Command:
             speed=data.get("speed"),
             gsi_port=data.get("gsi_port"),
             log_path=data.get("log_path"),
+            message=data.get("message"),
             event=data.get("event"),
             hand=data.get("hand"),
             priority=data.get("priority"),
@@ -876,6 +895,165 @@ def response_pistolwhip_status(
         response="pistolwhip_status",
         req_id=req_id,
         running=enabled,
+        events_received=events_received,
+        last_event_ts=last_event_ts,
+        last_event_type=last_event_type,
+    )
+
+
+# =============================================================================
+# Star Citizen Integration Protocol
+# =============================================================================
+
+def event_starcitizen_started(log_path: str) -> Event:
+    """Event when Star Citizen integration starts."""
+    return Event(event=EventType.STARCITIZEN_STARTED.value, log_path=log_path)
+
+
+def event_starcitizen_stopped() -> Event:
+    """Event when Star Citizen integration stops."""
+    return Event(event=EventType.STARCITIZEN_STOPPED.value)
+
+
+def event_starcitizen_game_event(
+    event_type: str,
+    params: Optional[Dict[str, Any]] = None,
+) -> Event:
+    """
+    Star Citizen game event (player_death, player_kill, npc_death, suicide).
+    
+    Args:
+        event_type: Type of event ("player_death", "player_kill", "npc_death", "suicide")
+        params: Event parameters (victim_name, killer_name, weapon, direction, etc.)
+    """
+    return Event(
+        event=EventType.STARCITIZEN_GAME_EVENT.value,
+        event_type=event_type,
+        params=params,
+    )
+
+
+def response_starcitizen_start(
+    success: bool,
+    log_path: Optional[str] = None,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to starcitizen_start command."""
+    return Response(
+        response="starcitizen_start",
+        req_id=req_id,
+        success=success,
+        log_path=log_path,
+        message=error,
+    )
+
+
+def response_starcitizen_stop(success: bool, req_id: Optional[str] = None) -> Response:
+    """Response to starcitizen_stop command."""
+    return Response(
+        response="starcitizen_stop",
+        req_id=req_id,
+        success=success,
+    )
+
+
+def response_starcitizen_status(
+    enabled: bool,
+    events_received: int = 0,
+    last_event_ts: Optional[float] = None,
+    last_event_type: Optional[str] = None,
+    log_path: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to starcitizen_status command."""
+    return Response(
+        response="starcitizen_status",
+        req_id=req_id,
+        running=enabled,
+        events_received=events_received,
+        last_event_ts=last_event_ts,
+        last_event_type=last_event_type,
+        log_path=log_path,
+    )
+
+
+# =============================================================================
+# Left 4 Dead 2 Integration Protocol
+# =============================================================================
+
+def event_l4d2_started(log_path: str) -> Event:
+    """Event when Left 4 Dead 2 integration starts."""
+    return Event(event=EventType.L4D2_STARTED.value, log_path=log_path)
+
+
+def event_l4d2_stopped() -> Event:
+    """Event when Left 4 Dead 2 integration stops."""
+    return Event(event=EventType.L4D2_STOPPED.value)
+
+
+def event_l4d2_game_event(
+    event_type: str,
+    params: Optional[Dict[str, Any]] = None,
+) -> Event:
+    """
+    Left 4 Dead 2 game event (player_damage, player_death, weapon_fire, etc.).
+    
+    Args:
+        event_type: Type of event ("player_damage", "player_death", "weapon_fire", etc.)
+        params: Event parameters (victim, attacker, damage, weapon, etc.)
+    """
+    return Event(
+        event=EventType.L4D2_GAME_EVENT.value,
+        event_type=event_type,
+        params=params,
+    )
+
+
+def response_l4d2_start(
+    success: bool,
+    log_path: Optional[str] = None,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to l4d2_start command."""
+    return Response(
+        response="l4d2_start",
+        req_id=req_id,
+        success=success,
+        log_path=log_path,
+        message=error,
+    )
+
+
+def response_l4d2_stop(
+    success: bool,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to l4d2_stop command."""
+    return Response(
+        response="l4d2_stop",
+        req_id=req_id,
+        success=success,
+        message=error,
+    )
+
+
+def response_l4d2_status(
+    running: bool,
+    log_path: Optional[str] = None,
+    events_received: int = 0,
+    last_event_ts: Optional[float] = None,
+    last_event_type: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to l4d2_status command."""
+    return Response(
+        response="l4d2_status",
+        req_id=req_id,
+        running=running,
+        log_path=log_path,
         events_received=events_received,
         last_event_ts=last_event_ts,
         last_event_type=last_event_type,

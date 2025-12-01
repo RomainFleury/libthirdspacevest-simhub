@@ -12,6 +12,8 @@ const { registerCS2Handlers } = require("./cs2Handlers.cjs");
 const { registerAlyxHandlers } = require("./alyxHandlers.cjs");
 const { registerSuperHotHandlers } = require("./superhotHandlers.cjs");
 const { registerPistolWhipHandlers } = require("./pistolwhipHandlers.cjs");
+const { registerStarCitizenHandlers } = require("./starcitizenHandlers.cjs");
+const { registerL4D2Handlers } = require("./l4d2Handlers.cjs");
 const { registerEffectsHandlers } = require("./effectsHandlers.cjs");
 const { registerBF2Handlers } = require("./bf2Handlers.cjs");
 const { registerMultiVestHandlers } = require("./multiVestHandlers.cjs");
@@ -40,6 +42,12 @@ function registerAllHandlers(getDaemonBridge, getMainWindow, reconnectToDaemon) 
 
   // Pistol Whip integration handlers
   registerPistolWhipHandlers();
+
+  // Star Citizen integration handlers
+  registerStarCitizenHandlers(getMainWindow);
+
+  // Left 4 Dead 2 integration handlers
+  registerL4D2Handlers(getMainWindow);
 
   // Predefined effects library handlers
   registerEffectsHandlers();
