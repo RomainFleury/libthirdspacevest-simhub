@@ -1718,6 +1718,51 @@ class VestDaemon:
             )
     
     # -------------------------------------------------------------------------
+    # Mordhau callbacks
+    # -------------------------------------------------------------------------
+    
+    def _on_mordhau_game_event(self, event_type: str, params: dict):
+        """
+        Called when Mordhau manager processes a game event.
+        
+        Broadcasts the event to all connected clients for UI display.
+        """
+        if self._loop is None:
+            return
+        
+        # Schedule broadcast in event loop
+        asyncio.run_coroutine_threadsafe(
+            self._clients.broadcast(event_mordhau_game_event(event_type, params)),
+            self._loop,
+        )
+    
+    def _on_mordhau_trigger(self, cell: int, speed: int):
+        """
+        Called when Mordhau manager wants to trigger a haptic effect.
+        
+        Triggers the effect on the main device.
+        """
+        # Get main device controller
+        main_device_id = self._registry.get_main_device_id()
+        if main_device_id is None:
+            return  # No device available
+        
+        controller = self._registry.get_controller(main_device_id)
+        if controller is None or not controller.status().connected:
+            return  # Device not connected
+        
+        # Trigger effect (synchronous, thread-safe)
+        controller.trigger_effect(cell, speed)
+        
+        # Broadcast event (async)
+        if self._loop is not None:
+            event = event_effect_triggered(cell, speed, device_id=main_device_id)
+            asyncio.run_coroutine_threadsafe(
+                self._clients.broadcast(event),
+                self._loop,
+            )
+    
+    # -------------------------------------------------------------------------
     # Pistol Whip callbacks
     # -------------------------------------------------------------------------
     

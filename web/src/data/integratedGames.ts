@@ -83,6 +83,15 @@ export const integratedGames: IntegratedGameConfig[] = [
     hasSetupGuide: true,
     tags: ["fps", "coop", "valve", "zombie"],
   },
+  {
+    id: "mordhau",
+    name: "Mordhau",
+    description: "Screen capture-based haptic feedback for medieval combat",
+    icon: "⚔️",
+    steamAppId: 629760,
+    hasSetupGuide: true,
+    tags: ["melee", "medieval", "combat"],
+  },
 ];
 
 /**

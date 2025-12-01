@@ -656,6 +656,59 @@ class DaemonBridge extends EventEmitter {
     }
   }
 
+  // Mordhau integration
+  async mordhauStart(logPath) {
+    try {
+      const params = logPath ? { log_path: logPath } : {};
+      const response = await this.sendCommand("mordhau_start", params);
+      return {
+        success: response.success ?? false,
+        log_path: response.log_path,
+        error: response.message,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  async mordhauStop() {
+    try {
+      const response = await this.sendCommand("mordhau_stop");
+      return {
+        success: response.success ?? false,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  async mordhauStatus() {
+    try {
+      const response = await this.sendCommand("mordhau_status");
+      return {
+        running: response.running ?? false,
+        log_path: response.log_path ?? null,
+        events_received: response.events_received ?? 0,
+        last_event_ts: response.last_event_ts ?? null,
+        error: response.message,
+      };
+    } catch (error) {
+      return {
+        running: false,
+        log_path: null,
+        events_received: 0,
+        last_event_ts: null,
+        error: error.message,
+      };
+    }
+  }
+
   /**
    * Get Alyx mod info (download URLs, install instructions).
    */

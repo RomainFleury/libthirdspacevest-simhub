@@ -101,6 +101,15 @@ export type AlyxStatus = {
   error?: string;
 };
 
+// Mordhau types
+export type MordhauStatus = {
+  running: boolean;
+  log_path?: string | null;
+  events_received?: number;
+  last_event_ts?: number | null;
+  error?: string;
+};
+
 export type AlyxStartResult = {
   success: boolean;
   log_path?: string;
@@ -119,6 +128,17 @@ export type AlyxModInfo = {
   github_url: string;
   install_instructions: string[];
   skill_manifest_addition: string;
+};
+
+export type MordhauStartResult = {
+  success: boolean;
+  log_path?: string;
+  error?: string;
+};
+
+export type MordhauStopResult = {
+  success: boolean;
+  error?: string;
 };
 
 export type AlyxModInfoResult = {
@@ -207,6 +227,9 @@ declare global {
       alyxStop: () => Promise<AlyxStopResult>;
       alyxStatus: () => Promise<AlyxStatus>;
       alyxGetModInfo: () => Promise<AlyxModInfoResult>;
+      mordhauStart: (logPath?: string) => Promise<MordhauStartResult>;
+      mordhauStop: () => Promise<MordhauStopResult>;
+      mordhauStatus: () => Promise<MordhauStatus>;
       // SUPERHOT VR Integration API
       superhotStart: () => Promise<{ success: boolean; error?: string }>;
       superhotStop: () => Promise<{ success: boolean; error?: string }>;
