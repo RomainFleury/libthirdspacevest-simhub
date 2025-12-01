@@ -1,8 +1,33 @@
 # Mordhau Haptic Integration
 
-> **Status: 🔬 RESEARCH / HIGH COMPLEXITY**
+> **Status: ✅ MULTIPLE APPROACHES IDENTIFIED - READY FOR TESTING**
 >
-> Mordhau uses Unreal Engine 4, which is fundamentally different from Unity games we've integrated before. This integration requires specialized knowledge of Unreal Engine Blueprint modding.
+> **SOLUTIONS FOUND:**
+> 1. ⭐⭐⭐ **Hybrid Approach** - Custom indicator mod + screen capture (RECOMMENDED)
+> 2. ⭐⭐ **Screen Capture** - Detect existing red arch around crosshair
+> 3. ⭐ **Full Blueprint Mod** - Direct event hooks with file I/O
+>
+> **PROGRESS:**
+> - ✅ Tested client-side logging - No damage events found
+> - ✅ Discovered red arch indicator around crosshair
+> - ✅ Found existing screen capture prototype (EA Battlefront 2)
+> - ✅ Created detailed implementation plans for each approach
+> - 🔬 **NEXT:** Try approaches in order (Plan B → Plan A → Plan C)
+
+## 🔍 NEW INVESTIGATION: Client-Side Logging Configuration
+
+**Discovery:** The [Mordhau Fandom Server Configuration](https://mordhau.fandom.com/wiki/Server_Configuration) page reveals extensive logging configuration options that might work on the client side too!
+
+**Key Finding:** Server-side `Engine.ini` supports logging categories like:
+- `LogMordhauPlayerController` - **Potentially logs player actions including damage!**
+- `LogMordhauGameInstance` - Game state changes
+- `LogMordhauGameSession` - Session events
+
+**Hypothesis:** If client-side `Engine.ini` supports the same logging categories, we can enable verbose logging and capture damage/combat events **without needing a Blueprint mod**!
+
+**This would make the integration similar to HL:Alyx** - just configure logging and watch log files. See "Approach 2: Log File Watching" below for details.
+
+---
 
 ## ⚠️ Key Differences from Other Integrations
 
@@ -14,6 +39,7 @@
 | **Mod Format** | .dll files | .pak files |
 | **Injection** | Runtime C# injection | Packaged asset loading |
 | **Learning Curve** | Moderate (C#) | High (UE4 editor + Blueprints) |
+| **Integration Method** | Log watching (if client logging works) / Blueprint mod (if not) |
 
 ## What are .pak Files?
 
@@ -70,7 +96,134 @@ For haptics, we need a **client-side mod** that can detect player damage events.
 
 ## Integration Approaches
 
-### Approach 1: Blueprint Mod with TCP/File Output (Recommended)
+### Approach 1: Hybrid - Custom Indicator Mod + Screen Capture (RECOMMENDED ⭐⭐⭐)
+
+**Complexity: LOW-MEDIUM** | **Feasibility: VERY HIGH**
+
+**Status: ✅ BEST OF BOTH WORLDS** - Simple mod creates easy-to-detect indicator, screen capture detects it!
+
+**Key Insight:** Create a **simple Blueprint mod** that displays a distinctive visual indicator when damage occurs, then use **screen capture** to detect it. This is easier than detecting the existing red arch!
+
+**How it works:**
+1. **Blueprint mod** - Detects damage events via MSDK hooks
+2. **Visual indicator** - Displays distinctive marker (bright color, specific pattern, fixed position)
+3. **Screen capture** - Detects the custom indicator (much easier than existing red arch)
+4. **Event processing** - Python daemon processes detected events
+
+**Advantages:**
+- ✅ **Simpler mod** - Just add visual indicator, no file I/O needed
+- ✅ **Easier detection** - Indicator designed specifically for screen capture
+- ✅ **More reliable** - Can use unique color/pattern that won't appear elsewhere
+- ✅ **Directional support** - Can encode direction in indicator position/color
+- ✅ **Proven approach** - Screen capture already works (EA Battlefront 2 prototype)
+
+**What the mod needs to do:**
+1. Hook into player damage events (via MSDK Blueprint nodes)
+2. Display visual indicator when damage occurs:
+   - **Position:** Fixed location (e.g., top-left corner, or around crosshair)
+   - **Color:** Unique, easy-to-detect (e.g., bright cyan #00FFFF, or specific RGB)
+   - **Pattern:** Distinctive shape (square, circle, specific pattern)
+   - **Duration:** Brief flash (0.1-0.3 seconds)
+   - **Direction encoding:** Different position/color for different directions (optional)
+
+**What makes a good indicator for detection:**
+- **Unique color** - RGB values that rarely appear in game (e.g., pure cyan #00FFFF)
+- **Fixed position** - Always in same location (easier to detect)
+- **Distinctive pattern** - Specific shape/size that's easy to recognize
+- **High contrast** - Stands out from game visuals
+- **Brief duration** - Appears/disappears quickly (prevents false positives)
+
+**Example indicator designs:**
+- **Option A:** Small bright cyan square in top-left corner (10x10px)
+  - Simple, easy to detect
+  - Fixed position = reliable detection
+  - Unique color = no false positives
+- **Option B:** Colored border around crosshair (different colors for directions)
+  - Encodes direction in color
+  - More complex but provides directional feedback
+- **Option C:** Specific pattern (e.g., 4-pixel pattern in corner)
+  - Very distinctive, unlikely to appear naturally
+  - Can encode direction in pattern position
+- **Option D:** Color-coded indicator (red=front, blue=back, green=left, yellow=right)
+  - Direction encoded in color
+  - Single indicator position, color changes
+
+**Recommended: Option A (Simple Cyan Square)**
+- Easiest to implement in Blueprint
+- Easiest to detect via screen capture
+- Can add direction later by using multiple squares (one per direction)
+
+**Mod Implementation (Conceptual):**
+```
+Blueprint Logic:
+  On Player Damage Event:
+    → Get damage amount
+    → Get damage direction (if available)
+    → Show indicator widget:
+       - Position: Top-left corner (fixed)
+       - Color: Cyan (#00FFFF)
+       - Size: 10x10 pixels
+       - Duration: 0.2 seconds
+       - Fade out animation
+```
+
+**Screen Capture Detection:**
+- Capture small region (e.g., 20x20px) in top-left corner
+- Check for cyan pixels (R=0, G=255, B=255)
+- If detected → damage event occurred
+- Write to log file for daemon processing
+
+### Approach 1B: Screen Capture + Existing Red Arch Detection (Alternative)
+
+**Complexity: LOW-MEDIUM** | **Feasibility: MEDIUM**
+
+**Status: ✅ PROVEN APPROACH** - We have a working prototype for EA Battlefront 2 that we can adapt!
+
+**Key Discovery:** Mordhau displays a **red arch around the crosshair** when taking damage. We can detect this visually using screen capture - no game modification needed!
+
+**How it works:**
+1. **Screen capture** - Capture crosshair region (center of screen)
+2. **Pixel analysis** - Detect red arch pattern around crosshair
+3. **Direction detection** - If arch has directional properties, detect angle
+4. **Intensity detection** - Measure red intensity = damage amount
+5. **Write to file** - Output damage events
+6. **Python watches file** - Daemon processes events
+
+**Reference Implementation:**
+- `misc-documentations/bhaptics-svg-24-nov/star-wars-battlefront-2-2017/screen_capture_prototype.py`
+- Already implements screen capture, red detection, and event writing
+- Can be adapted for crosshair detection instead of edge detection
+
+**Advantages:**
+- ✅ **No game modification** - Works with any version
+- ✅ **No Blueprint modding** - Much simpler than MSDK approach
+- ✅ **Proven approach** - Already working for EA Battlefront 2
+- ✅ **Fast to implement** - Can adapt existing prototype
+- ✅ **Non-invasive** - Doesn't touch game files
+
+**What we need for accurate detection (Custom Indicator):**
+1. **Indicator position** - Fixed location (e.g., top-left corner, configurable)
+2. **Unique color** - RGB values for custom indicator (e.g., cyan #00FFFF)
+3. **Pattern recognition** - Detect specific shape/size
+4. **Direction encoding** - If using directional indicators (position or color)
+5. **Cooldown period** - Prevent duplicate detections from same hit
+
+**What we need for accurate detection (Existing Red Arch):**
+1. **Crosshair position** - Usually center of screen, but may need detection
+2. **Arch radius** - How far from center the red arch appears
+3. **Red color threshold** - RGB values for the damage indicator red
+4. **Arch shape detection** - Circular/arc pattern vs simple red pixels
+5. **Direction detection** - If arch has directional properties (which side is redder)
+6. **Cooldown period** - Prevent duplicate detections from same hit
+
+**Next Steps:**
+1. Adapt BF2 screen capture prototype for crosshair detection
+2. Test with Mordhau to capture red arch appearance
+3. Calibrate detection thresholds
+4. Implement direction detection (if arch is directional)
+5. Integrate with daemon
+
+### Approach 2: Blueprint Mod with TCP/File Output (Alternative)
 
 **Complexity: HIGH** | **Feasibility: MEDIUM**
 
@@ -100,16 +253,103 @@ Create a Blueprint mod using MSDK that:
    - Writes to a text file (simpler) or sends TCP (harder)
 4. Package as .pak file
 
-### Approach 2: Log File Watching
+### Approach 2: Screen Capture + Crosshair Detection (NEW DISCOVERY ⭐⭐⭐)
 
-**Complexity: LOW** | **Feasibility: ❌ NOT VIABLE**
+**Complexity: LOW-MEDIUM** | **Feasibility: VERY HIGH**
 
-Checked Mordhau logs at `%LOCALAPPDATA%\Mordhau\Saved\Logs\`:
-- Only contains engine startup information
+**Key Discovery:** Mordhau displays a **red arch around the crosshair** when the player takes damage! We can detect this visually using screen capture, similar to our EA Battlefront 2 integration.
+
+**How it works:**
+1. **Screen capture** - Capture crosshair region (center of screen)
+2. **Pixel analysis** - Detect red arch pattern around crosshair
+3. **Direction detection** - If arch has directional properties, detect angle
+4. **Intensity detection** - Measure red intensity = damage amount
+5. **Write to file** - Output damage events
+6. **Python watches file** - Daemon processes events
+
+**Advantages:**
+- ✅ **No game modification needed** - Works with any game version
+- ✅ **No Blueprint modding required** - Much simpler than MSDK approach
+- ✅ **Universal approach** - Can work for other games too
+- ✅ **Easy to test** - Just capture screen and analyze
+- ✅ **Non-invasive** - Doesn't modify game files
+- ✅ **Works with any game version** - Not affected by updates
+- ✅ **Precise detection** - Crosshair is always centered, less false positives
+
+**Implementation:**
+- Use existing screen capture prototype (from EA Battlefront 2) as base
+- Adapt to capture crosshair region instead of edges
+- Detect red arch pattern (circular/arc shape around center)
+- Monitor continuously (30-60 FPS)
+- Write events to log file for daemon to process
+
+**Libraries (already used in BF2 prototype):**
+- `mss` - Fast screen capture
+- `PIL/Pillow` - Image processing
+- `numpy` - Array operations for pixel analysis
+- `opencv-python` - Advanced image processing (for arch shape detection)
+
+**Challenges:**
+- Need to identify game window (handle resolution changes)
+- Crosshair position may vary (need to detect or assume center)
+- May need to filter out other red UI elements
+- Performance - screen capture has overhead
+- Arch shape detection (circular pattern vs simple red pixels)
+
+### Approach 3: Log File Watching (TESTED ❌)
+
+**Complexity: LOW** | **Feasibility: ❌ NOT VIABLE (Client-side logging doesn't output damage events)**
+
+**New Finding:** The [Mordhau Fandom Server Configuration](https://mordhau.fandom.com/wiki/Server_Configuration) page reveals extensive logging configuration options in `Engine.ini`:
+
+**Server-side logging categories:**
+- `LogMordhauGameInstance` (default: Verbose)
+- `LogMordhauGameSession` (default: Verbose)
+- `LogMordhauPlayerController` (default: Verbose) ⭐ **Potentially contains damage/combat events!**
+- `LogMordhauWebAPI` (default: Verbose)
+- `LogPlayFabAPI` (default: Verbose)
+- `LogMatchmaking` (default: Verbose)
+
+**Key Insight:** If client-side `Engine.ini` supports similar logging configuration, we might be able to enable verbose logging for `LogMordhauPlayerController` and capture damage/combat events in the client log files!
+
+**Investigation Steps:**
+1. ✅ Found server config documentation with logging options
+2. ✅ Located client-side `Engine.ini` file location
+3. ✅ Added verbose logging configuration to client `Engine.ini`
+4. ✅ Tested gameplay with VeryVerbose logging enabled
+5. ❌ **RESULT:** No damage/combat events found in logs
+
+**Test Results:**
+- ✅ `LogMordhauGameInstance` entries appear (version, matchmaking, party changes)
+- ❌ **No `LogMordhauPlayerController` entries found** (even at VeryVerbose)
+- ❌ No damage, hit, combat, or health-related events in logs
+- ✅ Match was played (FFA_Highlands map, match state changes logged)
+
+**Conclusion:**
+Client-side logging does NOT output damage/combat events, even with VeryVerbose settings. The `LogMordhauPlayerController` category either:
+- Doesn't exist on client-side (server-only)
+- Doesn't log damage events even at maximum verbosity
+- Is disabled/limited on client builds
+
+**Verdict:** Log-watching approach is **NOT VIABLE** for client-side damage detection. A Blueprint mod is required.
+
+**Client Config Location (CONFIRMED ✅):**
+- ✅ **Found:** `%LOCALAPPDATA%\Mordhau\Saved\Config\WindowsClient\Engine.ini`
+- Current state: Only contains `[Core.System]` paths section
+- **No logging configuration present** - we can add it!
+
+**Previous Finding (May be outdated):**
+Previously checked Mordhau logs at `%LOCALAPPDATA%\Mordhau\Saved\Logs\`:
+- Only contained engine startup information
 - No gameplay events (damage, health, hits)
-- Cannot use log-watching approach like HL:Alyx
+- **BUT:** This was with default logging settings - we haven't tested with verbose logging enabled!
 
-**Possible extension:** A Blueprint mod could be created that WRITES to a log file when damage occurs, then we watch that custom log. This is essentially Approach 1 with file output.
+**If this works:** This would be the simplest integration approach (similar to HL:Alyx), requiring only:
+1. Configure `Engine.ini` with verbose logging
+2. Watch log files for damage events
+3. Parse and map to haptic feedback
+
+**If this doesn't work:** A Blueprint mod could be created that WRITES to a log file when damage occurs, then we watch that custom log. This is essentially Approach 1 with file output.
 
 ### Approach 3: Memory Reading (Not Recommended)
 
@@ -127,16 +367,74 @@ Read player health values directly from game memory using tools like Cheat Engin
 
 ## Research Needed
 
-### 1. Check for Log Output
+### 1. Check for Log Output (UPDATED - NEW PATH TO INVESTIGATE)
+
+**Priority: HIGH** - This could be the simplest integration method!
+
+#### Step 1: Locate Client Config Files
 
 ```powershell
-# Check Mordhau log files
-Get-ChildItem "$env:LOCALAPPDATA\Mordhau\Saved\Logs\" -Recurse
-Get-ChildItem "C:\Program Files (x86)\Steam\steamapps\common\Mordhau\Mordhau\Saved\Logs\" -Recurse
+# Check for client-side Engine.ini
+$clientConfigPaths = @(
+    "$env:LOCALAPPDATA\Mordhau\Saved\Config\WindowsClient\Engine.ini",
+    "$env:LOCALAPPDATA\Mordhau\Saved\Config\Windows\Engine.ini",
+    "C:\Program Files (x86)\Steam\steamapps\common\Mordhau\Mordhau\Saved\Config\WindowsClient\Engine.ini"
+)
 
-# Try running with debug flags and check logs
-# Add to Steam launch options: -log -verbose
+foreach ($path in $clientConfigPaths) {
+    if (Test-Path $path) {
+        Write-Host "Found: $path"
+        Get-Content $path | Select-String -Pattern "LogMordhau|Core.Log" -Context 2
+    }
+}
 ```
+
+#### Step 2: Test Verbose Logging Configuration
+
+**✅ Client-side `Engine.ini` confirmed to exist!** Add logging configuration:
+
+**Location:** `%LOCALAPPDATA%\Mordhau\Saved\Config\WindowsClient\Engine.ini`
+
+**Add these sections to the file:**
+
+```ini
+[LogFiles]
+PurgeLogsDays=5
+MaxLogFilesOnDisk=10
+LogTimes=True
+
+[Core.Log]
+LogMordhauPlayerController=VeryVerbose
+LogMordhauGameInstance=VeryVerbose
+LogMordhauGameSession=VeryVerbose
+LogMordhauWebAPI=VeryVerbose
+LogPlayFabAPI=VeryVerbose
+LogMatchmaking=VeryVerbose
+```
+
+**Note:** The current `Engine.ini` only contains `[Core.System]` paths - we can safely add the logging sections without conflicts.
+
+#### Step 3: Test Gameplay and Check Logs
+
+```powershell
+# Play a match, take damage, then check logs
+Get-ChildItem "$env:LOCALAPPDATA\Mordhau\Saved\Logs\" -Recurse | 
+    Sort-Object LastWriteTime -Descending | 
+    Select-Object -First 1 | 
+    Get-Content -Tail 100 | 
+    Select-String -Pattern "damage|hurt|hit|health|combat" -CaseSensitive:$false
+```
+
+#### Step 4: Check for Damage Events
+
+Look for patterns like:
+- Damage amounts
+- Hit locations
+- Weapon types
+- Player names
+- Health values
+
+**Reference:** Server config shows these log categories exist - we need to verify if they work on client-side too!
 
 ### 2. Investigate Existing Mods
 
@@ -304,14 +602,38 @@ The `DictionaryLib` folder contains an **unpacked Unreal Engine plugin** - this 
 
 ## Log File Analysis
 
+### Initial Finding (Default Settings)
+
 **Result: ❌ No gameplay events logged by default**
 
 Checked `C:\Users\...\AppData\Local\Mordhau\Saved\Logs\Mordhau.log`:
 - Contains only engine initialization (GPU, memory, drivers)
 - No damage, health, hit, or combat events
-- Not useful for log-watching approach
+- **BUT:** This was with default logging settings!
 
-This confirms that a **Blueprint mod is required** - we cannot use the simpler log-watching method like HL:Alyx.
+### New Investigation Path (Server Config Discovery)
+
+**Status: 🔬 INVESTIGATING**
+
+**Key Discovery:** [Mordhau Fandom Server Configuration](https://mordhau.fandom.com/wiki/Server_Configuration) reveals extensive logging options:
+
+**Server-side logging categories:**
+- `LogMordhauPlayerController=Verbose` - **Potentially logs player actions including damage!**
+- `LogMordhauGameInstance=Verbose`
+- `LogMordhauGameSession=Verbose`
+- `LogMordhauWebAPI=Verbose`
+- `LogPlayFabAPI=Verbose`
+- `LogMatchmaking=Verbose`
+
+**Hypothesis:** If client-side `Engine.ini` supports the same logging categories, we can enable verbose logging and potentially capture damage/combat events without needing a Blueprint mod!
+
+**Next Steps:**
+1. Locate client-side `Engine.ini` file
+2. Test if `LogMordhauPlayerController=VeryVerbose` works on client
+3. Play a match and check if damage events appear in logs
+4. If successful, this becomes the simplest integration approach (similar to HL:Alyx)
+
+**If this doesn't work:** A Blueprint mod is still required - we cannot use the simpler log-watching method like HL:Alyx.
 
 ---
 
@@ -339,7 +661,29 @@ If log-based approach is possible, implementation becomes much simpler (similar 
 
 ## Next Steps
 
-- [x] Check Mordhau log files for damage events → **No gameplay events logged**
+### Priority 1: Hybrid Approach - Custom Indicator Mod + Screen Capture (RECOMMENDED ⭐⭐⭐)
+
+- [x] Found server config documentation with logging options
+- [x] Tested client-side logging - No damage events found
+- [x] **Discovered red arch around crosshair** when taking damage
+- [x] **Found existing screen capture prototype** (EA Battlefront 2)
+- [x] **NEW IDEA:** Custom indicator mod + screen capture (hybrid approach)
+- [ ] **NEXT:** Research MSDK Blueprint nodes for damage events
+- [ ] **NEXT:** Create simple Blueprint mod with visual indicator
+- [ ] **NEXT:** Adapt screen capture prototype for indicator detection
+- [ ] **NEXT:** Test end-to-end (mod → indicator → screen capture → daemon)
+- [ ] **NEXT:** Add directional support (if needed)
+
+### Priority 2: Pure Screen Capture (Existing Red Arch) - Alternative
+
+- [ ] **NEXT:** Adapt screen capture prototype for crosshair detection
+- [ ] **NEXT:** Test with Mordhau - capture red arch appearance
+- [ ] **NEXT:** Calibrate detection thresholds (red color, arch radius)
+- [ ] **NEXT:** Implement direction detection (if arch is directional)
+- [ ] **NEXT:** Integrate with daemon (file watcher + event processing)
+
+### Priority 2: Blueprint Mod Development (If Logging Fails)
+
 - [x] Analyze DictionaryLib mod structure → **Got unpacked mod source!**
 - [ ] Install FModel and inspect HeartbeatMod.pak to see how it reads health
 - [ ] Find Mordhau modding Discord/community for help
@@ -347,6 +691,25 @@ If log-based approach is possible, implementation becomes much simpler (similar 
 - [ ] Determine if MSDK has damage event Blueprint nodes
 - [ ] Create prototype Blueprint that writes damage events to file
 - [ ] Test Python daemon watching the output file
+
+### Reference: Server Config Logging Options
+
+From [Mordhau Fandom Server Configuration](https://mordhau.fandom.com/wiki/Server_Configuration):
+
+**Logging verbosity levels (in order):**
+- `Fatal` (most severe)
+- `Error`
+- `Warning`
+- `Display`
+- `Log`
+- `Verbose`
+- `VeryVerbose` (most detailed)
+- `NoLogging` (disable)
+
+**Key log categories to test:**
+- `LogMordhauPlayerController` - Player actions, damage, combat
+- `LogMordhauGameInstance` - Game state changes
+- `LogMordhauGameSession` - Session events
 
 ## Mod Development Approach
 
