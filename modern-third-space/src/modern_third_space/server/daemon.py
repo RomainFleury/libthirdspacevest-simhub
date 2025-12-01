@@ -78,6 +78,7 @@ from .gtav_manager import GTAVManager
 from .pistolwhip_manager import PistolWhipManager
 from .starcitizen_manager import StarCitizenManager
 from .l4d2_manager import L4D2Manager
+from .mordhau_manager import MordhauManager
 from .protocol import (
     event_alyx_started,
     event_alyx_stopped,
@@ -110,6 +111,12 @@ from .protocol import (
     response_l4d2_start,
     response_l4d2_stop,
     response_l4d2_status,
+    event_mordhau_started,
+    event_mordhau_stopped,
+    event_mordhau_game_event,
+    response_mordhau_start,
+    response_mordhau_stop,
+    response_mordhau_status,
     # Predefined effects
     event_effect_started,
     event_effect_completed,
@@ -185,6 +192,12 @@ class VestDaemon:
         self._l4d2_manager = L4D2Manager(
             on_game_event=self._on_l4d2_game_event,
             on_trigger=self._on_l4d2_trigger,
+        )
+        
+        # Mordhau manager
+        self._mordhau_manager = MordhauManager(
+            on_game_event=self._on_mordhau_game_event,
+            on_trigger=self._on_mordhau_trigger,
         )
         
         self._loop: Optional[asyncio.AbstractEventLoop] = None
@@ -480,6 +493,15 @@ class VestDaemon:
         
         if cmd_type == CommandType.L4D2_STATUS:
             return await self._cmd_l4d2_status(command)
+        
+        if cmd_type == CommandType.MORDHAU_START:
+            return await self._cmd_mordhau_start(command)
+        
+        if cmd_type == CommandType.MORDHAU_STOP:
+            return await self._cmd_mordhau_stop(command)
+        
+        if cmd_type == CommandType.MORDHAU_STATUS:
+            return await self._cmd_mordhau_status(command)
         
         # Predefined effects commands
         if cmd_type == CommandType.PLAY_EFFECT:
@@ -1612,6 +1634,41 @@ class VestDaemon:
             last_event_ts=self._l4d2_manager.last_event_ts,
             last_event_type=None,  # L4D2 manager doesn't track last event type yet
             log_path=log_path_str,
+            req_id=command.req_id,
+        )
+    
+    # -------------------------------------------------------------------------
+    # Mordhau commands
+    # -------------------------------------------------------------------------
+    
+    async def _cmd_mordhau_start(self, command: Command) -> Response:
+        """Start watching Mordhau haptic_events.log."""
+        logger.info(f"[Mordhau] Received start command: log_path={command.log_path}")
+        log_path = command.log_path
+        
+        success, error = self._mordhau_manager.start(log_path=log_path)
+        
+        if success:
+            log_path_str = str(self._mordhau_manager.log_path) if self._mordhau_manager.log_path else None
+            await self._clients.broadcast(event_mordhau_started(log_path_str or ""))
+            return response_mordhau_start(success=True, log_path=log_path_str, req_id=command.req_id)
+        else:
+            return response_mordhau_start(success=False, error=error, req_id=command.req_id)
+    
+    async def _cmd_mordhau_stop(self, command: Command) -> Response:
+        """Stop watching Mordhau haptic_events.log."""
+        success = self._mordhau_manager.stop()
+        if success:
+            await self._clients.broadcast(event_mordhau_stopped())
+        return response_mordhau_stop(success=success, req_id=command.req_id)
+    
+    async def _cmd_mordhau_status(self, command: Command) -> Response:
+        """Get Mordhau integration status."""
+        return response_mordhau_status(
+            running=self._mordhau_manager.is_running,
+            log_path=str(self._mordhau_manager.log_path) if self._mordhau_manager.log_path else None,
+            events_received=self._mordhau_manager.events_received,
+            last_event_ts=self._mordhau_manager.last_event_ts,
             req_id=command.req_id,
         )
     
