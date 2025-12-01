@@ -461,13 +461,11 @@ def response_list_connected_devices(devices: List[Dict[str, Any]], req_id: Optio
 
 def response_set_main_device(success: bool, device_id: Optional[str] = None, error: Optional[str] = None, req_id: Optional[str] = None) -> Response:
     """Response for set_main_device command."""
-    # Create device dict if device_id is provided
-    device = {"device_id": device_id} if device_id else None
     return Response(
         response="set_main_device",
         req_id=req_id,
         success=success,
-        device=device,
+        device_id=device_id,
         message=error,
     )
 
