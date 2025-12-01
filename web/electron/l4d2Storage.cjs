@@ -56,10 +56,23 @@ function setL4D2PlayerName(playerName) {
   saveL4D2Settings(settings);
 }
 
+function getL4D2GameDir() {
+  const settings = loadL4D2Settings();
+  return settings.gameDir || null;
+}
+
+function setL4D2GameDir(gameDir) {
+  const settings = loadL4D2Settings();
+  settings.gameDir = gameDir;
+  saveL4D2Settings(settings);
+}
+
 module.exports = {
   getL4D2LogPath,
   setL4D2LogPath,
   getL4D2PlayerName,
   setL4D2PlayerName,
+  getL4D2GameDir,
+  setL4D2GameDir,
 };
 

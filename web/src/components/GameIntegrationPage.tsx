@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useState } from "react";
 import type {
   GameIntegrationPageProps,
   GameEvent,
@@ -35,6 +36,10 @@ export function GameIntegrationPage({
   const steamLaunchUrl = game.steamAppId
     ? `steam://run/${game.steamAppId}${game.steamLaunchOptions ? `//${game.steamLaunchOptions}` : ""}`
     : null;
+
+  // Collapsible section states
+  const [configExpanded, setConfigExpanded] = useState(true);
+  const [guideExpanded, setGuideExpanded] = useState(false);
 
   const getEventInfo = (type: string): EventDisplayInfo => {
     return eventDisplayMap[type] || { label: type, icon: "📡", color: "text-slate-400" };
@@ -173,19 +178,50 @@ export function GameIntegrationPage({
 
       {/* Configuration (if provided) */}
       {configurationPanel && (
-        <section className="rounded-2xl bg-slate-800/80 p-4 md:p-6 shadow-lg ring-1 ring-white/5">
-          <h2 className="text-lg font-semibold text-white mb-4">Configuration</h2>
-          {configurationPanel}
+        <section className="rounded-2xl bg-slate-800/80 shadow-lg ring-1 ring-white/5 overflow-hidden">
+          <button
+            onClick={() => setConfigExpanded(!configExpanded)}
+            className="w-full flex items-center justify-between p-4 md:p-6 text-left hover:bg-slate-700/30 transition"
+          >
+            <h2 className="text-lg font-semibold text-white">Configuration</h2>
+            <svg
+              className={`h-5 w-5 text-slate-400 transition-transform ${configExpanded ? 'rotate-180' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {configExpanded && (
+            <div className="px-4 md:px-6 pb-4 md:pb-6">
+              {configurationPanel}
+            </div>
+          )}
         </section>
       )}
 
       {/* Setup Guide (if provided) */}
       {(setupGuide || modInfo) && (
-        <section className="rounded-2xl bg-slate-800/80 p-4 md:p-6 shadow-lg ring-1 ring-white/5">
-          <h2 className="text-lg font-semibold text-white mb-4">Setup Guide</h2>
-          
-          {/* Mod info banner */}
-          {modInfo && (
+        <section className="rounded-2xl bg-slate-800/80 shadow-lg ring-1 ring-white/5 overflow-hidden">
+          <button
+            onClick={() => setGuideExpanded(!guideExpanded)}
+            className="w-full flex items-center justify-between p-4 md:p-6 text-left hover:bg-slate-700/30 transition"
+          >
+            <h2 className="text-lg font-semibold text-white">Setup Guide</h2>
+            <svg
+              className={`h-5 w-5 text-slate-400 transition-transform ${guideExpanded ? 'rotate-180' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {guideExpanded && (
+            <div className="px-4 md:px-6 pb-4 md:pb-6">
+              {/* Mod info banner */}
+              {modInfo && (
             <div className="mb-4 rounded-xl bg-amber-900/20 border border-amber-700/30 p-4">
               <h3 className="text-sm font-medium text-amber-200 mb-2">
                 ⚠️ Mod Required: {modInfo.name}
@@ -231,7 +267,9 @@ export function GameIntegrationPage({
             </div>
           )}
 
-          {setupGuide}
+              {setupGuide}
+            </div>
+          )}
         </section>
       )}
 
@@ -261,6 +299,8 @@ export function GameIntegrationPage({
               {events.map((event) => {
                 const info = getEventInfo(event.type);
                 const details = getEventDetails(event);
+                // Handle both seconds (Unix) and milliseconds timestamps
+                const timestamp = event.ts > 1e12 ? event.ts : event.ts * 1000;
                 return (
                   <li
                     key={event.id}
@@ -274,7 +314,7 @@ export function GameIntegrationPage({
                       <span className="text-slate-400">({details})</span>
                     )}
                     <span className="ml-auto text-xs text-slate-500">
-                      {new Date(event.ts).toLocaleTimeString()}
+                      {new Date(timestamp).toLocaleTimeString()}
                     </span>
                   </li>
                 );

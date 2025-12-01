@@ -1640,14 +1640,25 @@ class VestDaemon:
         
         Triggers the effect on the main device.
         """
-        if self._loop is None:
-            return
+        # Get main device controller
+        main_device_id = self._registry.get_main_device_id()
+        if main_device_id is None:
+            return  # No device available
         
-        # Schedule trigger in event loop
-        asyncio.run_coroutine_threadsafe(
-            self._trigger_main_device(cell, speed),
-            self._loop,
-        )
+        controller = self._registry.get_controller(main_device_id)
+        if controller is None or not controller.status().connected:
+            return  # Device not connected
+        
+        # Trigger effect (synchronous, thread-safe)
+        controller.trigger_effect(cell, speed)
+        
+        # Broadcast event (async)
+        if self._loop is not None:
+            event = event_effect_triggered(cell, speed, device_id=main_device_id)
+            asyncio.run_coroutine_threadsafe(
+                self._clients.broadcast(event),
+                self._loop,
+            )
     
     # -------------------------------------------------------------------------
     # Pistol Whip callbacks

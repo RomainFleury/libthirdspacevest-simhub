@@ -155,14 +155,14 @@ def parse_console_line(line: str, player_name: Optional[str] = None) -> Optional
         
         # Map event types to our internal format
         if event_type == "PlayerHurt":
-            # Format: {PlayerHurt|damage|attacker|angle|damage_type|victim}
+            # Format: {PlayerHurt|victim|damage|angle|damage_type|attacker}
             if len(params_list) >= 5:
                 try:
-                    damage = int(params_list[0])
-                    attacker = params_list[1]
+                    victim = params_list[0]
+                    damage = int(params_list[1])
                     angle = int(params_list[2]) if params_list[2] else 0
                     damage_type = params_list[3]
-                    victim = params_list[4]
+                    attacker = params_list[4]
                     
                     # Filter by player name if provided
                     if player_name and victim.lower() != player_name.lower():
@@ -189,23 +189,34 @@ def parse_console_line(line: str, player_name: Optional[str] = None) -> Optional
                 weapon = params_list[1]
                 victim = params_list[2]
                 
-                # Determine event type based on player
-                if player_name and victim.lower() == player_name.lower():
-                    event_type_internal = "player_death"
-                elif player_name and killer.lower() == player_name.lower():
-                    event_type_internal = "player_kill"
-                else:
-                    event_type_internal = "teammate_death"
+                # Only trigger for the player
+                if not player_name or victim.lower() == player_name.lower():
+                    return L4D2Event(
+                        type="player_death",
+                        raw=line,
+                        params={
+                            "victim": victim,
+                            "attacker": killer,
+                            "weapon": weapon,
+                        }
+                    )
+        
+        elif event_type == "PlayerIncap":
+            # Format: {PlayerIncap|victim|attacker} - player downed
+            if len(params_list) >= 2:
+                victim = params_list[0]
+                attacker = params_list[1]
                 
-                return L4D2Event(
-                    type=event_type_internal,
-                    raw=line,
-                    params={
-                        "victim": victim,
-                        "attacker": killer,
-                        "weapon": weapon,
-                    }
-                )
+                # Only trigger for the player
+                if not player_name or victim.lower() == player_name.lower():
+                    return L4D2Event(
+                        type="player_incap",
+                        raw=line,
+                        params={
+                            "victim": victim,
+                            "attacker": attacker,
+                        }
+                    )
         
         elif event_type == "WeaponFire":
             # Format: {WeaponFire|weapon|player}
@@ -224,17 +235,20 @@ def parse_console_line(line: str, player_name: Optional[str] = None) -> Optional
                     )
         
         elif event_type == "HealthPickup":
-            # Format: {HealthPickup|item|player}
-            if len(params_list) >= 2:
-                item = params_list[0]
-                player = params_list[1]
+            # Format: {HealthPickup|player|item}
+            # We ignore health pickups for haptics (user preference)
+            pass
+        
+        elif event_type == "AdrenalineUsed":
+            # Format: {AdrenalineUsed|player}
+            if len(params_list) >= 1:
+                player = params_list[0]
                 
                 if not player_name or player.lower() == player_name.lower():
                     return L4D2Event(
-                        type="health_pickup",
+                        type="adrenaline_used",
                         raw=line,
                         params={
-                            "item": item,
                             "player": player,
                         }
                     )
@@ -448,21 +462,26 @@ def map_event_to_haptics(event: L4D2Event) -> List[Tuple[int, int]]:
     commands: List[Tuple[int, int]] = []
     
     if event.type == "player_death":
-        # Full vest pulse (all cells, max intensity)
+        # Full vest pulse (all cells, max intensity) - player died
         for cell in ALL_CELLS:
             commands.append((cell, 10))
     
-    elif event.type == "player_kill":
-        # Quick pulse on front cells
-        for cell in FRONT_CELLS:
-            commands.append((cell, 7))
+    elif event.type == "player_incap":
+        # Strong pulse (all cells) - player downed
+        for cell in ALL_CELLS:
+            commands.append((cell, 8))
     
     elif event.type == "player_damage":
         # Scale intensity by damage amount
         damage = event.params.get("damage", 0)
+        
+        # Skip 0 damage events (collisions, etc.)
+        if damage <= 0:
+            return commands
+        
         intensity = min(10, max(1, damage // 10))  # 1-10 based on damage
         
-        # Phase 2: Use directional data if available
+        # Use directional data if available
         angle = event.params.get("angle")
         if angle is not None:
             # Map angle to directional cells
@@ -485,59 +504,16 @@ def map_event_to_haptics(event: L4D2Event) -> List[Tuple[int, int]]:
             for cell in cells:
                 commands.append((cell, intensity))
         else:
-            # Phase 1: No directional data, use front cells
+            # No directional data, use front cells
             for cell in FRONT_CELLS:
                 commands.append((cell, intensity))
     
-    elif event.type == "weapon_fire":
-        # Light recoil on front upper cells
-        for cell in [Cell.FRONT_UPPER_LEFT, Cell.FRONT_UPPER_RIGHT]:
-            commands.append((cell, 3))
+    elif event.type == "adrenaline_used":
+        # Adrenaline injection - quick pulse on all cells
+        for cell in ALL_CELLS:
+            commands.append((cell, 6))
     
-    elif event.type == "health_pickup":
-        # Soothing wave: front to back
-        for cell in FRONT_CELLS:
-            commands.append((cell, 4))
-        # Slight delay for back cells (handled by multiple triggers)
-        for cell in BACK_CELLS:
-            commands.append((cell, 3))
-    
-    elif event.type == "ammo_pickup":
-        # Quick pulse on lower cells
-        for cell in LOWER_CELLS:
-            commands.append((cell, 2))
-    
-    elif event.type == "infected_spawn":
-        infected = event.params.get("infected", "")
-        if infected == "tank":
-            # Strong pulse all cells for Tank
-            for cell in ALL_CELLS:
-                commands.append((cell, 7))
-        elif infected == "witch":
-            # Subtle pulse pattern for Witch
-            for cell in UPPER_CELLS:
-                commands.append((cell, 4))
-        else:
-            # Other infected: moderate pulse
-            for cell in FRONT_CELLS:
-                commands.append((cell, 5))
-    
-    elif event.type == "infected_hit":
-        # Player hit an infected - feedback on front cells
-        damage = event.params.get("damage", 0)
-        intensity = min(8, max(3, damage // 15))  # 3-8 based on damage
-        for cell in FRONT_CELLS:
-            commands.append((cell, intensity))
-    
-    elif event.type == "player_healed":
-        # Player was healed - soothing wave
-        amount = event.params.get("amount", 0)
-        intensity = min(6, max(2, amount // 20))  # 2-6 based on heal amount
-        # Wave from front to back
-        for cell in FRONT_CELLS:
-            commands.append((cell, intensity))
-        for cell in BACK_CELLS:
-            commands.append((cell, intensity - 1))
+    # All other events (weapon_fire, health_pickup, ammo_pickup, etc.) are ignored
     
     return commands
 
@@ -631,8 +607,12 @@ class ConsoleLogWatcher:
                 self._last_position = f.tell()
             
             for line in new_content.splitlines():
+                line = line.strip()
+                if line:
+                    logger.info(f"[L4D2 LOG] {line}")
                 event = parse_console_line(line, self.player_name)
                 if event:
+                    logger.info(f"[L4D2 PARSED] {event.type}: {event.params}")
                     self.on_event(event)
         
         except IOError as e:

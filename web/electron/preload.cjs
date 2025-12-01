@@ -86,6 +86,11 @@ contextBridge.exposeInMainWorld("vestBridge", {
   l4d2GetSettings: () => ipcRenderer.invoke("l4d2:getSettings"),
   l4d2SetLogPath: (logPath) => ipcRenderer.invoke("l4d2:setLogPath", logPath),
   l4d2SetPlayerName: (playerName) => ipcRenderer.invoke("l4d2:setPlayerName", playerName),
+  l4d2BrowseGameDir: () => ipcRenderer.invoke("l4d2:browseGameDir"),
+  l4d2GetGameDir: () => ipcRenderer.invoke("l4d2:getGameDir"),
+  l4d2SetGameDir: (gameDir) => ipcRenderer.invoke("l4d2:setGameDir", gameDir),
+  l4d2CheckModInstalled: () => ipcRenderer.invoke("l4d2:checkModInstalled"),
+  l4d2InstallMod: () => ipcRenderer.invoke("l4d2:installMod"),
 
   // Predefined Effects Library API
   playEffect: (effectName) => ipcRenderer.invoke("effects:play", effectName),

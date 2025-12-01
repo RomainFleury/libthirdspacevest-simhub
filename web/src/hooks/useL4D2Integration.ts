@@ -26,6 +26,13 @@ interface L4D2GameEvent {
   timestamp: number;
 }
 
+interface ModStatus {
+  installed: boolean;
+  hapticsInstalled?: boolean;
+  coopInstalled?: boolean;
+  gameDir?: string;
+}
+
 export function useL4D2Integration() {
   const [status, setStatus] = useState<L4D2Status>({
     running: false,
@@ -39,6 +46,8 @@ export function useL4D2Integration() {
   const [gameEvents, setGameEvents] = useState<L4D2GameEvent[]>([]);
   const [logPath, setLogPath] = useState<string>('');
   const [playerName, setPlayerName] = useState<string>('');
+  const [gameDir, setGameDir] = useState<string>('');
+  const [modStatus, setModStatus] = useState<ModStatus>({ installed: false });
 
   // Load saved settings
   const loadSettings = useCallback(async () => {
@@ -52,6 +61,13 @@ export function useL4D2Integration() {
         if (result.playerName) {
           setPlayerName(result.playerName);
         }
+      }
+      
+      // Load game directory
+      // @ts-ignore - window.vestBridge
+      const gameDirResult = await window.vestBridge?.l4d2GetGameDir?.();
+      if (gameDirResult?.success && gameDirResult.gameDir) {
+        setGameDir(gameDirResult.gameDir);
       }
     } catch (err) {
       console.error('Failed to load L4D2 settings:', err);
@@ -165,6 +181,61 @@ export function useL4D2Integration() {
     }
   }, [saveLogPath]);
 
+  // Browse for game directory
+  const browseGameDir = useCallback(async () => {
+    try {
+      // @ts-ignore - window.vestBridge
+      const result = await window.vestBridge?.l4d2BrowseGameDir?.();
+      if (result?.success && result.gameDir) {
+        setGameDir(result.gameDir);
+        // Check mod status after setting game dir
+        await checkModInstalled();
+      }
+    } catch (err) {
+      console.error('Failed to browse game dir:', err);
+    }
+  }, []);
+
+  // Check if mod is installed
+  const checkModInstalled = useCallback(async () => {
+    try {
+      // @ts-ignore - window.vestBridge
+      const result = await window.vestBridge?.l4d2CheckModInstalled?.();
+      if (result?.success) {
+        setModStatus({
+          installed: result.installed,
+          hapticsInstalled: result.hapticsInstalled,
+          coopInstalled: result.coopInstalled,
+          gameDir: result.gameDir,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to check mod status:', err);
+    }
+  }, []);
+
+  // Install mod
+  const installMod = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      // @ts-ignore - window.vestBridge
+      const result = await window.vestBridge?.l4d2InstallMod?.();
+      if (result?.success) {
+        await checkModInstalled();
+        return { success: true, copiedFiles: result.copiedFiles };
+      } else {
+        setError(result?.error || 'Failed to install mod');
+        return { success: false, error: result?.error };
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Failed to install mod');
+      return { success: false, error: err?.message };
+    } finally {
+      setIsLoading(false);
+    }
+  }, [checkModInstalled]);
+
   // Clear events
   const clearEvents = useCallback(() => {
     setGameEvents([]);
@@ -174,7 +245,8 @@ export function useL4D2Integration() {
   useEffect(() => {
     loadSettings();
     refreshStatus();
-  }, [loadSettings, refreshStatus]);
+    checkModInstalled();
+  }, [loadSettings, refreshStatus, checkModInstalled]);
 
   // Subscribe to daemon events
   useEffect(() => {
@@ -198,10 +270,13 @@ export function useL4D2Integration() {
       }
     };
 
-    bridge.on?.('daemon_event', handleL4D2Event);
+    // Use onDaemonEvent to subscribe to daemon events
+    const unsubscribe = bridge.onDaemonEvent?.(handleL4D2Event);
 
     return () => {
-      bridge.off?.('daemon_event', handleL4D2Event);
+      if (unsubscribe) {
+        unsubscribe();
+      }
     };
   }, [refreshStatus]);
 
@@ -214,11 +289,16 @@ export function useL4D2Integration() {
     setLogPath: saveLogPath,
     playerName,
     setPlayerName: savePlayerName,
+    gameDir,
+    modStatus,
     refreshStatus,
     start,
     stop,
     clearEvents,
     browseLogPath,
+    browseGameDir,
+    checkModInstalled,
+    installMod,
   };
 }
 
