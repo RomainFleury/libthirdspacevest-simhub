@@ -78,6 +78,7 @@ from .gtav_manager import GTAVManager
 from .pistolwhip_manager import PistolWhipManager
 from .starcitizen_manager import StarCitizenManager
 from .l4d2_manager import L4D2Manager
+from .hl2dm_manager import HL2DMManager
 from .protocol import (
     event_alyx_started,
     event_alyx_stopped,
@@ -110,6 +111,13 @@ from .protocol import (
     response_l4d2_start,
     response_l4d2_stop,
     response_l4d2_status,
+    # Half-Life 2: Deathmatch integration
+    event_hl2dm_started,
+    event_hl2dm_stopped,
+    event_hl2dm_game_event,
+    response_hl2dm_start,
+    response_hl2dm_stop,
+    response_hl2dm_status,
     # Predefined effects
     event_effect_started,
     event_effect_completed,
@@ -187,6 +195,12 @@ class VestDaemon:
             on_trigger=self._on_l4d2_trigger,
         )
         
+        # Half-Life 2: Deathmatch manager
+        self._hl2dm_manager = HL2DMManager(
+            on_game_event=self._on_hl2dm_game_event,
+            on_trigger=self._on_hl2dm_trigger,
+        )
+        
         self._loop: Optional[asyncio.AbstractEventLoop] = None
     
     @property
@@ -228,6 +242,14 @@ class VestDaemon:
         # Stop Alyx integration if running
         if self._alyx_manager.is_running:
             self._alyx_manager.stop()
+        
+        # Stop L4D2 integration if running
+        if self._l4d2_manager.is_running:
+            self._l4d2_manager.stop()
+        
+        # Stop HL2DM integration if running
+        if self._hl2dm_manager.is_running:
+            self._hl2dm_manager.stop()
         
         # Disconnect from all vests
         for device_id in list(self._registry._controllers.keys()):
@@ -480,6 +502,16 @@ class VestDaemon:
         
         if cmd_type == CommandType.L4D2_STATUS:
             return await self._cmd_l4d2_status(command)
+        
+        # Half-Life 2: Deathmatch commands
+        if cmd_type == CommandType.HL2DM_START:
+            return await self._cmd_hl2dm_start(command)
+        
+        if cmd_type == CommandType.HL2DM_STOP:
+            return await self._cmd_hl2dm_stop(command)
+        
+        if cmd_type == CommandType.HL2DM_STATUS:
+            return await self._cmd_hl2dm_status(command)
         
         # Predefined effects commands
         if cmd_type == CommandType.PLAY_EFFECT:
@@ -1637,6 +1669,89 @@ class VestDaemon:
     def _on_l4d2_trigger(self, cell: int, speed: int):
         """
         Called when Left 4 Dead 2 manager wants to trigger a haptic effect.
+        
+        Triggers the effect on the main device.
+        """
+        # Get main device controller
+        main_device_id = self._registry.get_main_device_id()
+        if main_device_id is None:
+            return  # No device available
+        
+        controller = self._registry.get_controller(main_device_id)
+        if controller is None or not controller.status().connected:
+            return  # Device not connected
+        
+        # Trigger effect (synchronous, thread-safe)
+        controller.trigger_effect(cell, speed)
+        
+        # Broadcast event (async)
+        if self._loop is not None:
+            event = event_effect_triggered(cell, speed, device_id=main_device_id)
+            asyncio.run_coroutine_threadsafe(
+                self._clients.broadcast(event),
+                self._loop,
+            )
+    
+    # -------------------------------------------------------------------------
+    # Half-Life 2: Deathmatch commands
+    # -------------------------------------------------------------------------
+    
+    async def _cmd_hl2dm_start(self, command: Command) -> Response:
+        """Start watching Half-Life 2: Deathmatch console.log."""
+        logger.info(f"[HL2DM] Received start command: log_path={command.log_path}, player_name={command.message}")
+        log_path = command.log_path
+        player_name = command.message  # Using message field for player name
+        
+        success, error = self._hl2dm_manager.start(log_path=log_path, player_name=player_name)
+        
+        if success:
+            log_path_str = str(self._hl2dm_manager.log_path) if self._hl2dm_manager.log_path else None
+            await self._clients.broadcast(event_hl2dm_started(log_path_str or ""))
+            return response_hl2dm_start(success=True, log_path=log_path_str, req_id=command.req_id)
+        else:
+            return response_hl2dm_start(success=False, error=error, req_id=command.req_id)
+    
+    async def _cmd_hl2dm_stop(self, command: Command) -> Response:
+        """Stop watching Half-Life 2: Deathmatch console.log."""
+        success = self._hl2dm_manager.stop()
+        if success:
+            await self._clients.broadcast(event_hl2dm_stopped())
+        return response_hl2dm_stop(success=success, req_id=command.req_id)
+    
+    async def _cmd_hl2dm_status(self, command: Command) -> Response:
+        """Get Half-Life 2: Deathmatch integration status."""
+        log_path_str = str(self._hl2dm_manager.log_path) if self._hl2dm_manager.log_path else None
+        return response_hl2dm_status(
+            running=self._hl2dm_manager.is_running,
+            events_received=self._hl2dm_manager.events_received,
+            last_event_ts=self._hl2dm_manager.last_event_ts,
+            last_event_type=self._hl2dm_manager.last_event_type,
+            log_path=log_path_str,
+            req_id=command.req_id,
+        )
+    
+    # -------------------------------------------------------------------------
+    # Half-Life 2: Deathmatch callbacks
+    # -------------------------------------------------------------------------
+    
+    def _on_hl2dm_game_event(self, event_type: str, params: dict):
+        """
+        Called when Half-Life 2: Deathmatch manager processes a game event.
+        
+        Broadcasts the event to all connected clients for UI display.
+        """
+        if self._loop is None:
+            return
+        
+        # Schedule broadcast in event loop
+        asyncio.run_coroutine_threadsafe(
+            self._clients.broadcast(event_hl2dm_game_event(event_type, params)),
+            self._loop,
+        )
+    
+    def _on_hl2dm_trigger(self, cell: int, speed: int):
+        """
+        Called when Half-Life 2: Deathmatch manager wants to trigger a haptic effect.
         
         Triggers the effect on the main device.
         """
