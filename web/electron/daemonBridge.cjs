@@ -891,6 +891,54 @@ class DaemonBridge extends EventEmitter {
   }
 
   // -------------------------------------------------------------------------
+  // Walking Dead: Saints and Sinners Integration API
+  // -------------------------------------------------------------------------
+
+  /**
+   * Enable Walking Dead integration.
+   */
+  async walkingdeadStart() {
+    try {
+      await this.sendCommand("walkingdead_start");
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, message: error.message };
+    }
+  }
+
+  /**
+   * Disable Walking Dead integration.
+   */
+  async walkingdeadStop() {
+    try {
+      await this.sendCommand("walkingdead_stop");
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, message: error.message };
+    }
+  }
+
+  /**
+   * Get Walking Dead integration status.
+   */
+  async walkingdeadStatus() {
+    try {
+      const response = await this.sendCommand("walkingdead_status");
+      return {
+        running: response.running ?? false,
+        events_received: response.events_received ?? 0,
+        last_event_ts: response.last_event_ts ?? null,
+        last_event_type: response.last_event_type ?? null,
+      };
+    } catch (error) {
+      return {
+        running: false,
+        error: error.message,
+      };
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Predefined Effects Library API
   // -------------------------------------------------------------------------
 

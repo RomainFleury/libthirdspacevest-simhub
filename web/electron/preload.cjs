@@ -92,6 +92,11 @@ contextBridge.exposeInMainWorld("vestBridge", {
   l4d2CheckModInstalled: () => ipcRenderer.invoke("l4d2:checkModInstalled"),
   l4d2InstallMod: () => ipcRenderer.invoke("l4d2:installMod"),
 
+  // Walking Dead: Saints and Sinners Integration API
+  walkingdeadStart: () => ipcRenderer.invoke("walkingdead:start"),
+  walkingdeadStop: () => ipcRenderer.invoke("walkingdead:stop"),
+  walkingdeadStatus: () => ipcRenderer.invoke("walkingdead:status"),
+
   // Predefined Effects Library API
   playEffect: (effectName) => ipcRenderer.invoke("effects:play", effectName),
   listEffectsLibrary: () => ipcRenderer.invoke("effects:list"),

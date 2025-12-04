@@ -84,6 +84,11 @@ class CommandType(Enum):
     L4D2_START = "l4d2_start"
     L4D2_STOP = "l4d2_stop"
     L4D2_STATUS = "l4d2_status"
+    # Walking Dead: Saints and Sinners integration
+    WALKINGDEAD_EVENT = "walkingdead_event"
+    WALKINGDEAD_START = "walkingdead_start"
+    WALKINGDEAD_STOP = "walkingdead_stop"
+    WALKINGDEAD_STATUS = "walkingdead_status"
     # Predefined effects
     PLAY_EFFECT = "play_effect"
     LIST_EFFECTS = "list_effects"
@@ -147,6 +152,10 @@ class EventType(Enum):
     L4D2_STARTED = "l4d2_started"
     L4D2_STOPPED = "l4d2_stopped"
     L4D2_GAME_EVENT = "l4d2_game_event"
+    # Walking Dead: Saints and Sinners integration
+    WALKINGDEAD_STARTED = "walkingdead_started"
+    WALKINGDEAD_STOPPED = "walkingdead_stopped"
+    WALKINGDEAD_GAME_EVENT = "walkingdead_game_event"
     # Predefined effects
     EFFECT_STARTED = "effect_started"
     EFFECT_COMPLETED = "effect_completed"
@@ -179,6 +188,9 @@ class Command:
     damage: Optional[float] = None  # Damage amount
     health_remaining: Optional[float] = None  # Remaining health
     cause: Optional[str] = None  # Death cause
+    # Walking Dead params
+    side: Optional[str] = None  # "left" or "right" for side-specific events
+    is_two_hand: Optional[bool] = None  # Two-handed weapon grip
     # Predefined effects params
     effect_name: Optional[str] = None  # Effect to play
     # Multi-vest support
@@ -208,6 +220,8 @@ class Command:
             damage=data.get("damage"),
             health_remaining=data.get("health_remaining"),
             cause=data.get("cause"),
+            side=data.get("side"),
+            is_two_hand=data.get("is_two_hand"),
             effect_name=data.get("effect_name"),
             device_id=data.get("device_id"),
             player_id=data.get("player_id"),
@@ -256,6 +270,7 @@ class Event:
     params: Optional[Dict[str, Any]] = None  # For alyx_game_event params
     # SUPERHOT VR info
     hand: Optional[str] = None  # "left" or "right" for hand-specific events
+    side: Optional[str] = None  # "left" or "right" for side-specific events (Walking Dead)
     # Predefined effects info
     effect_name: Optional[str] = None  # Name of effect being played/completed
     # Multi-vest support
@@ -1054,6 +1069,59 @@ def response_l4d2_status(
         req_id=req_id,
         running=running,
         log_path=log_path,
+        events_received=events_received,
+        last_event_ts=last_event_ts,
+        last_event_type=last_event_type,
+    )
+
+
+# -------------------------------------------------------------------------
+# Walking Dead: Saints and Sinners events and responses
+# -------------------------------------------------------------------------
+
+def event_walkingdead_started() -> Event:
+    """Event when Walking Dead integration starts."""
+    return Event(event=EventType.WALKINGDEAD_STARTED.value)
+
+
+def event_walkingdead_stopped() -> Event:
+    """Event when Walking Dead integration stops."""
+    return Event(event=EventType.WALKINGDEAD_STOPPED.value)
+
+
+def event_walkingdead_game_event(
+    event_type: str,
+    hand: Optional[str] = None,
+    side: Optional[str] = None,
+) -> Event:
+    """
+    Walking Dead game event (gun_fire, zombie_grab, damage, etc.).
+    
+    Args:
+        event_type: Type of event ("gun_fire", "zombie_grab", "damage", etc.)
+        hand: "left" or "right" for hand-specific events
+        side: "left" or "right" for side-specific events (zombie attacks)
+    """
+    return Event(
+        event=EventType.WALKINGDEAD_GAME_EVENT.value,
+        event_type=event_type,
+        hand=hand,
+        side=side,
+    )
+
+
+def response_walkingdead_status(
+    enabled: bool,
+    events_received: int = 0,
+    last_event_ts: Optional[float] = None,
+    last_event_type: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to walkingdead_status command."""
+    return Response(
+        response="walkingdead_status",
+        req_id=req_id,
+        running=enabled,
         events_received=events_received,
         last_event_ts=last_event_ts,
         last_event_type=last_event_type,

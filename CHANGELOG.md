@@ -6,7 +6,34 @@ This file helps AI assistants quickly understand recent project evolution.
 
 ---
 
-## 2025-11-27 (Latest)
+## 2025-12-04 (Latest)
+
+### Added
+
+- **Walking Dead: Saints and Sinners Integration** - Haptic feedback support for the VR zombie game
+  - Based on research from [McFredward/twd_bhaptics](https://github.com/McFredward/twd_bhaptics)
+  - Walking Dead is an Unreal Engine game, so uses memory reading instead of MelonLoader
+  - **Events Supported**:
+    - Gun fire (one-handed and two-handed, left/right)
+    - Zombie grab and hold (directional - left/right side)
+    - Damage (generic hits, bullet hits)
+    - Healing and low health heartbeat
+    - Low stamina breathing
+    - Eating haptics
+    - Backpack and shoulder holster interactions
+    - Inventory item storage
+    - Lamp/book retrieval from chest
+  - **Looping Effects**: Heartbeat, zombie hold, eating, and stamina all support continuous haptic loops
+  - **Python Manager**: `server/walkingdead_manager.py`
+  - **Daemon Protocol**: Added `walkingdead_event`, `walkingdead_start`, `walkingdead_stop`, `walkingdead_status` commands
+  - **Electron UI**: Integration panel with live event log (`WalkingDeadIntegrationPanel.tsx`)
+  - **Documentation**: `docs-external-integrations-ideas/WALKINGDEAD_INTEGRATION.md`
+  - **Status**: Core implementation complete; requires memory reader for game communication
+  - **Note**: Memory reading approach is version-specific; addresses may need updating for newer game versions
+
+---
+
+## 2025-11-27
 
 ### Added
 

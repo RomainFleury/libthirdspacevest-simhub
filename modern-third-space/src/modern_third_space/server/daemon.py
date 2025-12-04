@@ -78,6 +78,7 @@ from .gtav_manager import GTAVManager
 from .pistolwhip_manager import PistolWhipManager
 from .starcitizen_manager import StarCitizenManager
 from .l4d2_manager import L4D2Manager
+from .walkingdead_manager import WalkingDeadManager
 from .protocol import (
     event_alyx_started,
     event_alyx_stopped,
@@ -110,6 +111,11 @@ from .protocol import (
     response_l4d2_start,
     response_l4d2_stop,
     response_l4d2_status,
+    # Walking Dead: Saints and Sinners
+    event_walkingdead_started,
+    event_walkingdead_stopped,
+    event_walkingdead_game_event,
+    response_walkingdead_status,
     # Predefined effects
     event_effect_started,
     event_effect_completed,
@@ -187,6 +193,11 @@ class VestDaemon:
             on_trigger=self._on_l4d2_trigger,
         )
         
+        # Walking Dead: Saints and Sinners manager
+        self._walkingdead_manager = WalkingDeadManager()
+        self._walkingdead_manager.set_event_callback(self._on_walkingdead_game_event)
+        self._walkingdead_manager.set_trigger_callback(self._on_walkingdead_trigger)
+        
         self._loop: Optional[asyncio.AbstractEventLoop] = None
     
     @property
@@ -241,7 +252,7 @@ class VestDaemon:
             await self._server.wait_closed()
         
         logger.info("Vest daemon stopped")
-        print("🛑 Vest daemon stopped")
+        print("?? Vest daemon stopped")
     
     async def _handle_client(
         self,
@@ -252,7 +263,7 @@ class VestDaemon:
         client = await self._clients.add_client(writer)
         addr = writer.get_extra_info("peername")
         logger.info(f"Client {client.id} connected from {addr}")
-        print(f"📱 Client {client.id} connected from {addr}")
+        print(f"?? Client {client.id} connected from {addr}")
         
         try:
             while self._running:
@@ -307,7 +318,7 @@ class VestDaemon:
             except Exception as e:
                 logger.debug(f"Error closing client connection: {e}")
             logger.info(f"Client {client.id} disconnected")
-            print(f"📴 Client {client.id} disconnected")
+            print(f"?? Client {client.id} disconnected")
     
     async def _handle_command(self, client: Client, command: Command) -> Optional[Response]:
         """
@@ -480,6 +491,19 @@ class VestDaemon:
         
         if cmd_type == CommandType.L4D2_STATUS:
             return await self._cmd_l4d2_status(command)
+        
+        # Walking Dead: Saints and Sinners commands
+        if cmd_type == CommandType.WALKINGDEAD_EVENT:
+            return await self._cmd_walkingdead_event(command)
+        
+        if cmd_type == CommandType.WALKINGDEAD_START:
+            return await self._cmd_walkingdead_start(command)
+        
+        if cmd_type == CommandType.WALKINGDEAD_STOP:
+            return await self._cmd_walkingdead_stop(command)
+        
+        if cmd_type == CommandType.WALKINGDEAD_STATUS:
+            return await self._cmd_walkingdead_status(command)
         
         # Predefined effects commands
         if cmd_type == CommandType.PLAY_EFFECT:
@@ -1661,6 +1685,104 @@ class VestDaemon:
             )
     
     # -------------------------------------------------------------------------
+    # Walking Dead: Saints and Sinners command handlers
+    # -------------------------------------------------------------------------
+    
+    async def _cmd_walkingdead_event(self, command: Command) -> Response:
+        """
+        Process a Walking Dead game event from the memory reader.
+        
+        This is the main entry point for events from the game.
+        """
+        if not command.event:
+            return response_error("Missing event name", command.req_id)
+        
+        success = self._walkingdead_manager.process_event(
+            event_name=command.event,
+            hand=command.hand,
+            side=command.side,
+            is_two_hand=command.is_two_hand or False,
+            priority=command.priority or 0,
+        )
+        
+        if success:
+            return response_ok(command.req_id)
+        else:
+            return response_error(f"Failed to process event: {command.event}", command.req_id)
+    
+    async def _cmd_walkingdead_start(self, command: Command) -> Response:
+        """Enable Walking Dead event processing."""
+        self._walkingdead_manager.enable()
+        await self._clients.broadcast(event_walkingdead_started())
+        return response_ok(command.req_id)
+    
+    async def _cmd_walkingdead_stop(self, command: Command) -> Response:
+        """Disable Walking Dead event processing."""
+        self._walkingdead_manager.disable()
+        await self._clients.broadcast(event_walkingdead_stopped())
+        return response_ok(command.req_id)
+    
+    async def _cmd_walkingdead_status(self, command: Command) -> Response:
+        """Get Walking Dead integration status."""
+        status = self._walkingdead_manager.get_status()
+        return response_walkingdead_status(
+            enabled=status["enabled"],
+            events_received=status["events_received"],
+            last_event_ts=status["last_event_ts"],
+            last_event_type=status.get("last_event_type"),
+            req_id=command.req_id,
+        )
+    
+    # -------------------------------------------------------------------------
+    # Walking Dead callbacks
+    # -------------------------------------------------------------------------
+    
+    def _on_walkingdead_game_event(self, event_type: str, event_name: str, side_or_hand: Optional[str]):
+        """
+        Called when Walking Dead manager processes a game event.
+        
+        Broadcasts the event to all connected clients for UI display.
+        """
+        if self._loop is None:
+            return
+        
+        # Determine if it's a hand or side event
+        hand = side_or_hand if side_or_hand in ("left", "right") and "zombie" not in event_name else None
+        side = side_or_hand if side_or_hand in ("left", "right") and "zombie" in event_name else None
+        
+        event = event_walkingdead_game_event(event_name, hand, side)
+        asyncio.run_coroutine_threadsafe(
+            self._clients.broadcast(event),
+            self._loop,
+        )
+    
+    def _on_walkingdead_trigger(self, cell: int, speed: int):
+        """
+        Called when Walking Dead manager wants to trigger a haptic effect.
+        
+        Routes the trigger command to the selected vest device.
+        """
+        # Get main device controller
+        main_device_id = self._registry.get_main_device_id()
+        if main_device_id is None:
+            return  # No device available
+        
+        controller = self._registry.get_controller(main_device_id)
+        if controller is None or not controller.status().connected:
+            return  # Device not connected
+        
+        # Trigger effect (synchronous, thread-safe)
+        controller.trigger_effect(cell, speed)
+        
+        # Broadcast effect triggered event (async)
+        if self._loop is not None:
+            event = event_effect_triggered(cell, speed, device_id=main_device_id)
+            asyncio.run_coroutine_threadsafe(
+                self._clients.broadcast(event),
+                self._loop,
+            )
+    
+    # -------------------------------------------------------------------------
     # Pistol Whip callbacks
     # -------------------------------------------------------------------------
     
@@ -1922,7 +2044,7 @@ def run_daemon(
     asyncio.set_event_loop(loop)
     
     def shutdown_handler():
-        print("\n⏹️  Shutting down...")
+        print("\n??  Shutting down...")
         loop.create_task(daemon.stop())
     
     # Register signal handlers
