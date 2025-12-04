@@ -207,6 +207,197 @@ declare global {
       alyxStop: () => Promise<AlyxStopResult>;
       alyxStatus: () => Promise<AlyxStatus>;
       alyxGetModInfo: () => Promise<AlyxModInfoResult>;
+      // SUPERHOT VR Integration API
+      superhotStart: () => Promise<{ success: boolean; error?: string }>;
+      superhotStop: () => Promise<{ success: boolean; error?: string }>;
+      superhotStatus: () => Promise<{
+        enabled: boolean;
+        events_received?: number;
+        last_event_ts?: number | null;
+        last_event_type?: string | null;
+        error?: string;
+      }>;
+      // Pistol Whip Integration API
+      pistolwhipStart: () => Promise<{ success: boolean; error?: string }>;
+      pistolwhipStop: () => Promise<{ success: boolean; error?: string }>;
+      pistolwhipStatus: () => Promise<{
+        enabled: boolean;
+        events_received?: number;
+        last_event_ts?: number | null;
+        last_event_type?: string | null;
+        error?: string;
+      }>;
+      // Star Citizen Integration API
+      starcitizenStart: (logPath?: string, playerName?: string) => Promise<{
+        success: boolean;
+        log_path?: string;
+        error?: string;
+      }>;
+      starcitizenStop: () => Promise<{ success: boolean; error?: string }>;
+      starcitizenStatus: () => Promise<{
+        enabled: boolean;
+        events_received?: number;
+        last_event_ts?: number | null;
+        last_event_type?: string | null;
+        log_path?: string | null;
+        error?: string;
+      }>;
+      starcitizenBrowseLogPath: () => Promise<{
+        success: boolean;
+        path?: string;
+        canceled?: boolean;
+        error?: string;
+      }>;
+      starcitizenGetSettings: () => Promise<{
+        success: boolean;
+        logPath?: string | null;
+        playerName?: string | null;
+        error?: string;
+      }>;
+      starcitizenSetLogPath: (logPath: string | null) => Promise<{
+        success: boolean;
+        error?: string;
+      }>;
+      starcitizenSetPlayerName: (playerName: string | null) => Promise<{
+        success: boolean;
+        error?: string;
+      }>;
+      // Left 4 Dead 2 Integration API
+      l4d2Start: (logPath?: string, playerName?: string) => Promise<{
+        success: boolean;
+        log_path?: string;
+        error?: string;
+      }>;
+      l4d2Stop: () => Promise<{ success: boolean; error?: string }>;
+      l4d2Status: () => Promise<{
+        success: boolean;
+        running: boolean;
+        events_received?: number;
+        last_event_ts?: number | null;
+        last_event_type?: string | null;
+        log_path?: string | null;
+        error?: string;
+      }>;
+      l4d2BrowseLogPath: () => Promise<{
+        success: boolean;
+        logPath?: string;
+        canceled?: boolean;
+        error?: string;
+      }>;
+      l4d2GetSettings: () => Promise<{
+        success: boolean;
+        logPath?: string | null;
+        playerName?: string | null;
+        error?: string;
+      }>;
+      l4d2SetLogPath: (logPath: string | null) => Promise<{ success: boolean; error?: string }>;
+      l4d2SetPlayerName: (playerName: string | null) => Promise<{ success: boolean; error?: string }>;
+      // EA Battlefront 2 (2017) Settings API
+      bf2GetSettings: () => Promise<{
+        success: boolean;
+        settings?: Record<string, any>;
+        error?: string;
+      }>;
+      bf2SetSettings: (settings: Record<string, any>) => Promise<{
+        success: boolean;
+        error?: string;
+      }>;
+      bf2SetSetting: (key: string, value: any) => Promise<{
+        success: boolean;
+        error?: string;
+      }>;
+      bf2ResetSettings: () => Promise<{
+        success: boolean;
+        settings?: Record<string, any>;
+        error?: string;
+      }>;
+      bf2GetConfigFilePath: () => Promise<{
+        success: boolean;
+        path?: string;
+        error?: string;
+      }>;
+      bf2WriteConfigFile: () => Promise<{
+        success: boolean;
+        path?: string;
+        error?: string;
+      }>;
+      // Multi-Vest Management API
+      listConnectedDevices: () => Promise<{
+        success: boolean;
+        devices?: Array<{
+          device_id: string;
+          is_main: boolean;
+          bus?: number;
+          address?: number;
+          serial_number?: string;
+          is_mock?: boolean;
+        }>;
+        error?: string;
+      }>;
+      setMainDevice: (deviceId: string) => Promise<{
+        success: boolean;
+        error?: string;
+      }>;
+      disconnectDevice: (deviceId: string) => Promise<{
+        success: boolean;
+        error?: string;
+      }>;
+      createMockDevice: () => Promise<{
+        success: boolean;
+        device_id?: string;
+        device?: any;
+        error?: string;
+      }>;
+      removeMockDevice: (deviceId: string) => Promise<{
+        success: boolean;
+        error?: string;
+      }>;
+      // Player Management API (backend still supports, but UI removed)
+      createPlayer: (playerId: string, name?: string) => Promise<{
+        success: boolean;
+        error?: string;
+      }>;
+      assignPlayer: (playerId: string, deviceId: string) => Promise<{
+        success: boolean;
+        error?: string;
+      }>;
+      unassignPlayer: (playerId: string) => Promise<{
+        success: boolean;
+        error?: string;
+      }>;
+      listPlayers: () => Promise<{
+        success: boolean;
+        devices?: Array<{
+          player_id: string;
+          device_id: string | null;
+          name: string | null;
+        }>;
+        error?: string;
+      }>;
+      getPlayerDevice: (playerId: string) => Promise<{
+        success: boolean;
+        device_id?: string;
+        error?: string;
+      }>;
+      // Game-Specific Player Mapping API
+      setGamePlayerMapping: (
+        gameId: string,
+        playerNum: number,
+        deviceId: string
+      ) => Promise<{ success: boolean; error?: string }>;
+      clearGamePlayerMapping: (
+        gameId: string,
+        playerNum?: number
+      ) => Promise<{ success: boolean; error?: string }>;
+      listGamePlayerMappings: (gameId?: string) => Promise<{
+        success: boolean;
+        player_mappings?: Array<{
+          game_id: string;
+          player_num: number;
+          device_id: string;
+        }>;
+        error?: string;
+      }>;
       // Predefined Effects Library API
       playEffect: (effectName: string) => Promise<PlayEffectResult>;
       listEffectsLibrary: () => Promise<EffectsListResult>;
