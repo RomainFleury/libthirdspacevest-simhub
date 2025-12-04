@@ -2,10 +2,14 @@
 Mordhau Integration Manager for the vest daemon.
 
 This module provides file watching to receive game events from Mordhau.
-The events are written by the screen capture script (Plan B) that detects
-the red arch damage indicator around the crosshair.
+Events can come from two sources:
 
-Event format: timestamp|DAMAGE|direction|intensity
+1. Screen Capture (Plan B) - detects red arch damage indicator
+   Format: timestamp|DAMAGE|direction|intensity
+
+2. Blueprint Mod (ThirdSpaceHapticsMod) - direct damage event hooks
+   Format: timestamp|DAMAGE|zone|damage_type|intensity
+   Format: timestamp|DEATH|all|death|intensity
 
 When Mordhau game events are detected, they are passed to callbacks which the
 daemon uses to:
@@ -43,9 +47,10 @@ logger = logging.getLogger(__name__)
 @dataclass
 class MordhauEvent:
     """Parsed event from Mordhau log file."""
-    type: str
-    direction: str
-    intensity: int
+    type: str  # DAMAGE, DEATH, BLOCK, PARRY
+    direction: str  # front, back, left, right, all, unknown
+    intensity: int  # 0-100
+    damage_type: str = "unknown"  # slash, stab, blunt, projectile, death, unknown
     timestamp: float = 0.0
     
     def __post_init__(self):
@@ -53,11 +58,20 @@ class MordhauEvent:
             self.timestamp = time.time()
 
 
+# Valid event types
+VALID_EVENT_TYPES = {"DAMAGE", "DEATH", "BLOCK", "PARRY"}
+
+# Valid directions/zones
+VALID_DIRECTIONS = {"front", "back", "left", "right", "all", "unknown"}
+
+
 def parse_mordhau_line(line: str) -> Optional[MordhauEvent]:
     """
-    Parse a damage event line from log file.
+    Parse an event line from log file.
     
-    Format: timestamp|DAMAGE|direction|intensity
+    Supports two formats:
+    - Screen Capture (4 parts): timestamp|DAMAGE|direction|intensity
+    - Blueprint Mod (5 parts): timestamp|EVENT_TYPE|zone|damage_type|intensity
     
     Returns MordhauEvent if valid, None otherwise.
     """
@@ -66,25 +80,46 @@ def parse_mordhau_line(line: str) -> Optional[MordhauEvent]:
         return None
     
     parts = line.split('|')
-    if len(parts) != 4:
+    
+    # Must have 4 or 5 parts
+    if len(parts) not in (4, 5):
         return None
     
     try:
         timestamp_ms = int(parts[0])
-        event_type = parts[1]
-        direction = parts[2]
-        intensity = int(parts[3])
+        event_type = parts[1].upper()
         
-        if event_type != "DAMAGE":
+        # Validate event type
+        if event_type not in VALID_EVENT_TYPES:
             return None
         
         # Convert timestamp from milliseconds to seconds
         timestamp = timestamp_ms / 1000.0
         
+        # Parse based on format
+        if len(parts) == 4:
+            # Screen Capture format: timestamp|DAMAGE|direction|intensity
+            direction = parts[2].lower()
+            intensity = int(parts[3])
+            damage_type = "unknown"
+        else:
+            # Blueprint Mod format: timestamp|EVENT_TYPE|zone|damage_type|intensity
+            direction = parts[2].lower()
+            damage_type = parts[3].lower()
+            intensity = int(parts[4])
+        
+        # Validate direction
+        if direction not in VALID_DIRECTIONS:
+            direction = "unknown"
+        
+        # Clamp intensity
+        intensity = max(0, min(100, intensity))
+        
         return MordhauEvent(
             type=event_type,
             direction=direction,
             intensity=intensity,
+            damage_type=damage_type,
             timestamp=timestamp,
         )
     except (ValueError, IndexError):
@@ -148,6 +183,23 @@ def intensity_to_speed(intensity: int) -> int:
         return 3
 
 
+def damage_type_to_speed_modifier(damage_type: str) -> float:
+    """
+    Get speed modifier based on damage type.
+    
+    Some damage types feel more intense than others.
+    """
+    modifiers = {
+        "stab": 1.2,       # Stabs are sharp and intense
+        "projectile": 1.1,  # Arrows are quick and piercing
+        "slash": 1.0,       # Slashes are standard
+        "blunt": 0.9,       # Blunt is more spread out
+        "death": 1.5,       # Death is maximum intensity
+        "unknown": 1.0,     # Default
+    }
+    return modifiers.get(damage_type.lower(), 1.0)
+
+
 def map_event_to_haptics(event: MordhauEvent) -> List[tuple[int, int]]:
     """
     Map a Mordhau event to haptic commands.
@@ -158,7 +210,35 @@ def map_event_to_haptics(event: MordhauEvent) -> List[tuple[int, int]]:
     
     if event.type == "DAMAGE":
         cells = direction_to_cells(event.direction)
-        speed = intensity_to_speed(event.intensity)
+        base_speed = intensity_to_speed(event.intensity)
+        
+        # Apply damage type modifier
+        modifier = damage_type_to_speed_modifier(event.damage_type)
+        speed = min(10, max(1, int(base_speed * modifier)))
+        
+        for cell in cells:
+            commands.append((cell, speed))
+    
+    elif event.type == "DEATH":
+        # Death triggers all cells at maximum intensity
+        cells = ALL_CELLS
+        speed = 10  # Maximum
+        
+        for cell in cells:
+            commands.append((cell, speed))
+    
+    elif event.type == "BLOCK":
+        # Block is a light feedback on the direction side
+        cells = direction_to_cells(event.direction)
+        speed = 3  # Light feedback
+        
+        for cell in cells:
+            commands.append((cell, speed))
+    
+    elif event.type == "PARRY":
+        # Parry is a satisfying medium feedback
+        cells = direction_to_cells(event.direction)
+        speed = 5  # Medium feedback
         
         for cell in cells:
             commands.append((cell, speed))
@@ -286,6 +366,10 @@ class MordhauManager:
     3. Triggers haptic effects via callback
     4. Reports events via callback (for broadcasting to clients)
     
+    Supports two event sources:
+    - Screen Capture (Plan B): %LOCALAPPDATA%/Mordhau/haptic_events.log
+    - Blueprint Mod: %LOCALAPPDATA%/Mordhau/Saved/ThirdSpaceHaptics/haptic_events.log
+    
     Args:
         on_game_event: Called when a game event is detected
                       (event_type, params) -> None
@@ -293,8 +377,14 @@ class MordhauManager:
                    (cell, speed) -> None
     """
     
-    # Default path for haptic_events.log
-    DEFAULT_LOG_PATH = Path(os.environ.get("LOCALAPPDATA", ".")) / "Mordhau" / "haptic_events.log"
+    # Log path for screen capture approach
+    SCREEN_CAPTURE_LOG_PATH = Path(os.environ.get("LOCALAPPDATA", ".")) / "Mordhau" / "haptic_events.log"
+    
+    # Log path for Blueprint mod approach
+    BLUEPRINT_MOD_LOG_PATH = Path(os.environ.get("LOCALAPPDATA", ".")) / "Mordhau" / "Saved" / "ThirdSpaceHaptics" / "haptic_events.log"
+    
+    # Default to screen capture path for backward compatibility
+    DEFAULT_LOG_PATH = SCREEN_CAPTURE_LOG_PATH
     
     def __init__(
         self,
@@ -385,12 +475,16 @@ class MordhauManager:
         self._last_event_ts = event.timestamp
         self._last_event_type = event.type
         
-        logger.debug(f"Mordhau event: {event.type} - direction={event.direction}, intensity={event.intensity}")
+        logger.debug(
+            f"Mordhau event: {event.type} - direction={event.direction}, "
+            f"damage_type={event.damage_type}, intensity={event.intensity}"
+        )
         
         # Emit event to callback (for broadcasting)
         if self.on_game_event:
             self.on_game_event(event.type, {
                 "direction": event.direction,
+                "damage_type": event.damage_type,
                 "intensity": event.intensity,
                 "timestamp": event.timestamp,
             })
