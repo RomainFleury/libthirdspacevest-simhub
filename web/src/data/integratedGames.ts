@@ -83,6 +83,17 @@ export const integratedGames: IntegratedGameConfig[] = [
     hasSetupGuide: true,
     tags: ["fps", "coop", "valve", "zombie"],
   },
+  {
+    id: "tf2",
+    name: "Team Fortress 2",
+    description: "Console log-based haptic feedback for class-based combat",
+    icon: "🎯",
+    steamAppId: 440,
+    steamLaunchOptions: "-condebug",
+    hasConfiguration: true,
+    hasSetupGuide: true,
+    tags: ["fps", "team", "valve", "class-based"],
+  },
 ];
 
 /**

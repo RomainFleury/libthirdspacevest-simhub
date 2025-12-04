@@ -92,6 +92,15 @@ contextBridge.exposeInMainWorld("vestBridge", {
   l4d2CheckModInstalled: () => ipcRenderer.invoke("l4d2:checkModInstalled"),
   l4d2InstallMod: () => ipcRenderer.invoke("l4d2:installMod"),
 
+  // Team Fortress 2 Integration API
+  tf2Start: (logPath, playerName) => ipcRenderer.invoke("tf2:start", logPath, playerName),
+  tf2Stop: () => ipcRenderer.invoke("tf2:stop"),
+  tf2Status: () => ipcRenderer.invoke("tf2:status"),
+  tf2BrowseLogPath: () => ipcRenderer.invoke("tf2:browseLogPath"),
+  tf2GetSettings: () => ipcRenderer.invoke("tf2:getSettings"),
+  tf2SetLogPath: (logPath) => ipcRenderer.invoke("tf2:setLogPath", logPath),
+  tf2SetPlayerName: (playerName) => ipcRenderer.invoke("tf2:setPlayerName", playerName),
+
   // Predefined Effects Library API
   playEffect: (effectName) => ipcRenderer.invoke("effects:play", effectName),
   listEffectsLibrary: () => ipcRenderer.invoke("effects:list"),
