@@ -18,17 +18,51 @@ Events are written to:
 %LOCALAPPDATA%\Mordhau\Saved\ThirdSpaceHaptics\haptic_events.log
 ```
 
-Each line:
+Each line (v2 format with angle):
 ```
-{timestamp}|{event_type}|{zone}|{damage_type}|{intensity}
+{timestamp}|{event_type}|{angle}|{zone}|{damage_type}|{intensity}
 ```
 
 Example:
 ```
-1704067200000|DAMAGE|front|slash|45
-1704067200500|DAMAGE|back|stab|75
-1704067201000|DEATH|all|death|100
+1704067200000|DAMAGE|0.0|front|slash|45
+1704067200100|DAMAGE|45.5|front-right|slash|60
+1704067200200|DAMAGE|135.0|back-right|stab|75
+1704067200300|DAMAGE|270.0|left|projectile|30
+1704067200400|DAMAGE|315.0|front-left|blunt|50
+1704067201000|DEATH|-1|all|death|100
 ```
+
+### Angle Convention
+
+The angle represents the direction of the damage from the **player's perspective**:
+
+```
+                0° (Front)
+                   │
+  315° (Front-Left)│ 45° (Front-Right)
+              ╲    │    ╱
+               ╲   │   ╱
+270° (Left) ───────●─────── 90° (Right)
+               ╱   │   ╲
+              ╱    │    ╲
+  225° (Back-Left) │ 135° (Back-Right)
+                   │
+               180° (Back)
+```
+
+### 8-Zone Mapping
+
+| Zone | Angle Range | Description |
+|------|-------------|-------------|
+| front | 337.5° - 22.5° | Damage from ahead |
+| front-right | 22.5° - 67.5° | Damage from front-right |
+| right | 67.5° - 112.5° | Damage from right |
+| back-right | 112.5° - 157.5° | Damage from back-right |
+| back | 157.5° - 202.5° | Damage from behind |
+| back-left | 202.5° - 247.5° | Damage from back-left |
+| left | 247.5° - 292.5° | Damage from left |
+| front-left | 292.5° - 337.5° | Damage from front-left |
 
 ## Installation
 
@@ -128,15 +162,31 @@ Once the mod is installed:
    - Damage events trigger haptic feedback
    - Direction maps to vest cells
 
-### Haptic Mapping
+### Haptic Mapping (8-Zone Precision)
 
-| Damage Zone | Vest Cells | Description |
-|-------------|------------|-------------|
-| Front | 2, 3, 4, 5 | Front-left and front-right |
-| Back | 0, 1, 6, 7 | Back-left and back-right |
-| Left | 0, 1, 2, 3 | Left side (front and back) |
-| Right | 4, 5, 6, 7 | Right side (front and back) |
-| All (death) | All 8 | Full body feedback |
+The vest has 8 cells, and we map damage angles to specific cells:
+
+```
+      FRONT                    BACK
+  ┌─────┬─────┐          ┌─────┬─────┐
+  │  2  │  5  │  Upper   │  1  │  6  │
+  ├─────┼─────┤          ├─────┼─────┤
+  │  3  │  4  │  Lower   │  0  │  7  │
+  └─────┴─────┘          └─────┴─────┘
+    L     R                L     R
+```
+
+| Zone | Angle Range | Vest Cells | Description |
+|------|-------------|------------|-------------|
+| front | 337.5° - 22.5° | 2, 3, 4, 5 | All front cells |
+| front-right | 22.5° - 67.5° | 4, 5 | Front-right only |
+| right | 67.5° - 112.5° | 4, 5, 6, 7 | Right side |
+| back-right | 112.5° - 157.5° | 6, 7 | Back-right only |
+| back | 157.5° - 202.5° | 0, 1, 6, 7 | All back cells |
+| back-left | 202.5° - 247.5° | 0, 1 | Back-left only |
+| left | 247.5° - 292.5° | 0, 1, 2, 3 | Left side |
+| front-left | 292.5° - 337.5° | 2, 3 | Front-left only |
+| all (death) | N/A | 0-7 | All cells |
 
 ### Intensity Mapping
 

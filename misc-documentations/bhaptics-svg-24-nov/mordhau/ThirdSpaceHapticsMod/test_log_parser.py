@@ -31,7 +31,8 @@ class DamageEvent:
     """Parsed damage event from log file."""
     timestamp: int  # milliseconds
     event_type: str  # DAMAGE, DEATH, BLOCK, PARRY
-    zone: str  # front, back, left, right, all
+    angle: float  # 0-360 degrees, -1 for unknown
+    zone: str  # front, front-right, right, back-right, back, back-left, left, front-left, all
     damage_type: str  # slash, stab, blunt, projectile, unknown
     intensity: int  # 0-100
     
@@ -41,10 +42,11 @@ class DamageEvent:
         return datetime.fromtimestamp(self.timestamp / 1000.0)
     
     def __str__(self) -> str:
+        angle_str = f"{self.angle:.1f}°" if self.angle >= 0 else "N/A"
         return (
             f"[{self.datetime.strftime('%H:%M:%S.%f')[:-3]}] "
-            f"{self.event_type}: zone={self.zone}, type={self.damage_type}, "
-            f"intensity={self.intensity}"
+            f"{self.event_type}: angle={angle_str} ({self.zone}), "
+            f"type={self.damage_type}, intensity={self.intensity}"
         )
 
 
@@ -52,12 +54,39 @@ class DamageEvent:
 # Log Parser
 # =============================================================================
 
+def angle_to_zone(angle: float) -> str:
+    """Convert angle to 8-zone direction."""
+    if angle < 0:
+        return "unknown"
+    
+    angle = angle % 360
+    
+    if 337.5 <= angle or angle < 22.5:
+        return "front"
+    elif 22.5 <= angle < 67.5:
+        return "front-right"
+    elif 67.5 <= angle < 112.5:
+        return "right"
+    elif 112.5 <= angle < 157.5:
+        return "back-right"
+    elif 157.5 <= angle < 202.5:
+        return "back"
+    elif 202.5 <= angle < 247.5:
+        return "back-left"
+    elif 247.5 <= angle < 292.5:
+        return "left"
+    else:
+        return "front-left"
+
+
 def parse_line(line: str) -> Optional[DamageEvent]:
     """
     Parse a single line from the log file.
     
-    Format: timestamp|event_type|zone|damage_type|intensity
-    Example: 1704067200000|DAMAGE|front|slash|45
+    Supports multiple formats:
+    - v1 (5 parts): timestamp|event_type|zone|damage_type|intensity
+    - v2 (6 parts): timestamp|event_type|angle|zone|damage_type|intensity
+    - Screen capture (4 parts): timestamp|DAMAGE|direction|intensity
     
     Returns DamageEvent if valid, None otherwise.
     """
@@ -66,23 +95,55 @@ def parse_line(line: str) -> Optional[DamageEvent]:
         return None
     
     parts = line.split('|')
-    if len(parts) != 5:
+    
+    # Must have 4, 5, or 6 parts
+    if len(parts) not in (4, 5, 6):
         return None
     
     try:
         timestamp = int(parts[0])
         event_type = parts[1].upper()
-        zone = parts[2].lower()
-        damage_type = parts[3].lower()
-        intensity = int(parts[4])
         
         # Validate event type
         if event_type not in ('DAMAGE', 'DEATH', 'BLOCK', 'PARRY'):
             return None
         
-        # Validate zone
-        if zone not in ('front', 'back', 'left', 'right', 'all', 'unknown'):
-            return None
+        # Parse based on format
+        if len(parts) == 4:
+            # Screen capture format: timestamp|DAMAGE|direction|intensity
+            direction = parts[2].lower()
+            intensity = int(parts[3])
+            damage_type = "unknown"
+            # Convert direction to approximate angle
+            direction_angles = {
+                'front': 0.0, 'right': 90.0, 'back': 180.0, 'left': 270.0,
+                'all': -1.0, 'unknown': -1.0
+            }
+            angle = direction_angles.get(direction, -1.0)
+            zone = direction if direction in ('front', 'back', 'left', 'right', 'all', 'unknown') else 'unknown'
+        
+        elif len(parts) == 5:
+            # v1 format: timestamp|event_type|zone|damage_type|intensity
+            zone = parts[2].lower()
+            damage_type = parts[3].lower()
+            intensity = int(parts[4])
+            # Convert zone to approximate angle
+            zone_angles = {
+                'front': 0.0, 'front-right': 45.0, 'right': 90.0, 'back-right': 135.0,
+                'back': 180.0, 'back-left': 225.0, 'left': 270.0, 'front-left': 315.0,
+                'all': -1.0, 'unknown': -1.0
+            }
+            angle = zone_angles.get(zone, -1.0)
+        
+        else:  # 6 parts
+            # v2 format: timestamp|event_type|angle|zone|damage_type|intensity
+            angle = float(parts[2])
+            zone = parts[3].lower()
+            damage_type = parts[4].lower()
+            intensity = int(parts[5])
+            # Derive zone from angle if zone is empty/unknown
+            if zone in ('', 'unknown') and angle >= 0:
+                zone = angle_to_zone(angle)
         
         # Validate intensity
         intensity = max(0, min(100, intensity))
@@ -90,6 +151,7 @@ def parse_line(line: str) -> Optional[DamageEvent]:
         return DamageEvent(
             timestamp=timestamp,
             event_type=event_type,
+            angle=angle,
             zone=zone,
             damage_type=damage_type,
             intensity=intensity
@@ -145,9 +207,13 @@ def get_zone_emoji(zone: str) -> str:
     """Get emoji indicator for damage zone."""
     return {
         'front': '⬆️ ',
-        'back': '⬇️ ',
-        'left': '⬅️ ',
+        'front-right': '↗️ ',
         'right': '➡️ ',
+        'back-right': '↘️ ',
+        'back': '⬇️ ',
+        'back-left': '↙️ ',
+        'left': '⬅️ ',
+        'front-left': '↖️ ',
         'all': '🔥',
         'unknown': '❓',
     }.get(zone, '❓')
@@ -165,13 +231,16 @@ def display_event(event: DamageEvent):
     emoji = get_zone_emoji(event.zone)
     bar = get_intensity_bar(event.intensity)
     
+    # Format angle
+    angle_str = f"{event.angle:6.1f}°" if event.angle >= 0 else "   N/A"
+    
     # Color code based on event type
     if event.event_type == 'DEATH':
         print(f"\n💀 {event.datetime.strftime('%H:%M:%S.%f')[:-3]} - PLAYER DEATH!")
         print(f"   {bar} Intensity: {event.intensity}%")
     else:
         print(f"\n{emoji} {event.datetime.strftime('%H:%M:%S.%f')[:-3]} - {event.event_type}")
-        print(f"   Zone: {event.zone.upper():<8} Type: {event.damage_type:<12}")
+        print(f"   Angle: {angle_str}  Zone: {event.zone:<12} Type: {event.damage_type:<12}")
         print(f"   {bar} Intensity: {event.intensity}%")
 
 
@@ -183,7 +252,7 @@ def simulate_events(log_path: Path):
     """Generate fake events for testing without the game."""
     import random
     
-    print("\n🎮 SIMULATION MODE")
+    print("\n🎮 SIMULATION MODE (v2 with angles)")
     print("=" * 50)
     print(f"Writing fake events to: {log_path}")
     print("Press Ctrl+C to stop\n")
@@ -191,7 +260,6 @@ def simulate_events(log_path: Path):
     # Create directory if needed
     log_path.parent.mkdir(parents=True, exist_ok=True)
     
-    zones = ['front', 'back', 'left', 'right']
     damage_types = ['slash', 'stab', 'blunt', 'projectile']
     
     try:
@@ -202,16 +270,26 @@ def simulate_events(log_path: Path):
                 ['DAMAGE', 'DEATH'],
                 weights=[0.9, 0.1]
             )[0]
-            zone = random.choice(zones) if event_type == 'DAMAGE' else 'all'
-            damage_type = random.choice(damage_types)
+            
+            if event_type == 'DAMAGE':
+                # Random angle 0-360
+                angle = random.uniform(0, 360)
+                zone = angle_to_zone(angle)
+            else:
+                # Death event
+                angle = -1
+                zone = 'all'
+            
+            damage_type = random.choice(damage_types) if event_type == 'DAMAGE' else 'death'
             intensity = random.randint(20, 100)
             
-            # Write to log
-            line = f"{timestamp}|{event_type}|{zone}|{damage_type}|{intensity}\n"
+            # Write to log (v2 format with angle)
+            line = f"{timestamp}|{event_type}|{angle:.1f}|{zone}|{damage_type}|{intensity}\n"
             with open(log_path, 'a') as f:
                 f.write(line)
             
-            print(f"Generated: {event_type} {zone} {damage_type} {intensity}")
+            angle_str = f"{angle:.1f}°" if angle >= 0 else "N/A"
+            print(f"Generated: {event_type} angle={angle_str} ({zone}) {damage_type} {intensity}")
             
             # Random delay between events
             delay = random.uniform(1.0, 5.0)

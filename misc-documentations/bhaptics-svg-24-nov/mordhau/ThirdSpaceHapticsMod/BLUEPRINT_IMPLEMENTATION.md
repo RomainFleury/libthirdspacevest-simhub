@@ -86,7 +86,7 @@ Custom Event: OnPlayerDamaged
     │   - InstigatedBy (Actor)
     │   - DamageCauser (Actor)
     │
-    ├──► Calculate Direction to Damage Source
+    ├──► Calculate Angle to Damage Source
     │       │
     │       ├──► Get Player Location (from LocalPlayerController → GetPawn → GetActorLocation)
     │       │
@@ -98,16 +98,30 @@ Custom Event: OnPlayerDamaged
     │       │
     │       ├──► Calculate Direction Vector (DamageSourceLocation - PlayerLocation → Normalize)
     │       │
-    │       └──► Calculate Angle between Forward and Direction
+    │       └──► Calculate Angle (0-360°)
     │               │
-    │               └──► Use Dot Product and Cross Product to get signed angle
+    │               ├──► DotProduct = Forward · Direction
+    │               ├──► CrossProduct = Forward × Direction (Z component)
+    │               ├──► BaseAngle = ArcCos(DotProduct) → degrees
+    │               └──► If CrossProduct < 0: Angle = 360 - BaseAngle
+    │                    Else: Angle = BaseAngle
     │
-    ├──► Determine Damage Zone (from angle)
+    │       Angle Convention (player's perspective):
+    │           0°   = Front (damage from ahead)
+    │           90°  = Right (damage from right)
+    │           180° = Back (damage from behind)
+    │           270° = Left (damage from left)
+    │
+    ├──► Determine Zone from Angle (for logging, optional)
     │       │
-    │       ├──► If angle > -45 AND angle < 45 → "front"
-    │       ├──► If angle >= 45 AND angle < 135 → "right"
-    │       ├──► If angle >= 135 OR angle < -135 → "back"
-    │       └──► If angle >= -135 AND angle < -45 → "left"
+    │       ├──► 337.5° - 22.5°  → "front"
+    │       ├──► 22.5° - 67.5°   → "front-right"
+    │       ├──► 67.5° - 112.5°  → "right"
+    │       ├──► 112.5° - 157.5° → "back-right"
+    │       ├──► 157.5° - 202.5° → "back"
+    │       ├──► 202.5° - 247.5° → "back-left"
+    │       ├──► 247.5° - 292.5° → "left"
+    │       └──► 292.5° - 337.5° → "front-left"
     │
     ├──► Get Damage Type String
     │       │
@@ -123,7 +137,55 @@ Custom Event: OnPlayerDamaged
     │
     └──► Call Function: WriteToLogFile
             │
-            └──► Format: "DAMAGE|{zone}|{damage_type}|{intensity}|{timestamp}"
+            └──► Format: "{timestamp}|DAMAGE|{angle}|{zone}|{damage_type}|{intensity}"
+```
+
+### 2.4.1 Angle Calculation Blueprint Nodes
+
+Here's the detailed Blueprint for calculating the damage angle:
+
+```
+[Get Player Pawn] → [GetActorLocation] → PlayerLocation
+[DamageCauser] → [GetActorLocation] → DamageLocation
+
+[DamageLocation] - [PlayerLocation] → DirectionVector
+[DirectionVector] → [Normalize] → NormalizedDirection
+
+[Get Player Pawn] → [GetActorForwardVector] → ForwardVector
+
+[ForwardVector] · [NormalizedDirection] → DotProduct (using Dot Product node)
+[ForwardVector] × [NormalizedDirection] → CrossProduct (using Cross Product node)
+
+[DotProduct] → [Acos] → [RadiansToDegrees] → BaseAngle
+
+[CrossProduct] → [Break Vector] → Z component
+
+Branch: If Z < 0
+    True:  Angle = 360 - BaseAngle
+    False: Angle = BaseAngle
+```
+
+### 2.4.2 Zone from Angle (Helper Function)
+
+Create a Blueprint Function to convert angle to zone string:
+
+```
+Function: AngleToZone
+Input: Angle (Float)
+Output: Zone (String)
+
+Logic:
+    Normalize Angle to 0-360 (Angle % 360)
+    
+    Select based on ranges:
+        Default: "front"
+        22.5 - 67.5: "front-right"
+        67.5 - 112.5: "right"
+        112.5 - 157.5: "back-right"
+        157.5 - 202.5: "back"
+        202.5 - 247.5: "back-left"
+        247.5 - 292.5: "left"
+        292.5 - 337.5: "front-left"
 ```
 
 ### 2.5 Function: WriteToLogFile
@@ -133,7 +195,8 @@ Function: WriteToLogFile
     │
     │   Inputs:
     │   - EventType (String)
-    │   - Zone (String)
+    │   - Angle (Float)        ← NEW: Precise angle 0-360°
+    │   - Zone (String)        ← Human-readable zone (front-left, back-right, etc.)
     │   - DamageType (String)
     │   - Intensity (Integer)
     │
@@ -141,7 +204,9 @@ Function: WriteToLogFile
     │
     ├──► Format String
     │       │
-    │       └──► "{timestamp}|{EventType}|{zone}|{damage_type}|{intensity}"
+    │       └──► "{timestamp}|{EventType}|{angle}|{zone}|{damage_type}|{intensity}"
+    │
+    │       Example: "1704067200000|DAMAGE|45.5|front-right|slash|75"
     │
     ├──► Get Log File Path
     │       │
@@ -253,17 +318,20 @@ C:\Users\{Username}\AppData\Local\Mordhau\Saved\ThirdSpaceHaptics\haptic_events.
 
 ## Step 5: Log Format
 
-Each line follows this format:
+Each line follows this format (v2 with angle):
 ```
-{timestamp}|{event_type}|{zone}|{damage_type}|{intensity}
+{timestamp}|{event_type}|{angle}|{zone}|{damage_type}|{intensity}
 ```
 
 ### Examples:
 ```
-1704067200000|DAMAGE|front|slash|45
-1704067200200|DAMAGE|back|stab|75
-1704067200500|DAMAGE|left|projectile|30
-1704067201000|DEATH|all|death|100
+1704067200000|DAMAGE|0.0|front|slash|45
+1704067200100|DAMAGE|45.5|front-right|slash|60
+1704067200200|DAMAGE|135.0|back-right|stab|75
+1704067200300|DAMAGE|225.0|back-left|blunt|50
+1704067200500|DAMAGE|270.0|left|projectile|30
+1704067200600|DAMAGE|315.0|front-left|slash|40
+1704067201000|DEATH|-1|all|death|100
 ```
 
 ### Field Descriptions:
@@ -272,9 +340,46 @@ Each line follows this format:
 |-------|-------------|--------|
 | timestamp | Unix timestamp in milliseconds | Integer |
 | event_type | Type of event | `DAMAGE`, `DEATH`, `BLOCK`, `PARRY` |
-| zone | Body zone hit | `front`, `back`, `left`, `right`, `all` |
+| angle | Direction angle in degrees | `0.0` to `360.0`, or `-1` for unknown/all |
+| zone | Human-readable zone (8 zones) | See zone table below |
 | damage_type | Weapon/damage type | `slash`, `stab`, `blunt`, `projectile`, `unknown` |
 | intensity | Damage intensity (0-100) | Integer |
+
+### Angle Convention
+
+The angle is from the **player's perspective**:
+
+```
+                    0° (Front)
+                       │
+                       │
+    315° (Front-Left)  │  45° (Front-Right)
+              ╲        │        ╱
+               ╲       │       ╱
+                ╲      │      ╱
+    270° (Left) ───────●─────── 90° (Right)
+                ╱      │      ╲
+               ╱       │       ╲
+              ╱        │        ╲
+    225° (Back-Left)   │  135° (Back-Right)
+                       │
+                       │
+                   180° (Back)
+```
+
+### Zone Table (8 Zones)
+
+| Zone | Angle Range | Vest Cells |
+|------|-------------|------------|
+| front | 337.5° - 22.5° | 2, 3, 4, 5 (all front) |
+| front-right | 22.5° - 67.5° | 4, 5 (front-right) |
+| right | 67.5° - 112.5° | 4, 5, 6, 7 (right side) |
+| back-right | 112.5° - 157.5° | 6, 7 (back-right) |
+| back | 157.5° - 202.5° | 0, 1, 6, 7 (all back) |
+| back-left | 202.5° - 247.5° | 0, 1 (back-left) |
+| left | 247.5° - 292.5° | 0, 1, 2, 3 (left side) |
+| front-left | 292.5° - 337.5° | 2, 3 (front-left) |
+| all | -1 (special) | 0-7 (all cells) |
 
 ## Step 6: Server Actor Registration
 

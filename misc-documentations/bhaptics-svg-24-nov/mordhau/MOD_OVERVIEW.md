@@ -24,10 +24,13 @@ A UE4 Blueprint mod that directly hooks into Mordhau's damage system.
 - `ThirdSpaceHapticsMod/BLUEPRINT_IMPLEMENTATION.md` - Step-by-step implementation guide
 - `ThirdSpaceHapticsMod/test_log_parser.py` - Testing utility
 
-**Log Format:**
+**Log Format (v2 with angle):**
 ```
-{timestamp}|{event_type}|{zone}|{damage_type}|{intensity}
+{timestamp}|{event_type}|{angle}|{zone}|{damage_type}|{intensity}
 ```
+
+The angle (0-360°) enables precise 8-zone haptic mapping:
+- `front`, `front-right`, `right`, `back-right`, `back`, `back-left`, `left`, `front-left`
 
 ### Approach 2: Screen Capture (Plan B)
 
@@ -150,19 +153,54 @@ Uses screen capture to detect the red damage arch that appears around the crossh
 
 ## Haptic Mapping
 
-Both approaches use the same haptic mapping in the daemon:
+Both approaches use the same haptic mapping in the daemon. The Blueprint mod uses **angle-based mapping** for precise 8-zone feedback:
+
+### Vest Cell Layout
+
+```
+      FRONT                    BACK
+  ┌─────┬─────┐          ┌─────┬─────┐
+  │  2  │  5  │  Upper   │  1  │  6  │
+  ├─────┼─────┤          ├─────┼─────┤
+  │  3  │  4  │  Lower   │  0  │  7  │
+  └─────┴─────┘          └─────┴─────┘
+    L     R                L     R
+```
+
+### 8-Zone Mapping (Angle-Based)
 
 ```python
-# Damage direction → Vest cells
-DIRECTION_CELLS = {
-    "front": [2, 3, 4, 5],  # Front cells
-    "back": [0, 1, 6, 7],   # Back cells
-    "left": [0, 1, 2, 3],   # Left side
-    "right": [4, 5, 6, 7],  # Right side
-    "all": [0, 1, 2, 3, 4, 5, 6, 7],  # All cells
-}
+# Angle → Vest cells (precise mapping)
+def angle_to_cells(angle: float) -> List[int]:
+    # Normalize to 0-360
+    angle = angle % 360
+    
+    if 337.5 <= angle or angle < 22.5:   return [2, 3, 4, 5]  # front
+    elif 22.5 <= angle < 67.5:           return [4, 5]        # front-right
+    elif 67.5 <= angle < 112.5:          return [4, 5, 6, 7]  # right
+    elif 112.5 <= angle < 157.5:         return [6, 7]        # back-right
+    elif 157.5 <= angle < 202.5:         return [0, 1, 6, 7]  # back
+    elif 202.5 <= angle < 247.5:         return [0, 1]        # back-left
+    elif 247.5 <= angle < 292.5:         return [0, 1, 2, 3]  # left
+    else:                                 return [2, 3]        # front-left
+```
 
-# Intensity → Haptic speed
+### Zone Summary
+
+| Zone | Angle Range | Vest Cells |
+|------|-------------|------------|
+| front | 337.5° - 22.5° | 2, 3, 4, 5 |
+| front-right | 22.5° - 67.5° | 4, 5 |
+| right | 67.5° - 112.5° | 4, 5, 6, 7 |
+| back-right | 112.5° - 157.5° | 6, 7 |
+| back | 157.5° - 202.5° | 0, 1, 6, 7 |
+| back-left | 202.5° - 247.5° | 0, 1 |
+| left | 247.5° - 292.5° | 0, 1, 2, 3 |
+| front-left | 292.5° - 337.5° | 2, 3 |
+
+### Intensity → Haptic Speed
+
+```python
 def intensity_to_speed(intensity: int) -> int:
     if intensity >= 80: return 9
     if intensity >= 60: return 7
