@@ -341,6 +341,169 @@ def _cs2_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_kcd(args: argparse.Namespace) -> int:
+    """Handle KCD integration subcommands."""
+    action = getattr(args, "kcd_action", None) or "start"
+    
+    if action == "start":
+        return _kcd_start(args)
+    elif action == "stop":
+        return _kcd_stop(args)
+    elif action == "status":
+        return _kcd_status(args)
+    else:
+        print(f"Unknown KCD action: {action}")
+        return 1
+
+
+def _kcd_start(args: argparse.Namespace) -> int:
+    """Start KCD integration via daemon."""
+    import socket
+    import json
+    
+    daemon_host = getattr(args, "daemon_host", "127.0.0.1")
+    daemon_port = getattr(args, "daemon_port", 5050)
+    log_path = getattr(args, "log_path", None)
+    
+    print(f"[KCD] Starting Kingdom Come: Deliverance integration...")
+    print(f"   Daemon: {daemon_host}:{daemon_port}")
+    if log_path:
+        print(f"   Log path: {log_path}")
+    else:
+        print(f"   Log path: auto-detect")
+    print()
+    
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(5.0)
+        sock.connect((daemon_host, daemon_port))
+        
+        # Send kcd_start command
+        cmd = {"cmd": "kcd_start"}
+        if log_path:
+            cmd["log_path"] = log_path
+        
+        sock.sendall((json.dumps(cmd) + "\n").encode())
+        
+        # Read response
+        response_line = sock.recv(4096).decode().strip()
+        response = json.loads(response_line)
+        
+        sock.close()
+        
+        if response.get("success"):
+            print("[OK] KCD integration started")
+            if response.get("log_path"):
+                print(f"   Watching: {response['log_path']}")
+            return 0
+        else:
+            print(f"[ERROR] {response.get('message', 'Unknown error')}")
+            return 1
+            
+    except ConnectionRefusedError:
+        print(f"[ERROR] Could not connect to daemon at {daemon_host}:{daemon_port}")
+        print("   Make sure the daemon is running: python -m modern_third_space.cli daemon start")
+        return 1
+    except Exception as e:
+        print(f"[ERROR] {e}")
+        return 1
+
+
+def _kcd_stop(args: argparse.Namespace) -> int:
+    """Stop KCD integration via daemon."""
+    import socket
+    import json
+    
+    daemon_host = getattr(args, "daemon_host", "127.0.0.1")
+    daemon_port = getattr(args, "daemon_port", 5050)
+    
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(5.0)
+        sock.connect((daemon_host, daemon_port))
+        
+        # Send kcd_stop command
+        cmd = {"cmd": "kcd_stop"}
+        sock.sendall((json.dumps(cmd) + "\n").encode())
+        
+        # Read response
+        response_line = sock.recv(4096).decode().strip()
+        response = json.loads(response_line)
+        
+        sock.close()
+        
+        if response.get("success"):
+            print("[OK] KCD integration stopped")
+            return 0
+        else:
+            print(f"[ERROR] {response.get('message', 'Unknown error')}")
+            return 1
+            
+    except ConnectionRefusedError:
+        print(f"[ERROR] Could not connect to daemon at {daemon_host}:{daemon_port}")
+        print("   Make sure the daemon is running: python -m modern_third_space.cli daemon start")
+        return 1
+    except Exception as e:
+        print(f"[ERROR] {e}")
+        return 1
+
+
+def _kcd_status(args: argparse.Namespace) -> int:
+    """Check KCD integration status via daemon."""
+    import socket
+    import json
+    
+    daemon_host = getattr(args, "daemon_host", "127.0.0.1")
+    daemon_port = getattr(args, "daemon_port", 5050)
+    
+    print("[KCD] Kingdom Come: Deliverance Integration Status")
+    print("=" * 50)
+    
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(5.0)
+        sock.connect((daemon_host, daemon_port))
+        
+        # Send kcd_status command
+        cmd = {"cmd": "kcd_status"}
+        sock.sendall((json.dumps(cmd) + "\n").encode())
+        
+        # Read response
+        response_line = sock.recv(4096).decode().strip()
+        response = json.loads(response_line)
+        
+        sock.close()
+        
+        if response.get("running"):
+            print("Status: 🟢 Running")
+            if response.get("log_path"):
+                print(f"Log file: {response['log_path']}")
+            if response.get("events_received") is not None:
+                print(f"Events received: {response['events_received']}")
+            if response.get("last_event_ts"):
+                import datetime
+                ts = response['last_event_ts']
+                dt = datetime.datetime.fromtimestamp(ts)
+                print(f"Last event: {dt.strftime('%Y-%m-%d %H:%M:%S')}")
+            if response.get("last_event_type"):
+                print(f"Last event type: {response['last_event_type']}")
+        else:
+            print("Status: 🔴 Not running")
+        
+        print()
+        return 0
+        
+    except ConnectionRefusedError:
+        print(f"Daemon: 🔴 Not running (could not connect to {daemon_host}:{daemon_port})")
+        print("   Start daemon: python -m modern_third_space.cli daemon start")
+        print()
+        return 1
+    except Exception as e:
+        print(f"[ERROR] {e}")
+        print()
+        return 1
+
+
 COMMANDS: Dict[str, Any] = {
     "status": _cmd_status,
     "trigger": _cmd_trigger,
@@ -351,6 +514,7 @@ COMMANDS: Dict[str, Any] = {
     "connect": _cmd_connect,
     "daemon": _cmd_daemon,
     "cs2": _cmd_cs2,
+    "kcd": _cmd_kcd,
 }
 
 
@@ -425,6 +589,28 @@ def build_parser() -> argparse.ArgumentParser:
     cs2_status.add_argument("--gsi-port", type=int, default=3000, help="GSI server port")
     cs2_status.add_argument("--daemon-host", type=str, default="127.0.0.1", help="Vest daemon host")
     
+    # -------------------------------------------------------------------------
+    # Kingdom Come: Deliverance commands
+    # -------------------------------------------------------------------------
+    kcd = sub.add_parser("kcd", help="Kingdom Come: Deliverance integration")
+    kcd_sub = kcd.add_subparsers(dest="kcd_action")
+    
+    # kcd start
+    kcd_start = kcd_sub.add_parser("start", help="Start KCD integration")
+    kcd_start.add_argument("--daemon-host", type=str, default="127.0.0.1", help="Vest daemon host")
+    kcd_start.add_argument("--daemon-port", type=int, default=5050, help="Vest daemon port")
+    kcd_start.add_argument("--log-path", type=str, help="Path to KCD log file (auto-detect if not set)")
+    
+    # kcd stop
+    kcd_stop = kcd_sub.add_parser("stop", help="Stop KCD integration")
+    kcd_stop.add_argument("--daemon-host", type=str, default="127.0.0.1", help="Vest daemon host")
+    kcd_stop.add_argument("--daemon-port", type=int, default=5050, help="Vest daemon port")
+    
+    # kcd status
+    kcd_status = kcd_sub.add_parser("status", help="Check KCD integration status")
+    kcd_status.add_argument("--daemon-host", type=str, default="127.0.0.1", help="Vest daemon host")
+    kcd_status.add_argument("--daemon-port", type=int, default=5050, help="Vest daemon port")
+    
     return parser
 
 
@@ -447,6 +633,8 @@ def main(argv: list[str] | None = None) -> int:
     if command == "daemon":
         return handler(args)
     if command == "cs2":
+        return handler(args)
+    if command == "kcd":
         return handler(args)
     
     # Commands that need a controller
