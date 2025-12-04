@@ -92,6 +92,12 @@ contextBridge.exposeInMainWorld("vestBridge", {
   l4d2CheckModInstalled: () => ipcRenderer.invoke("l4d2:checkModInstalled"),
   l4d2InstallMod: () => ipcRenderer.invoke("l4d2:installMod"),
 
+  // Kingdom Come: Deliverance 2 Integration API
+  kcd2Start: (logPath) => ipcRenderer.invoke("kcd2:start", logPath),
+  kcd2Stop: () => ipcRenderer.invoke("kcd2:stop"),
+  kcd2Status: () => ipcRenderer.invoke("kcd2:status"),
+  kcd2GetModInfo: () => ipcRenderer.invoke("kcd2:getModInfo"),
+
   // Predefined Effects Library API
   playEffect: (effectName) => ipcRenderer.invoke("effects:play", effectName),
   listEffectsLibrary: () => ipcRenderer.invoke("effects:list"),

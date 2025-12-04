@@ -14,6 +14,7 @@ const { registerSuperHotHandlers } = require("./superhotHandlers.cjs");
 const { registerPistolWhipHandlers } = require("./pistolwhipHandlers.cjs");
 const { registerStarCitizenHandlers } = require("./starcitizenHandlers.cjs");
 const { registerL4D2Handlers } = require("./l4d2Handlers.cjs");
+const { registerKCD2Handlers } = require("./kcd2Handlers.cjs");
 const { registerEffectsHandlers } = require("./effectsHandlers.cjs");
 const { registerBF2Handlers } = require("./bf2Handlers.cjs");
 const { registerMultiVestHandlers } = require("./multiVestHandlers.cjs");
@@ -49,6 +50,9 @@ function registerAllHandlers(getDaemonBridge, getMainWindow, reconnectToDaemon) 
   // Left 4 Dead 2 integration handlers
   registerL4D2Handlers(getMainWindow);
 
+  // Kingdom Come: Deliverance 2 integration handlers
+  registerKCD2Handlers();
+
   // Predefined effects library handlers
   registerEffectsHandlers();
 
@@ -69,6 +73,7 @@ module.exports = {
   registerAlyxHandlers,
   registerSuperHotHandlers,
   registerPistolWhipHandlers,
+  registerKCD2Handlers,
   registerEffectsHandlers,
   registerBF2Handlers,
 };

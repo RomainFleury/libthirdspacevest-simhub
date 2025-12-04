@@ -127,6 +127,45 @@ export type AlyxModInfoResult = {
   error?: string;
 };
 
+// Kingdom Come: Deliverance 2 types
+export type KCD2Status = {
+  running: boolean;
+  log_path?: string | null;
+  events_received?: number;
+  last_event_ts?: number | null;
+  last_event_type?: string | null;
+  error?: string;
+};
+
+export type KCD2StartResult = {
+  success: boolean;
+  log_path?: string;
+  error?: string;
+};
+
+export type KCD2StopResult = {
+  success: boolean;
+  error?: string;
+};
+
+export type KCD2ModInfo = {
+  name: string;
+  description: string;
+  version: string;
+  download_url: string;
+  github_url: string;
+  modding_docs: string;
+  files: string[];
+  install_instructions: string[];
+  console_commands: string[];
+};
+
+export type KCD2ModInfoResult = {
+  success: boolean;
+  mod_info?: KCD2ModInfo;
+  error?: string;
+};
+
 // Predefined Effects Library types
 export type EffectStep = {
   cells: number[];
@@ -207,6 +246,11 @@ declare global {
       alyxStop: () => Promise<AlyxStopResult>;
       alyxStatus: () => Promise<AlyxStatus>;
       alyxGetModInfo: () => Promise<AlyxModInfoResult>;
+      // Kingdom Come: Deliverance 2 API
+      kcd2Start: (logPath?: string) => Promise<KCD2StartResult>;
+      kcd2Stop: () => Promise<KCD2StopResult>;
+      kcd2Status: () => Promise<KCD2Status>;
+      kcd2GetModInfo: () => Promise<KCD2ModInfoResult>;
       // SUPERHOT VR Integration API
       superhotStart: () => Promise<{ success: boolean; error?: string }>;
       superhotStop: () => Promise<{ success: boolean; error?: string }>;
@@ -619,6 +663,39 @@ export async function alyxStatus(): Promise<AlyxStatus> {
  */
 export async function alyxGetModInfo(): Promise<AlyxModInfoResult> {
   return await ensureBridge().alyxGetModInfo();
+}
+
+// -------------------------------------------------------------------------
+// Kingdom Come: Deliverance 2 Integration
+// -------------------------------------------------------------------------
+
+/**
+ * Start the KCD2 log watcher.
+ * @param logPath Optional path to game.log (auto-detect if not provided)
+ */
+export async function kcd2Start(logPath?: string): Promise<KCD2StartResult> {
+  return await ensureBridge().kcd2Start(logPath);
+}
+
+/**
+ * Stop the KCD2 log watcher.
+ */
+export async function kcd2Stop(): Promise<KCD2StopResult> {
+  return await ensureBridge().kcd2Stop();
+}
+
+/**
+ * Get KCD2 integration status.
+ */
+export async function kcd2Status(): Promise<KCD2Status> {
+  return await ensureBridge().kcd2Status();
+}
+
+/**
+ * Get KCD2 mod info (download URLs, install instructions).
+ */
+export async function kcd2GetModInfo(): Promise<KCD2ModInfoResult> {
+  return await ensureBridge().kcd2GetModInfo();
 }
 
 // -------------------------------------------------------------------------

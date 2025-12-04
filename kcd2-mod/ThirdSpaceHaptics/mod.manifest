@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<kcd_mod>
+    <info>
+        <name>Third Space Haptics</name>
+        <modid>thirdspace_haptics</modid>
+        <description>Haptic feedback integration for Third Space Vest</description>
+        <author>Third Space Community</author>
+        <version>1.0.0</version>
+        <created_on>2024-12-01</created_on>
+        <updated_on>2024-12-01</updated_on>
+    </info>
+</kcd_mod>

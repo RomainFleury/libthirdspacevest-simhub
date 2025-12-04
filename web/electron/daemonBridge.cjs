@@ -891,6 +891,87 @@ class DaemonBridge extends EventEmitter {
   }
 
   // -------------------------------------------------------------------------
+  // Kingdom Come: Deliverance 2 Integration API
+  // -------------------------------------------------------------------------
+
+  /**
+   * Start KCD2 log watcher.
+   * @param {string} [logPath] - Optional path to game.log (auto-detect if not provided)
+   */
+  async kcd2Start(logPath) {
+    try {
+      const params = logPath ? { log_path: logPath } : {};
+      const response = await this.sendCommand("kcd2_start", params);
+      return {
+        success: response.success ?? false,
+        log_path: response.log_path,
+        error: response.message,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Stop KCD2 log watcher.
+   */
+  async kcd2Stop() {
+    try {
+      const response = await this.sendCommand("kcd2_stop");
+      return {
+        success: response.success ?? false,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Get KCD2 integration status.
+   */
+  async kcd2Status() {
+    try {
+      const response = await this.sendCommand("kcd2_status");
+      return {
+        running: response.running ?? false,
+        log_path: response.log_path ?? null,
+        events_received: response.events_received ?? 0,
+        last_event_ts: response.last_event_ts ?? null,
+        last_event_type: response.last_event_type ?? null,
+      };
+    } catch (error) {
+      return {
+        running: false,
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Get KCD2 mod info (download URLs, install instructions).
+   */
+  async kcd2GetModInfo() {
+    try {
+      const response = await this.sendCommand("kcd2_get_mod_info");
+      return {
+        success: true,
+        mod_info: response.mod_info,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Predefined Effects Library API
   // -------------------------------------------------------------------------
 

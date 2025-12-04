@@ -341,6 +341,184 @@ def _cs2_status(args: argparse.Namespace) -> int:
     return 0
 
 
+# -------------------------------------------------------------------------
+# KCD2 (Kingdom Come: Deliverance 2) subcommands
+# -------------------------------------------------------------------------
+
+def _cmd_kcd2(args: argparse.Namespace) -> int:
+    """Handle KCD2 subcommands."""
+    action = getattr(args, "kcd2_action", None) or "start"
+    
+    if action == "start":
+        return _kcd2_start(args)
+    elif action == "stop":
+        return _kcd2_stop(args)
+    elif action == "status":
+        return _kcd2_status(args)
+    elif action == "mod-info":
+        return _kcd2_mod_info(args)
+    else:
+        print(f"Unknown kcd2 action: {action}")
+        return 1
+
+
+def _kcd2_start(args: argparse.Namespace) -> int:
+    """Start the KCD2 integration."""
+    import socket
+    import json
+    
+    daemon_host = getattr(args, "daemon_host", "127.0.0.1")
+    daemon_port = getattr(args, "daemon_port", 5050)
+    log_path = getattr(args, "log_path", None)
+    
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((daemon_host, daemon_port))
+        
+        cmd: Dict[str, Any] = {"cmd": "kcd2_start"}
+        if log_path:
+            cmd["log_path"] = log_path
+        
+        sock.sendall(json.dumps(cmd).encode() + b'\n')
+        
+        response = b''
+        while b'\n' not in response:
+            response += sock.recv(1024)
+        
+        result = json.loads(response.decode().strip())
+        
+        if result.get("success"):
+            print("✅ KCD2 integration started")
+            if result.get("log_path"):
+                print(f"   Watching: {result['log_path']}")
+        else:
+            print(f"❌ Failed to start: {result.get('message', 'Unknown error')}")
+        
+        sock.close()
+        return 0 if result.get("success") else 1
+    except ConnectionRefusedError:
+        print("❌ Cannot connect to daemon. Is it running?")
+        print("   Start with: python -m modern_third_space.cli daemon start")
+        return 1
+
+
+def _kcd2_stop(args: argparse.Namespace) -> int:
+    """Stop the KCD2 integration."""
+    import socket
+    import json
+    
+    daemon_host = getattr(args, "daemon_host", "127.0.0.1")
+    daemon_port = getattr(args, "daemon_port", 5050)
+    
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((daemon_host, daemon_port))
+        
+        sock.sendall(json.dumps({"cmd": "kcd2_stop"}).encode() + b'\n')
+        
+        response = b''
+        while b'\n' not in response:
+            response += sock.recv(1024)
+        
+        result = json.loads(response.decode().strip())
+        
+        if result.get("success"):
+            print("✅ KCD2 integration stopped")
+        else:
+            print("❌ Failed to stop (may not have been running)")
+        
+        sock.close()
+        return 0 if result.get("success") else 1
+    except ConnectionRefusedError:
+        print("❌ Cannot connect to daemon. Is it running?")
+        return 1
+
+
+def _kcd2_status(args: argparse.Namespace) -> int:
+    """Check KCD2 integration status."""
+    import socket
+    import json
+    from datetime import datetime
+    
+    daemon_host = getattr(args, "daemon_host", "127.0.0.1")
+    daemon_port = getattr(args, "daemon_port", 5050)
+    
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((daemon_host, daemon_port))
+        
+        sock.sendall(json.dumps({"cmd": "kcd2_status"}).encode() + b'\n')
+        
+        response = b''
+        while b'\n' not in response:
+            response += sock.recv(1024)
+        
+        result = json.loads(response.decode().strip())
+        
+        if result.get("running"):
+            print("🎮 KCD2 Integration: RUNNING")
+            print(f"   Log file: {result.get('log_path', 'Unknown')}")
+            print(f"   Events received: {result.get('events_received', 0)}")
+            
+            if result.get("last_event_ts"):
+                last_time = datetime.fromtimestamp(result["last_event_ts"])
+                print(f"   Last event: {result.get('last_event_type', 'Unknown')} at {last_time.strftime('%H:%M:%S')}")
+        else:
+            print("🎮 KCD2 Integration: STOPPED")
+        
+        sock.close()
+        return 0
+    except ConnectionRefusedError:
+        print("❌ Cannot connect to daemon. Is it running?")
+        return 1
+
+
+def _kcd2_mod_info(args: argparse.Namespace) -> int:
+    """Get KCD2 mod installation info."""
+    import socket
+    import json
+    
+    daemon_host = getattr(args, "daemon_host", "127.0.0.1")
+    daemon_port = getattr(args, "daemon_port", 5050)
+    
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((daemon_host, daemon_port))
+        
+        sock.sendall(json.dumps({"cmd": "kcd2_get_mod_info"}).encode() + b'\n')
+        
+        response = b''
+        while b'\n' not in response:
+            response += sock.recv(1024)
+        
+        result = json.loads(response.decode().strip())
+        info = result.get("mod_info", {})
+        
+        print(f"\n📦 {info.get('name', 'Third Space Haptics Mod')}")
+        print(f"   Version: {info.get('version', '1.0.0')}")
+        print(f"   {info.get('description', '')}")
+        print()
+        print("📁 Required Files:")
+        for f in info.get("files", []):
+            print(f"   - {f}")
+        print()
+        print("📋 Installation Steps:")
+        for step in info.get("install_instructions", []):
+            print(f"   {step}")
+        print()
+        print("🔧 Console Commands (in-game, prefix with #):")
+        for cmd in info.get("console_commands", []):
+            print(f"   {cmd}")
+        print()
+        print(f"📖 Modding Documentation: {info.get('modding_docs', 'N/A')}")
+        
+        sock.close()
+        return 0
+    except ConnectionRefusedError:
+        print("❌ Cannot connect to daemon. Is it running?")
+        return 1
+
+
 COMMANDS: Dict[str, Any] = {
     "status": _cmd_status,
     "trigger": _cmd_trigger,
@@ -351,6 +529,7 @@ COMMANDS: Dict[str, Any] = {
     "connect": _cmd_connect,
     "daemon": _cmd_daemon,
     "cs2": _cmd_cs2,
+    "kcd2": _cmd_kcd2,
 }
 
 
@@ -425,6 +604,33 @@ def build_parser() -> argparse.ArgumentParser:
     cs2_status.add_argument("--gsi-port", type=int, default=3000, help="GSI server port")
     cs2_status.add_argument("--daemon-host", type=str, default="127.0.0.1", help="Vest daemon host")
     
+    # -------------------------------------------------------------------------
+    # KCD2 (Kingdom Come: Deliverance 2) commands
+    # -------------------------------------------------------------------------
+    kcd2 = sub.add_parser("kcd2", help="Kingdom Come: Deliverance 2 integration")
+    kcd2_sub = kcd2.add_subparsers(dest="kcd2_action")
+    
+    # kcd2 start
+    kcd2_start = kcd2_sub.add_parser("start", help="Start KCD2 integration")
+    kcd2_start.add_argument("--log-path", type=str, help="Path to KCD2 log file (auto-detects if not specified)")
+    kcd2_start.add_argument("--daemon-host", type=str, default="127.0.0.1", help="Vest daemon host")
+    kcd2_start.add_argument("--daemon-port", type=int, default=5050, help="Vest daemon port")
+    
+    # kcd2 stop
+    kcd2_stop = kcd2_sub.add_parser("stop", help="Stop KCD2 integration")
+    kcd2_stop.add_argument("--daemon-host", type=str, default="127.0.0.1", help="Vest daemon host")
+    kcd2_stop.add_argument("--daemon-port", type=int, default=5050, help="Vest daemon port")
+    
+    # kcd2 status
+    kcd2_status = kcd2_sub.add_parser("status", help="Check KCD2 integration status")
+    kcd2_status.add_argument("--daemon-host", type=str, default="127.0.0.1", help="Vest daemon host")
+    kcd2_status.add_argument("--daemon-port", type=int, default=5050, help="Vest daemon port")
+    
+    # kcd2 mod-info
+    kcd2_mod_info = kcd2_sub.add_parser("mod-info", help="Get KCD2 mod installation info")
+    kcd2_mod_info.add_argument("--daemon-host", type=str, default="127.0.0.1", help="Vest daemon host")
+    kcd2_mod_info.add_argument("--daemon-port", type=int, default=5050, help="Vest daemon port")
+    
     return parser
 
 
@@ -447,6 +653,8 @@ def main(argv: list[str] | None = None) -> int:
     if command == "daemon":
         return handler(args)
     if command == "cs2":
+        return handler(args)
+    if command == "kcd2":
         return handler(args)
     
     # Commands that need a controller
