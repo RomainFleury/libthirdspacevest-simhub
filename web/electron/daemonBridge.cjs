@@ -891,6 +891,66 @@ class DaemonBridge extends EventEmitter {
   }
 
   // -------------------------------------------------------------------------
+  // Assassin's Creed Mirage Integration API
+  // -------------------------------------------------------------------------
+
+  /**
+   * Start Assassin's Creed Mirage integration (watch game logs).
+   * @param {string} [logPath] - Optional path to game log (auto-detect if not provided)
+   */
+  async acmirageStart(logPath) {
+    try {
+      const params = {};
+      if (logPath) {
+        params.log_path = logPath;
+      }
+      const response = await this.sendCommand("acmirage_start", params);
+      return {
+        success: response.success ?? true,
+        log_path: response.log_path,
+        error: response.message,
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Stop Assassin's Creed Mirage integration.
+   */
+  async acmirageStop() {
+    try {
+      await this.sendCommand("acmirage_stop");
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Get Assassin's Creed Mirage integration status.
+   */
+  async acmirageStatus() {
+    try {
+      const response = await this.sendCommand("acmirage_status");
+      return {
+        success: true,
+        running: response.running ?? false,
+        events_received: response.events_received ?? 0,
+        last_event_ts: response.last_event_ts ?? null,
+        last_event_type: response.last_event_type ?? null,
+        log_path: response.log_path ?? null,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        running: false,
+        error: error.message,
+      };
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Predefined Effects Library API
   // -------------------------------------------------------------------------
 
