@@ -6,7 +6,33 @@ This file helps AI assistants quickly understand recent project evolution.
 
 ---
 
-## 2025-11-27 (Latest)
+## 2025-12-04 (Latest)
+
+### Added
+
+- **Arma Reforger Integration** - TCP-based mod integration for Arma Reforger
+  - **Architecture**: Enforce Script mod sends events via TCP to Python daemon (port 5050)
+  - **Event Types**:
+    - Player events: damage (directional), death, heal, suppression
+    - Weapon events: rifle/MG/pistol/launcher fire, reload, grenade throw
+    - Vehicle events: collision, damage, explosion, helicopter rotor
+    - Environment events: nearby explosions, bullet impacts
+  - **Python Manager**: `server/armareforger_manager.py`
+    - Processes all game events from mod
+    - Angle-based directional cell mapping
+    - Intensity scaling based on damage/distance
+  - **Daemon Protocol**: Added `armareforger_event`, `armareforger_start`, `armareforger_stop`, `armareforger_status` commands
+  - **Electron UI**: Complete integration panel with live event log
+    - Status display (enabled/disabled, events received)
+    - Enable/disable controls
+    - Real-time event feed with icons
+    - Mod installation instructions
+  - **Documentation**: `docs-external-integrations-ideas/ARMAREFORGER_INTEGRATION.md`
+  - **Status**: Python/UI complete, Enforce Script mod requires Arma Reforger Workbench
+
+---
+
+## 2025-11-27
 
 ### Added
 

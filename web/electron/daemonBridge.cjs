@@ -891,6 +891,57 @@ class DaemonBridge extends EventEmitter {
   }
 
   // -------------------------------------------------------------------------
+  // Arma Reforger Integration API
+  // -------------------------------------------------------------------------
+
+  /**
+   * Enable Arma Reforger integration.
+   */
+  async armaReforgerStart() {
+    try {
+      const response = await this.sendCommand("armareforger_start");
+      return {
+        success: response.success ?? true,
+        error: response.message,
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Disable Arma Reforger integration.
+   */
+  async armaReforgerStop() {
+    try {
+      await this.sendCommand("armareforger_stop");
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Get Arma Reforger integration status.
+   */
+  async armaReforgerStatus() {
+    try {
+      const response = await this.sendCommand("armareforger_status");
+      return {
+        running: response.running ?? false,
+        events_received: response.events_received ?? 0,
+        last_event_ts: response.last_event_ts ?? null,
+        last_event_type: response.last_event_type ?? null,
+      };
+    } catch (error) {
+      return {
+        running: false,
+        error: error.message,
+      };
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Predefined Effects Library API
   // -------------------------------------------------------------------------
 

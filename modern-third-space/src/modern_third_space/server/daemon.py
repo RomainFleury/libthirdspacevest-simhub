@@ -78,6 +78,7 @@ from .gtav_manager import GTAVManager
 from .pistolwhip_manager import PistolWhipManager
 from .starcitizen_manager import StarCitizenManager
 from .l4d2_manager import L4D2Manager
+from .armareforger_manager import ArmaReforgerManager, get_mod_info as get_armareforger_mod_info
 from .protocol import (
     event_alyx_started,
     event_alyx_stopped,
@@ -110,6 +111,13 @@ from .protocol import (
     response_l4d2_start,
     response_l4d2_stop,
     response_l4d2_status,
+    # Arma Reforger
+    event_armareforger_started,
+    event_armareforger_stopped,
+    event_armareforger_game_event,
+    response_armareforger_start,
+    response_armareforger_stop,
+    response_armareforger_status,
     # Predefined effects
     event_effect_started,
     event_effect_completed,
@@ -185,6 +193,12 @@ class VestDaemon:
         self._l4d2_manager = L4D2Manager(
             on_game_event=self._on_l4d2_game_event,
             on_trigger=self._on_l4d2_trigger,
+        )
+        
+        # Arma Reforger manager
+        self._armareforger_manager = ArmaReforgerManager(
+            on_game_event=self._on_armareforger_game_event,
+            on_trigger=self._on_armareforger_trigger,
         )
         
         self._loop: Optional[asyncio.AbstractEventLoop] = None
@@ -480,6 +494,19 @@ class VestDaemon:
         
         if cmd_type == CommandType.L4D2_STATUS:
             return await self._cmd_l4d2_status(command)
+        
+        # Arma Reforger commands
+        if cmd_type == CommandType.ARMAREFORGER_EVENT:
+            return await self._cmd_armareforger_event(command)
+        
+        if cmd_type == CommandType.ARMAREFORGER_START:
+            return await self._cmd_armareforger_start(command)
+        
+        if cmd_type == CommandType.ARMAREFORGER_STOP:
+            return await self._cmd_armareforger_stop(command)
+        
+        if cmd_type == CommandType.ARMAREFORGER_STATUS:
+            return await self._cmd_armareforger_status(command)
         
         # Predefined effects commands
         if cmd_type == CommandType.PLAY_EFFECT:
@@ -1637,6 +1664,115 @@ class VestDaemon:
     def _on_l4d2_trigger(self, cell: int, speed: int):
         """
         Called when Left 4 Dead 2 manager wants to trigger a haptic effect.
+        
+        Triggers the effect on the main device.
+        """
+        # Get main device controller
+        main_device_id = self._registry.get_main_device_id()
+        if main_device_id is None:
+            return  # No device available
+        
+        controller = self._registry.get_controller(main_device_id)
+        if controller is None or not controller.status().connected:
+            return  # Device not connected
+        
+        # Trigger effect (synchronous, thread-safe)
+        controller.trigger_effect(cell, speed)
+        
+        # Broadcast event (async)
+        if self._loop is not None:
+            event = event_effect_triggered(cell, speed, device_id=main_device_id)
+            asyncio.run_coroutine_threadsafe(
+                self._clients.broadcast(event),
+                self._loop,
+            )
+    
+    # -------------------------------------------------------------------------
+    # Arma Reforger command handlers
+    # -------------------------------------------------------------------------
+    
+    async def _cmd_armareforger_event(self, command: Command) -> Response:
+        """
+        Process an Arma Reforger game event from the Enforce Script mod.
+        
+        This is the main entry point for events from the game.
+        """
+        if not command.event:
+            return response_error("Missing event name", command.req_id)
+        
+        success = self._armareforger_manager.process_event(
+            event_type=command.event,
+            angle=command.angle,
+            damage=command.damage,
+            distance=command.distance,
+            severity=command.severity,
+            hand=command.hand,
+        )
+        
+        if success:
+            return response_ok(command.req_id)
+        else:
+            return response_error(f"Failed to process event: {command.event}", command.req_id)
+    
+    async def _cmd_armareforger_start(self, command: Command) -> Response:
+        """Enable Arma Reforger event processing."""
+        success, error = self._armareforger_manager.start()
+        
+        if success:
+            await self._clients.broadcast(event_armareforger_started())
+            print("[ARMA] Integration enabled, waiting for mod connection")
+        
+        return response_armareforger_start(
+            success=success,
+            error=error,
+            req_id=command.req_id,
+        )
+    
+    async def _cmd_armareforger_stop(self, command: Command) -> Response:
+        """Disable Arma Reforger event processing."""
+        success = self._armareforger_manager.stop()
+        
+        if success:
+            await self._clients.broadcast(event_armareforger_stopped())
+            print("[ARMA] Integration disabled")
+        
+        return response_armareforger_stop(
+            success=success,
+            req_id=command.req_id,
+        )
+    
+    async def _cmd_armareforger_status(self, command: Command) -> Response:
+        """Get Arma Reforger integration status."""
+        return response_armareforger_status(
+            enabled=self._armareforger_manager.is_enabled,
+            events_received=self._armareforger_manager.events_received,
+            last_event_ts=self._armareforger_manager.last_event_ts,
+            last_event_type=self._armareforger_manager.last_event_type,
+            req_id=command.req_id,
+        )
+    
+    # -------------------------------------------------------------------------
+    # Arma Reforger callbacks
+    # -------------------------------------------------------------------------
+    
+    def _on_armareforger_game_event(self, event_type: str, params: dict):
+        """
+        Called when Arma Reforger manager processes a game event.
+        
+        Broadcasts the event to all connected clients for UI display.
+        """
+        if self._loop is None:
+            return
+        
+        event = event_armareforger_game_event(event_type, params)
+        asyncio.run_coroutine_threadsafe(
+            self._clients.broadcast(event),
+            self._loop,
+        )
+    
+    def _on_armareforger_trigger(self, cell: int, speed: int):
+        """
+        Called when Arma Reforger manager wants to trigger a haptic effect.
         
         Triggers the effect on the main device.
         """
