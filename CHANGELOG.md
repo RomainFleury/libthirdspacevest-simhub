@@ -6,7 +6,40 @@ This file helps AI assistants quickly understand recent project evolution.
 
 ---
 
-## 2025-11-27 (Latest)
+## 2025-12-04 (Latest)
+
+### Added
+
+- **For Honor Integration** - Log file watching integration for Ubisoft's For Honor
+  - **Strategy Document**: `docs-external-integrations-ideas/FOR_HONOR_INTEGRATION.md`
+    - Overview of For Honor (third-person melee combat game)
+    - Integration approach using log file watching (similar to HL:Alyx)
+    - EasyAntiCheat-safe method (read-only log monitoring)
+    - Directional combat mapping (LEFT, RIGHT, TOP, BACK)
+    - Event-to-haptic mapping table for melee combat
+  - **Python Manager**: `server/forhonor_manager.py`
+    - Log file watcher with 50ms polling
+    - Combat event parsing (damage, block, guard break, death, execution, etc.)
+    - Directional damage → vest cell mapping
+    - Auto-detect log file paths (Ubisoft Connect, Steam)
+  - **Daemon Protocol**: Added `forhonor_start`, `forhonor_stop`, `forhonor_status` commands
+    - Protocol events: `forhonor_started`, `forhonor_stopped`, `forhonor_game_event`
+  - **Supported Events**:
+    - Directional damage (LEFT/RIGHT/TOP/BACK with intensity scaling)
+    - Block/Parry feedback (light pulse on guard side)
+    - Guard break (front impact)
+    - Death (full vest effect)
+    - Execution (victim and performer)
+    - Kill confirmation
+    - Revenge mode activation
+    - Feat usage
+    - Ledge kills
+  - **User Setup**: Launch game with `-log` flag to enable logging
+  - **Status**: 🔬 Research phase - requires validation with actual game logs
+
+---
+
+## 2025-11-27
 
 ### Added
 

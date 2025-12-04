@@ -84,6 +84,10 @@ class CommandType(Enum):
     L4D2_START = "l4d2_start"
     L4D2_STOP = "l4d2_stop"
     L4D2_STATUS = "l4d2_status"
+    # For Honor integration
+    FORHONOR_START = "forhonor_start"
+    FORHONOR_STOP = "forhonor_stop"
+    FORHONOR_STATUS = "forhonor_status"
     # Predefined effects
     PLAY_EFFECT = "play_effect"
     LIST_EFFECTS = "list_effects"
@@ -147,6 +151,10 @@ class EventType(Enum):
     L4D2_STARTED = "l4d2_started"
     L4D2_STOPPED = "l4d2_stopped"
     L4D2_GAME_EVENT = "l4d2_game_event"
+    # For Honor integration
+    FORHONOR_STARTED = "forhonor_started"
+    FORHONOR_STOPPED = "forhonor_stopped"
+    FORHONOR_GAME_EVENT = "forhonor_game_event"
     # Predefined effects
     EFFECT_STARTED = "effect_started"
     EFFECT_COMPLETED = "effect_completed"
@@ -1051,6 +1059,83 @@ def response_l4d2_status(
     """Response to l4d2_status command."""
     return Response(
         response="l4d2_status",
+        req_id=req_id,
+        running=running,
+        log_path=log_path,
+        events_received=events_received,
+        last_event_ts=last_event_ts,
+        last_event_type=last_event_type,
+    )
+
+
+# =============================================================================
+# For Honor Integration Protocol
+# =============================================================================
+
+def event_forhonor_started(log_path: str) -> Event:
+    """Event when For Honor integration starts."""
+    return Event(event=EventType.FORHONOR_STARTED.value, log_path=log_path)
+
+
+def event_forhonor_stopped() -> Event:
+    """Event when For Honor integration stops."""
+    return Event(event=EventType.FORHONOR_STOPPED.value)
+
+
+def event_forhonor_game_event(
+    event_type: str,
+    params: Optional[Dict[str, Any]] = None,
+) -> Event:
+    """
+    For Honor game event (damage, block, death, etc.).
+    
+    Args:
+        event_type: Type of event ("damage", "block", "death", "guard_break", etc.)
+        params: Event parameters (direction, amount, etc.)
+    """
+    return Event(
+        event=EventType.FORHONOR_GAME_EVENT.value,
+        event_type=event_type,
+        params=params,
+    )
+
+
+def response_forhonor_start(
+    success: bool,
+    log_path: Optional[str] = None,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to forhonor_start command."""
+    return Response(
+        response="forhonor_start",
+        req_id=req_id,
+        success=success,
+        log_path=log_path,
+        message=error,
+    )
+
+
+def response_forhonor_stop(success: bool, req_id: Optional[str] = None) -> Response:
+    """Response to forhonor_stop command."""
+    return Response(
+        response="forhonor_stop",
+        req_id=req_id,
+        success=success,
+    )
+
+
+def response_forhonor_status(
+    running: bool,
+    log_path: Optional[str] = None,
+    events_received: int = 0,
+    last_event_ts: Optional[float] = None,
+    last_event_type: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to forhonor_status command."""
+    return Response(
+        response="forhonor_status",
         req_id=req_id,
         running=running,
         log_path=log_path,
