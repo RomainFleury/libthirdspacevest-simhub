@@ -73,6 +73,7 @@ from .protocol import (
 )
 from .cs2_manager import CS2Manager, generate_cs2_config
 from .alyx_manager import AlyxManager, get_mod_info as get_alyx_mod_info
+from .kcd_manager import KCDManager, get_mod_info as get_kcd_mod_info
 from .superhot_manager import SuperHotManager
 from .gtav_manager import GTAVManager
 from .pistolwhip_manager import PistolWhipManager
@@ -86,6 +87,13 @@ from .protocol import (
     response_alyx_stop,
     response_alyx_status,
     response_alyx_get_mod_info,
+    event_kcd_started,
+    event_kcd_stopped,
+    event_kcd_game_event,
+    response_kcd_start,
+    response_kcd_stop,
+    response_kcd_status,
+    response_kcd_get_mod_info,
     event_superhot_started,
     event_superhot_stopped,
     event_superhot_game_event,
@@ -162,6 +170,12 @@ class VestDaemon:
             on_trigger=self._on_alyx_trigger,
         )
         
+        # Kingdom Come: Deliverance manager
+        self._kcd_manager = KCDManager(
+            on_game_event=self._on_kcd_game_event,
+            on_trigger=self._on_kcd_trigger,
+        )
+        
         # SUPERHOT VR manager
         self._superhot_manager = SuperHotManager()
         self._superhot_manager.set_event_callback(self._on_superhot_game_event)
@@ -228,6 +242,10 @@ class VestDaemon:
         # Stop Alyx integration if running
         if self._alyx_manager.is_running:
             self._alyx_manager.stop()
+        
+        # Stop KCD integration if running
+        if self._kcd_manager.is_running:
+            self._kcd_manager.stop()
         
         # Disconnect from all vests
         for device_id in list(self._registry._controllers.keys()):
@@ -421,6 +439,19 @@ class VestDaemon:
         
         if cmd_type == CommandType.ALYX_GET_MOD_INFO:
             return await self._cmd_alyx_get_mod_info(command)
+        
+        # Kingdom Come: Deliverance commands
+        if cmd_type == CommandType.KCD_START:
+            return await self._cmd_kcd_start(command)
+        
+        if cmd_type == CommandType.KCD_STOP:
+            return await self._cmd_kcd_stop(command)
+        
+        if cmd_type == CommandType.KCD_STATUS:
+            return await self._cmd_kcd_status(command)
+        
+        if cmd_type == CommandType.KCD_GET_MOD_INFO:
+            return await self._cmd_kcd_get_mod_info(command)
         
         # SUPERHOT VR commands
         if cmd_type == CommandType.SUPERHOT_EVENT:
@@ -1292,6 +1323,59 @@ class VestDaemon:
         )
     
     # -------------------------------------------------------------------------
+    # Kingdom Come: Deliverance command handlers
+    # -------------------------------------------------------------------------
+    
+    async def _cmd_kcd_start(self, command: Command) -> Response:
+        """Start the KCD log watcher."""
+        log_path = command.log_path  # Can be None for auto-detect
+        
+        success, error = self._kcd_manager.start(log_path)
+        
+        if success:
+            actual_path = str(self._kcd_manager.log_path) if self._kcd_manager.log_path else None
+            # Broadcast KCD started event
+            await self._clients.broadcast(event_kcd_started(actual_path or ""))
+            print(f"[KCD] Integration started, watching: {actual_path}")
+        
+        return response_kcd_start(
+            success=success,
+            log_path=str(self._kcd_manager.log_path) if self._kcd_manager.log_path else None,
+            error=error,
+            req_id=command.req_id,
+        )
+    
+    async def _cmd_kcd_stop(self, command: Command) -> Response:
+        """Stop the KCD log watcher."""
+        success = self._kcd_manager.stop()
+        
+        if success:
+            # Broadcast KCD stopped event
+            await self._clients.broadcast(event_kcd_stopped())
+            print("[KCD] Integration stopped")
+        
+        return response_kcd_stop(success=success, req_id=command.req_id)
+    
+    async def _cmd_kcd_status(self, command: Command) -> Response:
+        """Get KCD integration status."""
+        return response_kcd_status(
+            running=self._kcd_manager.is_running,
+            log_path=str(self._kcd_manager.log_path) if self._kcd_manager.log_path else None,
+            events_received=self._kcd_manager.events_received,
+            last_event_ts=self._kcd_manager.last_event_ts,
+            last_event_type=getattr(self._kcd_manager, '_last_event_type', None),
+            req_id=command.req_id,
+        )
+    
+    async def _cmd_kcd_get_mod_info(self, command: Command) -> Response:
+        """Get KCD mod info (download URLs, install instructions)."""
+        mod_info = get_kcd_mod_info()
+        return response_kcd_get_mod_info(
+            mod_info=mod_info,
+            req_id=command.req_id,
+        )
+    
+    # -------------------------------------------------------------------------
     # Alyx callbacks (called from watcher thread)
     # -------------------------------------------------------------------------
     
@@ -1314,6 +1398,54 @@ class VestDaemon:
     def _on_alyx_trigger(self, cell: int, speed: int):
         """
         Called when Alyx wants to trigger a haptic effect.
+        
+        Defaults to main device (backward compatible).
+        This performs the actual vest trigger synchronously since
+        the vest controller is thread-safe for simple operations.
+        """
+        # Get main device controller (backward compatible - always uses main device)
+        main_device_id = self._registry.get_main_device_id()
+        if main_device_id is None:
+            return  # No device available
+        
+        controller = self._registry.get_controller(main_device_id)
+        if controller is None or not controller.status().connected:
+            return  # Device not connected
+        
+        # Trigger effect (synchronous, thread-safe)
+        controller.trigger_effect(cell, speed)
+        
+        # Broadcast effect triggered event (async)
+        if self._loop is not None:
+            event = event_effect_triggered(cell, speed, device_id=main_device_id)
+            asyncio.run_coroutine_threadsafe(
+                self._clients.broadcast(event),
+                self._loop,
+            )
+    
+    # -------------------------------------------------------------------------
+    # KCD callbacks (called from watcher thread)
+    # -------------------------------------------------------------------------
+    
+    def _on_kcd_game_event(self, event_type: str, params: dict):
+        """
+        Called when KCD detects a game event.
+        
+        This is called from the file watcher thread, so we need to schedule
+        the broadcast on the event loop.
+        """
+        if self._loop is None:
+            return
+        
+        event = event_kcd_game_event(event_type, params)
+        asyncio.run_coroutine_threadsafe(
+            self._clients.broadcast(event),
+            self._loop,
+        )
+    
+    def _on_kcd_trigger(self, cell: int, speed: int):
+        """
+        Called when KCD wants to trigger a haptic effect.
         
         Defaults to main device (backward compatible).
         This performs the actual vest trigger synchronously since
