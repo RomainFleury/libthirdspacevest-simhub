@@ -709,6 +709,72 @@ class DaemonBridge extends EventEmitter {
     }
   }
 
+  // -------------------------------------------------------------------------
+  // Chivalry 2 Integration API
+  // -------------------------------------------------------------------------
+
+  /**
+   * Start Chivalry 2 integration (watch haptic_events.log).
+   * @param {string} [logPath] - Optional path to haptic_events.log (default if not provided)
+   */
+  async chivalry2Start(logPath) {
+    try {
+      const params = logPath ? { log_path: logPath } : {};
+      const response = await this.sendCommand("chivalry2_start", params);
+      return {
+        success: response.success ?? false,
+        log_path: response.log_path,
+        error: response.message,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Stop Chivalry 2 integration.
+   */
+  async chivalry2Stop() {
+    try {
+      const response = await this.sendCommand("chivalry2_stop");
+      return {
+        success: response.success ?? false,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Get Chivalry 2 integration status.
+   */
+  async chivalry2Status() {
+    try {
+      const response = await this.sendCommand("chivalry2_status");
+      return {
+        running: response.running ?? false,
+        log_path: response.log_path ?? null,
+        events_received: response.events_received ?? 0,
+        last_event_ts: response.last_event_ts ?? null,
+        error: response.message,
+      };
+    } catch (error) {
+      return {
+        running: false,
+        log_path: null,
+        events_received: 0,
+        last_event_ts: null,
+        error: error.message,
+      };
+    }
+  }
+
   /**
    * Get Alyx mod info (download URLs, install instructions).
    */

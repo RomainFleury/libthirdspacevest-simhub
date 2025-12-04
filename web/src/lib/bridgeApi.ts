@@ -141,6 +141,26 @@ export type MordhauStopResult = {
   error?: string;
 };
 
+// Chivalry 2 types
+export type Chivalry2Status = {
+  running: boolean;
+  log_path?: string | null;
+  events_received?: number;
+  last_event_ts?: number | null;
+  error?: string;
+};
+
+export type Chivalry2StartResult = {
+  success: boolean;
+  log_path?: string;
+  error?: string;
+};
+
+export type Chivalry2StopResult = {
+  success: boolean;
+  error?: string;
+};
+
 export type AlyxModInfoResult = {
   success: boolean;
   mod_info?: AlyxModInfo;
@@ -230,6 +250,9 @@ declare global {
       mordhauStart: (logPath?: string) => Promise<MordhauStartResult>;
       mordhauStop: () => Promise<MordhauStopResult>;
       mordhauStatus: () => Promise<MordhauStatus>;
+      chivalry2Start: (logPath?: string) => Promise<Chivalry2StartResult>;
+      chivalry2Stop: () => Promise<Chivalry2StopResult>;
+      chivalry2Status: () => Promise<Chivalry2Status>;
       // SUPERHOT VR Integration API
       superhotStart: () => Promise<{ success: boolean; error?: string }>;
       superhotStop: () => Promise<{ success: boolean; error?: string }>;
@@ -669,4 +692,56 @@ export async function listEffectsLibrary(): Promise<EffectsListResult> {
  */
 export async function stopEffect(): Promise<{ success: boolean; error?: string }> {
   return await ensureBridge().stopEffect();
+}
+
+// -------------------------------------------------------------------------
+// Mordhau Integration
+// -------------------------------------------------------------------------
+
+/**
+ * Start the Mordhau log file watcher.
+ * @param logPath Optional path to haptic_events.log (default if not provided)
+ */
+export async function mordhauStart(logPath?: string): Promise<MordhauStartResult> {
+  return await ensureBridge().mordhauStart(logPath);
+}
+
+/**
+ * Stop the Mordhau log file watcher.
+ */
+export async function mordhauStop(): Promise<MordhauStopResult> {
+  return await ensureBridge().mordhauStop();
+}
+
+/**
+ * Get Mordhau integration status.
+ */
+export async function mordhauStatus(): Promise<MordhauStatus> {
+  return await ensureBridge().mordhauStatus();
+}
+
+// -------------------------------------------------------------------------
+// Chivalry 2 Integration
+// -------------------------------------------------------------------------
+
+/**
+ * Start the Chivalry 2 log file watcher.
+ * @param logPath Optional path to haptic_events.log (default if not provided)
+ */
+export async function chivalry2Start(logPath?: string): Promise<Chivalry2StartResult> {
+  return await ensureBridge().chivalry2Start(logPath);
+}
+
+/**
+ * Stop the Chivalry 2 log file watcher.
+ */
+export async function chivalry2Stop(): Promise<Chivalry2StopResult> {
+  return await ensureBridge().chivalry2Stop();
+}
+
+/**
+ * Get Chivalry 2 integration status.
+ */
+export async function chivalry2Status(): Promise<Chivalry2Status> {
+  return await ensureBridge().chivalry2Status();
 }

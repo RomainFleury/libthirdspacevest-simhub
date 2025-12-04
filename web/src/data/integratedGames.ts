@@ -92,6 +92,16 @@ export const integratedGames: IntegratedGameConfig[] = [
     hasSetupGuide: true,
     tags: ["melee", "medieval", "combat"],
   },
+  {
+    id: "chivalry2",
+    name: "Chivalry 2",
+    description: "Blueprint mod-based haptic feedback for medieval multiplayer combat",
+    icon: "⚔️",
+    steamAppId: 1824220,
+    hasSetupGuide: true,
+    requiresMod: true,
+    tags: ["melee", "medieval", "combat", "multiplayer"],
+  },
 ];
 
 /**

@@ -88,6 +88,10 @@ class CommandType(Enum):
     MORDHAU_START = "mordhau_start"
     MORDHAU_STOP = "mordhau_stop"
     MORDHAU_STATUS = "mordhau_status"
+    # Chivalry 2 integration
+    CHIVALRY2_START = "chivalry2_start"
+    CHIVALRY2_STOP = "chivalry2_stop"
+    CHIVALRY2_STATUS = "chivalry2_status"
     # Predefined effects
     PLAY_EFFECT = "play_effect"
     LIST_EFFECTS = "list_effects"
@@ -155,6 +159,10 @@ class EventType(Enum):
     MORDHAU_STARTED = "mordhau_started"
     MORDHAU_STOPPED = "mordhau_stopped"
     MORDHAU_GAME_EVENT = "mordhau_game_event"
+    # Chivalry 2 integration
+    CHIVALRY2_STARTED = "chivalry2_started"
+    CHIVALRY2_STOPPED = "chivalry2_stopped"
+    CHIVALRY2_GAME_EVENT = "chivalry2_game_event"
     # Predefined effects
     EFFECT_STARTED = "effect_started"
     EFFECT_COMPLETED = "effect_completed"
@@ -1138,6 +1146,84 @@ def response_mordhau_status(
     """Response to mordhau_status command."""
     return Response(
         response="mordhau_status",
+        req_id=req_id,
+        running=running,
+        log_path=log_path,
+        events_received=events_received,
+        last_event_ts=last_event_ts,
+    )
+
+
+# =============================================================================
+# Chivalry 2 Integration Protocol
+# =============================================================================
+
+def event_chivalry2_started(log_path: str) -> Event:
+    """Event when Chivalry 2 integration starts."""
+    return Event(event=EventType.CHIVALRY2_STARTED.value, log_path=log_path)
+
+
+def event_chivalry2_stopped() -> Event:
+    """Event when Chivalry 2 integration stops."""
+    return Event(event=EventType.CHIVALRY2_STOPPED.value)
+
+
+def event_chivalry2_game_event(
+    event_type: str,
+    params: Optional[Dict[str, Any]] = None,
+) -> Event:
+    """
+    Chivalry 2 game event (DAMAGE, DEATH, FALL_DAMAGE, etc.).
+    
+    Args:
+        event_type: Type of event ("DAMAGE", "DEATH", "FALL_DAMAGE", etc.)
+        params: Event parameters (angle, zone, damage_type, intensity, timestamp, etc.)
+    """
+    return Event(
+        event=EventType.CHIVALRY2_GAME_EVENT.value,
+        event_type=event_type,
+        params=params,
+    )
+
+
+def response_chivalry2_start(
+    success: bool,
+    log_path: Optional[str] = None,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to chivalry2_start command."""
+    return Response(
+        response="chivalry2_start",
+        req_id=req_id,
+        success=success,
+        log_path=log_path,
+        message=error,
+    )
+
+
+def response_chivalry2_stop(
+    success: bool,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to chivalry2_stop command."""
+    return Response(
+        response="chivalry2_stop",
+        req_id=req_id,
+        success=success,
+    )
+
+
+def response_chivalry2_status(
+    running: bool,
+    log_path: Optional[str] = None,
+    events_received: int = 0,
+    last_event_ts: Optional[float] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to chivalry2_status command."""
+    return Response(
+        response="chivalry2_status",
         req_id=req_id,
         running=running,
         log_path=log_path,
