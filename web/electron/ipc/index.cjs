@@ -53,7 +53,9 @@ function registerAllHandlers(getDaemonBridge, getMainWindow, reconnectToDaemon) 
 
   // Mordhau integration handlers
   registerMordhauHandlers(getDaemonBridge);
-  registerChivalry2Handlers(getDaemonBridge);
+  
+  // Chivalry 2 integration handlers
+  registerChivalry2Handlers(getDaemonBridge, getMainWindow);
 
   // Predefined effects library handlers
   registerEffectsHandlers();

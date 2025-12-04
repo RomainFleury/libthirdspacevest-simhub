@@ -44,9 +44,12 @@ export function Chivalry2IntegrationPage() {
     loading,
     error,
     gameEvents,
+    logPath,
+    setLogPath,
     start,
     stop,
     clearEvents,
+    browseLogPath,
   } = useChivalry2Integration();
 
   // Convert Chivalry 2 events to generic GameEvent format
@@ -56,6 +59,42 @@ export function Chivalry2IntegrationPage() {
     ts: e.ts,
     params: e.params,
   }));
+
+  // Configuration panel
+  const configurationPanel = (
+    <div className="space-y-4">
+      {/* Log Path */}
+      <div>
+        <label className="text-sm text-slate-400 block mb-2">Log File Path</label>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={logPath}
+            onChange={(e) => setLogPath(e.target.value || null)}
+            placeholder="Auto-detect (default: %LOCALAPPDATA%\Chivalry2\ThirdSpaceHaptics\haptic_events.log)"
+            className="flex-1 rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white placeholder-slate-500 ring-1 ring-white/10 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <button
+            onClick={browseLogPath}
+            disabled={loading}
+            className="rounded-lg bg-slate-600/80 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-600 disabled:opacity-50"
+          >
+            Browse
+          </button>
+        </div>
+        {status.log_path && (
+          <p className="text-xs text-emerald-400 mt-1">
+            ✓ Watching: {status.log_path}
+          </p>
+        )}
+        {!status.log_path && !logPath && (
+          <p className="text-xs text-slate-500 mt-1">
+            Leave empty to use default path: <code className="bg-slate-800 px-1 rounded">%LOCALAPPDATA%\Chivalry2\ThirdSpaceHaptics\haptic_events.log</code>
+          </p>
+        )}
+      </div>
+    </div>
+  );
 
   // Setup guide
   const setupGuide = (
@@ -67,6 +106,7 @@ export function Chivalry2IntegrationPage() {
         <li>Install the ThirdSpaceChivalry2 Blueprint mod (ArgonSDK-based)</li>
         <li>Package the mod as a .pak file and place it in <code className="bg-slate-800 px-1 rounded">Chivalry2/Content/Paks/mods/</code></li>
         <li>Launch Chivalry 2 and take damage to test detection</li>
+        <li>Select the log file path above (or leave empty for default)</li>
         <li>Click "Start" above to begin watching for events</li>
       </ol>
       <p className="text-slate-500 text-xs">
@@ -77,16 +117,6 @@ export function Chivalry2IntegrationPage() {
       </p>
     </div>
   );
-
-  // Additional stats
-  const additionalStats = status.log_path ? (
-    <div className="rounded-lg bg-slate-700/30 px-4 py-2">
-      <span className="text-slate-400 text-sm">Log:</span>{" "}
-      <span className="font-mono text-white text-xs truncate max-w-xs inline-block align-middle" title={status.log_path}>
-        ...{status.log_path.slice(-30)}
-      </span>
-    </div>
-  ) : undefined;
 
   return (
     <GameIntegrationPage
@@ -100,8 +130,8 @@ export function Chivalry2IntegrationPage() {
       onStop={stop}
       onClearEvents={clearEvents}
       formatEventDetails={formatEventDetails}
+      configurationPanel={configurationPanel}
       setupGuide={setupGuide}
-      additionalStats={additionalStats}
     />
   );
 }

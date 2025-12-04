@@ -27,7 +27,32 @@ export function useChivalry2Integration() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [gameEvents, setGameEvents] = useState<Chivalry2GameEvent[]>([]);
+  const [logPath, setLogPath] = useState<string>("");
   const eventIdCounter = useRef(0);
+
+  // Load saved settings
+  const loadSettings = useCallback(async () => {
+    try {
+      // @ts-ignore - window.vestBridge
+      const result = await window.vestBridge?.chivalry2GetSettings?.();
+      if (result?.success && result.logPath) {
+        setLogPath(result.logPath);
+      }
+    } catch (err) {
+      console.error("Failed to load Chivalry 2 settings:", err);
+    }
+  }, []);
+
+  // Save log path
+  const saveLogPath = useCallback(async (path: string | null) => {
+    try {
+      // @ts-ignore - window.vestBridge
+      await window.vestBridge?.chivalry2SetLogPath?.(path);
+      setLogPath(path || "");
+    } catch (err) {
+      console.error("Failed to save log path:", err);
+    }
+  }, []);
 
   // Fetch status on mount and periodically
   const fetchStatus = useCallback(async () => {
@@ -35,17 +60,22 @@ export function useChivalry2Integration() {
       const result = await chivalry2Status();
       setStatus(result);
       setError(result.error || null);
+      if (result.log_path && !logPath) {
+        setLogPath(result.log_path);
+        await saveLogPath(result.log_path);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to get status");
     }
-  }, []);
+  }, [logPath, saveLogPath]);
 
   useEffect(() => {
+    loadSettings();
     fetchStatus();
     // Poll status every 5 seconds
     const interval = setInterval(fetchStatus, 5000);
     return () => clearInterval(interval);
-  }, [fetchStatus]);
+  }, [fetchStatus, loadSettings]);
 
   // Subscribe to daemon events for Chivalry 2 game events
   useEffect(() => {
@@ -83,13 +113,18 @@ export function useChivalry2Integration() {
     return unsubscribe;
   }, []);
 
-  const start = useCallback(async (logPath?: string) => {
+  const start = useCallback(async (customLogPath?: string) => {
     setLoading(true);
     setError(null);
     try {
-      const result = await chivalry2Start(logPath);
+      const path = customLogPath || logPath || undefined;
+      const result = await chivalry2Start(path);
       if (!result.success) {
         setError(result.error || "Failed to start Chivalry 2 integration");
+      } else {
+        if (result.log_path) {
+          await saveLogPath(result.log_path);
+        }
       }
       await fetchStatus();
     } catch (err) {
@@ -97,7 +132,7 @@ export function useChivalry2Integration() {
     } finally {
       setLoading(false);
     }
-  }, [fetchStatus]);
+  }, [logPath, fetchStatus, saveLogPath]);
 
   const stop = useCallback(async () => {
     setLoading(true);
@@ -119,14 +154,30 @@ export function useChivalry2Integration() {
     setGameEvents([]);
   }, []);
 
+  // Browse for log path
+  const browseLogPath = useCallback(async () => {
+    try {
+      // @ts-ignore - window.vestBridge
+      const result = await window.vestBridge?.chivalry2BrowseLogPath?.();
+      if (result?.success && result.logPath) {
+        await saveLogPath(result.logPath);
+      }
+    } catch (err) {
+      console.error("Failed to browse log path:", err);
+    }
+  }, [saveLogPath]);
+
   return {
     status,
     loading,
     error,
     gameEvents,
+    logPath,
+    setLogPath: saveLogPath,
     start,
     stop,
     clearEvents,
+    browseLogPath,
     refresh: fetchStatus,
   };
 }
