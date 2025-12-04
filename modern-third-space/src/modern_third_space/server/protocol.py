@@ -84,6 +84,11 @@ class CommandType(Enum):
     L4D2_START = "l4d2_start"
     L4D2_STOP = "l4d2_stop"
     L4D2_STATUS = "l4d2_status"
+    # Kingdom Come: Deliverance 2 integration
+    KCD2_START = "kcd2_start"
+    KCD2_STOP = "kcd2_stop"
+    KCD2_STATUS = "kcd2_status"
+    KCD2_GET_MOD_INFO = "kcd2_get_mod_info"
     # Predefined effects
     PLAY_EFFECT = "play_effect"
     LIST_EFFECTS = "list_effects"
@@ -147,6 +152,10 @@ class EventType(Enum):
     L4D2_STARTED = "l4d2_started"
     L4D2_STOPPED = "l4d2_stopped"
     L4D2_GAME_EVENT = "l4d2_game_event"
+    # Kingdom Come: Deliverance 2 integration
+    KCD2_STARTED = "kcd2_started"
+    KCD2_STOPPED = "kcd2_stopped"
+    KCD2_GAME_EVENT = "kcd2_game_event"
     # Predefined effects
     EFFECT_STARTED = "effect_started"
     EFFECT_COMPLETED = "effect_completed"
@@ -1103,5 +1112,94 @@ def response_list_effects(
         req_id=req_id,
         effects=effects,
         categories=categories,
+    )
+
+
+# =============================================================================
+# Kingdom Come: Deliverance 2 Integration Protocol
+# =============================================================================
+
+def event_kcd2_started(log_path: str) -> Event:
+    """Event when KCD2 integration starts."""
+    return Event(event=EventType.KCD2_STARTED.value, log_path=log_path)
+
+
+def event_kcd2_stopped() -> Event:
+    """Event when KCD2 integration stops."""
+    return Event(event=EventType.KCD2_STOPPED.value)
+
+
+def event_kcd2_game_event(
+    event_type: str,
+    params: Optional[Dict[str, Any]] = None,
+) -> Event:
+    """
+    KCD2 game event (damage, death, block, etc.).
+    
+    Args:
+        event_type: Type of event ("PlayerDamage", "PlayerDeath", etc.)
+        params: Event parameters (damage, health, direction, etc.)
+    """
+    return Event(
+        event=EventType.KCD2_GAME_EVENT.value,
+        event_type=event_type,
+        params=params,
+    )
+
+
+def response_kcd2_start(
+    success: bool,
+    log_path: Optional[str] = None,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to kcd2_start command."""
+    return Response(
+        response="kcd2_start",
+        req_id=req_id,
+        success=success,
+        log_path=log_path,
+        message=error,
+    )
+
+
+def response_kcd2_stop(success: bool, req_id: Optional[str] = None) -> Response:
+    """Response to kcd2_stop command."""
+    return Response(
+        response="kcd2_stop",
+        req_id=req_id,
+        success=success,
+    )
+
+
+def response_kcd2_status(
+    running: bool,
+    log_path: Optional[str] = None,
+    events_received: int = 0,
+    last_event_ts: Optional[float] = None,
+    last_event_type: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to kcd2_status command."""
+    return Response(
+        response="kcd2_status",
+        req_id=req_id,
+        running=running,
+        log_path=log_path,
+        events_received=events_received,
+        last_event_ts=last_event_ts,
+        last_event_type=last_event_type,
+    )
+
+
+def response_kcd2_get_mod_info(
+    mod_info: Dict[str, Any],
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to kcd2_get_mod_info command with mod download/install info."""
+    return Response(
+        response="kcd2_get_mod_info",
+        req_id=req_id,
+        mod_info=mod_info,
     )
 

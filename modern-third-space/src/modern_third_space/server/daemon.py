@@ -78,6 +78,7 @@ from .gtav_manager import GTAVManager
 from .pistolwhip_manager import PistolWhipManager
 from .starcitizen_manager import StarCitizenManager
 from .l4d2_manager import L4D2Manager
+from .kcd2_manager import KCD2Manager, get_mod_info as get_kcd2_mod_info
 from .protocol import (
     event_alyx_started,
     event_alyx_stopped,
@@ -110,6 +111,14 @@ from .protocol import (
     response_l4d2_start,
     response_l4d2_stop,
     response_l4d2_status,
+    # Kingdom Come: Deliverance 2 integration
+    event_kcd2_started,
+    event_kcd2_stopped,
+    event_kcd2_game_event,
+    response_kcd2_start,
+    response_kcd2_stop,
+    response_kcd2_status,
+    response_kcd2_get_mod_info,
     # Predefined effects
     event_effect_started,
     event_effect_completed,
@@ -185,6 +194,12 @@ class VestDaemon:
         self._l4d2_manager = L4D2Manager(
             on_game_event=self._on_l4d2_game_event,
             on_trigger=self._on_l4d2_trigger,
+        )
+        
+        # Kingdom Come: Deliverance 2 manager
+        self._kcd2_manager = KCD2Manager(
+            on_game_event=self._on_kcd2_game_event,
+            on_trigger=self._on_kcd2_trigger,
         )
         
         self._loop: Optional[asyncio.AbstractEventLoop] = None
@@ -480,6 +495,19 @@ class VestDaemon:
         
         if cmd_type == CommandType.L4D2_STATUS:
             return await self._cmd_l4d2_status(command)
+        
+        # Kingdom Come: Deliverance 2 commands
+        if cmd_type == CommandType.KCD2_START:
+            return await self._cmd_kcd2_start(command)
+        
+        if cmd_type == CommandType.KCD2_STOP:
+            return await self._cmd_kcd2_stop(command)
+        
+        if cmd_type == CommandType.KCD2_STATUS:
+            return await self._cmd_kcd2_status(command)
+        
+        if cmd_type == CommandType.KCD2_GET_MOD_INFO:
+            return await self._cmd_kcd2_get_mod_info(command)
         
         # Predefined effects commands
         if cmd_type == CommandType.PLAY_EFFECT:
@@ -1637,6 +1665,99 @@ class VestDaemon:
     def _on_l4d2_trigger(self, cell: int, speed: int):
         """
         Called when Left 4 Dead 2 manager wants to trigger a haptic effect.
+        
+        Triggers the effect on the main device.
+        """
+        # Get main device controller
+        main_device_id = self._registry.get_main_device_id()
+        if main_device_id is None:
+            return  # No device available
+        
+        controller = self._registry.get_controller(main_device_id)
+        if controller is None or not controller.status().connected:
+            return  # Device not connected
+        
+        # Trigger effect (synchronous, thread-safe)
+        controller.trigger_effect(cell, speed)
+        
+        # Broadcast event (async)
+        if self._loop is not None:
+            event = event_effect_triggered(cell, speed, device_id=main_device_id)
+            asyncio.run_coroutine_threadsafe(
+                self._clients.broadcast(event),
+                self._loop,
+            )
+    
+    # -------------------------------------------------------------------------
+    # Kingdom Come: Deliverance 2 commands
+    # -------------------------------------------------------------------------
+    
+    async def _cmd_kcd2_start(self, command: Command) -> Response:
+        """Start watching KCD2 Game.log."""
+        logger.info(f"[KCD2] Received start command: log_path={command.log_path}")
+        log_path = command.log_path
+        
+        success, error = self._kcd2_manager.start(log_path=log_path)
+        
+        if success:
+            log_path_str = str(self._kcd2_manager.log_path) if self._kcd2_manager.log_path else None
+            await self._clients.broadcast(event_kcd2_started(log_path_str or ""))
+            logger.info(f"[KCD2] Integration started, watching: {log_path_str}")
+            return response_kcd2_start(success=True, log_path=log_path_str, req_id=command.req_id)
+        else:
+            logger.warning(f"[KCD2] Failed to start: {error}")
+            return response_kcd2_start(success=False, error=error, req_id=command.req_id)
+    
+    async def _cmd_kcd2_stop(self, command: Command) -> Response:
+        """Stop watching KCD2 Game.log."""
+        success = self._kcd2_manager.stop()
+        if success:
+            await self._clients.broadcast(event_kcd2_stopped())
+            logger.info("[KCD2] Integration stopped")
+        return response_kcd2_stop(success=success, req_id=command.req_id)
+    
+    async def _cmd_kcd2_status(self, command: Command) -> Response:
+        """Get KCD2 integration status."""
+        log_path_str = str(self._kcd2_manager.log_path) if self._kcd2_manager.log_path else None
+        return response_kcd2_status(
+            running=self._kcd2_manager.is_running,
+            log_path=log_path_str,
+            events_received=self._kcd2_manager.events_received,
+            last_event_ts=self._kcd2_manager.last_event_ts,
+            last_event_type=self._kcd2_manager.last_event_type,
+            req_id=command.req_id,
+        )
+    
+    async def _cmd_kcd2_get_mod_info(self, command: Command) -> Response:
+        """Get KCD2 mod info (download URLs, install instructions)."""
+        mod_info = get_kcd2_mod_info()
+        return response_kcd2_get_mod_info(
+            mod_info=mod_info,
+            req_id=command.req_id,
+        )
+    
+    # -------------------------------------------------------------------------
+    # Kingdom Come: Deliverance 2 callbacks
+    # -------------------------------------------------------------------------
+    
+    def _on_kcd2_game_event(self, event_type: str, params: dict):
+        """
+        Called when KCD2 manager processes a game event.
+        
+        Broadcasts the event to all connected clients for UI display.
+        """
+        if self._loop is None:
+            return
+        
+        # Schedule broadcast in event loop
+        asyncio.run_coroutine_threadsafe(
+            self._clients.broadcast(event_kcd2_game_event(event_type, params)),
+            self._loop,
+        )
+    
+    def _on_kcd2_trigger(self, cell: int, speed: int):
+        """
+        Called when KCD2 manager wants to trigger a haptic effect.
         
         Triggers the effect on the main device.
         """
