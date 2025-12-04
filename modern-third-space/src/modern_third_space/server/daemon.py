@@ -79,6 +79,7 @@ from .pistolwhip_manager import PistolWhipManager
 from .starcitizen_manager import StarCitizenManager
 from .l4d2_manager import L4D2Manager
 from .mordhau_manager import MordhauManager
+from .chivalry2_manager import Chivalry2Manager
 from .protocol import (
     event_alyx_started,
     event_alyx_stopped,
@@ -117,6 +118,12 @@ from .protocol import (
     response_mordhau_start,
     response_mordhau_stop,
     response_mordhau_status,
+    event_chivalry2_started,
+    event_chivalry2_stopped,
+    event_chivalry2_game_event,
+    response_chivalry2_start,
+    response_chivalry2_stop,
+    response_chivalry2_status,
     # Predefined effects
     event_effect_started,
     event_effect_completed,
@@ -198,6 +205,12 @@ class VestDaemon:
         self._mordhau_manager = MordhauManager(
             on_game_event=self._on_mordhau_game_event,
             on_trigger=self._on_mordhau_trigger,
+        )
+        
+        # Chivalry 2 manager
+        self._chivalry2_manager = Chivalry2Manager(
+            on_game_event=self._on_chivalry2_game_event,
+            on_trigger=self._on_chivalry2_trigger,
         )
         
         self._loop: Optional[asyncio.AbstractEventLoop] = None
@@ -502,6 +515,14 @@ class VestDaemon:
         
         if cmd_type == CommandType.MORDHAU_STATUS:
             return await self._cmd_mordhau_status(command)
+        
+        # Chivalry 2 commands
+        if cmd_type == CommandType.CHIVALRY2_START:
+            return await self._cmd_chivalry2_start(command)
+        if cmd_type == CommandType.CHIVALRY2_STOP:
+            return await self._cmd_chivalry2_stop(command)
+        if cmd_type == CommandType.CHIVALRY2_STATUS:
+            return await self._cmd_chivalry2_status(command)
         
         # Predefined effects commands
         if cmd_type == CommandType.PLAY_EFFECT:
@@ -1672,6 +1693,82 @@ class VestDaemon:
             req_id=command.req_id,
         )
     
+    # Chivalry 2 commands
+    
+    async def _cmd_chivalry2_start(self, command: Command) -> Response:
+        """Start watching Chivalry 2 haptic_events.log."""
+        logger.info(f"[Chivalry2] Received start command: log_path={command.log_path}")
+        log_path = command.log_path
+        
+        success, error = self._chivalry2_manager.start(log_path=log_path)
+        
+        if success:
+            log_path_str = str(self._chivalry2_manager.log_path) if self._chivalry2_manager.log_path else None
+            await self._clients.broadcast(event_chivalry2_started(log_path_str or ""))
+            return response_chivalry2_start(success=True, log_path=log_path_str, req_id=command.req_id)
+        else:
+            return response_chivalry2_start(success=False, error=error, req_id=command.req_id)
+    
+    async def _cmd_chivalry2_stop(self, command: Command) -> Response:
+        """Stop watching Chivalry 2 haptic_events.log."""
+        success = self._chivalry2_manager.stop()
+        if success:
+            await self._clients.broadcast(event_chivalry2_stopped())
+        return response_chivalry2_stop(success=success, req_id=command.req_id)
+    
+    async def _cmd_chivalry2_status(self, command: Command) -> Response:
+        """Get Chivalry 2 integration status."""
+        return response_chivalry2_status(
+            running=self._chivalry2_manager.is_running,
+            log_path=str(self._chivalry2_manager.log_path) if self._chivalry2_manager.log_path else None,
+            events_received=self._chivalry2_manager.events_received,
+            last_event_ts=self._chivalry2_manager.last_event_ts,
+            req_id=command.req_id,
+        )
+    
+    # Chivalry 2 callbacks
+
+    def _on_chivalry2_game_event(self, event_type: str, params: dict):
+        """
+        Called when Chivalry 2 manager processes a game event.
+        
+        Broadcasts the event to all connected clients for UI display.
+        """
+        if self._loop is None:
+            return
+        
+        # Schedule broadcast in event loop
+        asyncio.run_coroutine_threadsafe(
+            self._clients.broadcast(event_chivalry2_game_event(event_type, params)),
+            self._loop,
+        )
+
+    def _on_chivalry2_trigger(self, cell: int, speed: int):
+        """
+        Called when Chivalry 2 manager wants to trigger a haptic effect.
+        
+        Triggers the effect on the main device.
+        """
+        # Get main device controller
+        main_device_id = self._registry.get_main_device_id()
+        if main_device_id is None:
+            return  # No device available
+        
+        controller = self._registry.get_controller(main_device_id)
+        if controller is None:
+            return  # Device not connected
+        
+        # Trigger effect (synchronous, thread-safe)
+        controller.trigger_effect(cell, speed)
+        
+        # Broadcast event (async)
+        if self._loop is not None:
+            event = event_effect_triggered(cell, speed, device_id=main_device_id)
+            asyncio.run_coroutine_threadsafe(
+                self._clients.broadcast(event),
+                self._loop,
+            )
+    
     # -------------------------------------------------------------------------
     # Left 4 Dead 2 callbacks
     # -------------------------------------------------------------------------
@@ -1739,6 +1836,51 @@ class VestDaemon:
     def _on_mordhau_trigger(self, cell: int, speed: int):
         """
         Called when Mordhau manager wants to trigger a haptic effect.
+        
+        Triggers the effect on the main device.
+        """
+        # Get main device controller
+        main_device_id = self._registry.get_main_device_id()
+        if main_device_id is None:
+            return  # No device available
+        
+        controller = self._registry.get_controller(main_device_id)
+        if controller is None:
+            return  # Device not connected
+        
+        # Trigger effect (synchronous, thread-safe)
+        controller.trigger_effect(cell, speed)
+        
+        # Broadcast event (async)
+        if self._loop is not None:
+            event = event_effect_triggered(cell, speed, device_id=main_device_id)
+            asyncio.run_coroutine_threadsafe(
+                self._clients.broadcast(event),
+                self._loop,
+            )
+    
+    # -------------------------------------------------------------------------
+    # Chivalry 2 callbacks
+    # -------------------------------------------------------------------------
+    
+    def _on_chivalry2_game_event(self, event_type: str, params: dict):
+        """
+        Called when Chivalry 2 manager processes a game event.
+        
+        Broadcasts the event to all connected clients for UI display.
+        """
+        if self._loop is None:
+            return
+        
+        # Schedule broadcast in event loop
+        asyncio.run_coroutine_threadsafe(
+            self._clients.broadcast(event_chivalry2_game_event(event_type, params)),
+            self._loop,
+        )
+    
+    def _on_chivalry2_trigger(self, cell: int, speed: int):
+        """
+        Called when Chivalry 2 manager wants to trigger a haptic effect.
         
         Triggers the effect on the main device.
         """

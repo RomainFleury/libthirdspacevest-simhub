@@ -6,6 +6,7 @@ import {
   PistolWhipIntegrationPage,
   L4D2IntegrationPage,
   MordhauIntegrationPage,
+  Chivalry2IntegrationPage,
 } from "./integrations";
 
 /**
@@ -18,6 +19,7 @@ const INTEGRATION_PAGES: Record<string, React.ComponentType> = {
   pistolwhip: PistolWhipIntegrationPage,
   l4d2: L4D2IntegrationPage,
   mordhau: MordhauIntegrationPage,
+  chivalry2: Chivalry2IntegrationPage,
   // Future integrations:
   // bf2: BF2IntegrationPage,
   // ultrakill: UltrakillIntegrationPage,

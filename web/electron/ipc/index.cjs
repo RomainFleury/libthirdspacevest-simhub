@@ -15,6 +15,7 @@ const { registerPistolWhipHandlers } = require("./pistolwhipHandlers.cjs");
 const { registerStarCitizenHandlers } = require("./starcitizenHandlers.cjs");
 const { registerL4D2Handlers } = require("./l4d2Handlers.cjs");
 const { registerMordhauHandlers } = require("./mordhauHandlers.cjs");
+const { registerChivalry2Handlers } = require("./chivalry2Handlers.cjs");
 const { registerEffectsHandlers } = require("./effectsHandlers.cjs");
 const { registerBF2Handlers } = require("./bf2Handlers.cjs");
 const { registerMultiVestHandlers } = require("./multiVestHandlers.cjs");
@@ -52,6 +53,7 @@ function registerAllHandlers(getDaemonBridge, getMainWindow, reconnectToDaemon) 
 
   // Mordhau integration handlers
   registerMordhauHandlers(getDaemonBridge);
+  registerChivalry2Handlers(getDaemonBridge);
 
   // Predefined effects library handlers
   registerEffectsHandlers();

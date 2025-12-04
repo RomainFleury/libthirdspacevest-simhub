@@ -4,3 +4,4 @@ export { SuperHotIntegrationPage } from "./SuperHotIntegrationPage";
 export { PistolWhipIntegrationPage } from "./PistolWhipIntegrationPage";
 export { L4D2IntegrationPage } from "./L4D2IntegrationPage";
 export { MordhauIntegrationPage } from "./MordhauIntegrationPage";
+export { Chivalry2IntegrationPage } from "./Chivalry2IntegrationPage";
