@@ -1697,9 +1697,10 @@ class VestDaemon:
     
     async def _cmd_chivalry2_start(self, command: Command) -> Response:
         """Start watching Chivalry 2 haptic_events.log."""
-        logger.info(f"[Chivalry2] Received start command: log_path={command.log_path}")
         log_path = command.log_path
+        logger.info(f"[Chivalry2] Received start command: log_path={log_path}")
         
+        # Pass log_path to manager (can be None for auto-detect)
         success, error = self._chivalry2_manager.start(log_path=log_path)
         
         if success:

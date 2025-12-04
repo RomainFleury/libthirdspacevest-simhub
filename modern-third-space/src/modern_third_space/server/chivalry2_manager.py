@@ -467,10 +467,14 @@ class Chivalry2Manager:
             return False, "Chivalry 2 integration already running"
         
         # Determine log path
-        if log_path:
-            self._log_path = Path(log_path)
+        if log_path and log_path.strip():
+            # Use provided path (convert to Path and resolve)
+            self._log_path = Path(log_path).resolve()
+            logger.info(f"Using custom log path: {self._log_path}")
         else:
+            # Use default path
             self._log_path = self.DEFAULT_LOG_PATH
+            logger.info(f"Using default log path: {self._log_path}")
         
         # Create watcher
         self._watcher = EventLogWatcher(
