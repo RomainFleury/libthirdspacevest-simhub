@@ -6,7 +6,32 @@ This file helps AI assistants quickly understand recent project evolution.
 
 ---
 
-## 2025-11-27 (Latest)
+## 2025-12-04 (Latest)
+
+### Added
+
+- **Half-Life 2: Deathmatch Integration** - Console log watching for HL2:DM multiplayer
+  - **Integration Type**: Console.log file watching (same as L4D2, Alyx)
+  - **Events Detected**:
+    - Player damage (with intensity scaling based on damage amount)
+    - Player death (full vest pulse at max intensity)
+    - Player kill (victory pulse on front cells)
+    - Respawn (light full vest pulse)
+  - **Files Created**:
+    - `server/hl2dm_manager.py` - Console log parser and haptic mapper
+    - `web/electron/ipc/hl2dmHandlers.cjs` - Electron IPC handlers
+    - `web/electron/hl2dmStorage.cjs` - Settings persistence
+    - `web/src/components/HL2DMIntegrationPanel.tsx` - React UI component
+    - `web/src/hooks/useHL2DMIntegration.ts` - React hook for state management
+  - **Daemon Commands**: `hl2dm_start`, `hl2dm_stop`, `hl2dm_status`
+  - **Daemon Events**: `hl2dm_started`, `hl2dm_stopped`, `hl2dm_game_event`
+  - **Setup**: Add `-condebug` to Steam launch options for HL2:DM
+  - **Documentation**: `docs-external-integrations-ideas/HL2DM_INTEGRATION.md`
+  - **Status**: Complete and ready for testing
+
+---
+
+## 2025-11-27
 
 ### Added
 

@@ -92,6 +92,15 @@ contextBridge.exposeInMainWorld("vestBridge", {
   l4d2CheckModInstalled: () => ipcRenderer.invoke("l4d2:checkModInstalled"),
   l4d2InstallMod: () => ipcRenderer.invoke("l4d2:installMod"),
 
+  // Half-Life 2: Deathmatch Integration API
+  hl2dmStart: (logPath, playerName) => ipcRenderer.invoke("hl2dm:start", logPath, playerName),
+  hl2dmStop: () => ipcRenderer.invoke("hl2dm:stop"),
+  hl2dmStatus: () => ipcRenderer.invoke("hl2dm:status"),
+  hl2dmBrowseLogPath: () => ipcRenderer.invoke("hl2dm:browseLogPath"),
+  hl2dmGetSettings: () => ipcRenderer.invoke("hl2dm:getSettings"),
+  hl2dmSetLogPath: (logPath) => ipcRenderer.invoke("hl2dm:setLogPath", logPath),
+  hl2dmSetPlayerName: (playerName) => ipcRenderer.invoke("hl2dm:setPlayerName", playerName),
+
   // Predefined Effects Library API
   playEffect: (effectName) => ipcRenderer.invoke("effects:play", effectName),
   listEffectsLibrary: () => ipcRenderer.invoke("effects:list"),
