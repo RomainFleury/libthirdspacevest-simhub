@@ -1790,22 +1790,35 @@ class VestDaemon:
         if effect is None:
             return response_error(f"Unknown effect: {command.effect_name}", command.req_id)
         
-        # Check if we have a device
-        if self._selected_device is None:
-            return response_error("No device selected", command.req_id)
+        # Resolve device_id using multi-vest logic
+        target_device_id = self._resolve_device_id(command)
         
-        # Auto-connect if needed
-        if self._controller is None or not self._controller.status().connected:
-            self._controller = VestController()
-            status = self._controller.connect_to_device({
-                "bus": self._selected_device.get("bus"),
-                "address": self._selected_device.get("address"),
-            })
-            if not status.connected:
-                return response_error("Failed to connect to vest", command.req_id)
+        # Get controller for resolved device_id
+        controller = self._registry.get_controller(target_device_id)
+        
+        # If no controller found, try to auto-connect main device (backward compatibility)
+        if controller is None:
+            if self._selected_device is None:
+                return response_error("No device selected and no device_id specified", command.req_id)
+            
+            # Auto-connect main device
+            try:
+                device_id, controller = self._registry.add_device(
+                    device_id=None,
+                    device_info=self._selected_device
+                )
+                self._controller = controller  # Update for backward compatibility
+                await self._clients.broadcast(event_connected(self._selected_device))
+                target_device_id = device_id
+            except ValueError as e:
+                return response_error(str(e), command.req_id)
+        
+        # Check if connected
+        if not controller.status().connected:
+            return response_error("Device not connected", command.req_id)
         
         # Start the effect playback in background
-        asyncio.create_task(self._play_effect_sequence(effect))
+        asyncio.create_task(self._play_effect_sequence(effect, controller, target_device_id))
         
         return response_play_effect(
             success=True,
@@ -1813,7 +1826,7 @@ class VestDaemon:
             req_id=command.req_id,
         )
     
-    async def _play_effect_sequence(self, effect) -> None:
+    async def _play_effect_sequence(self, effect, controller, device_id: str = None) -> None:
         """
         Play an effect's step sequence.
         
@@ -1829,18 +1842,18 @@ class VestDaemon:
             for step in effect.steps:
                 # Trigger all cells in this step
                 for cell in step.cells:
-                    if self._controller is not None:
-                        self._controller.trigger_effect(cell, step.speed)
-                    # Broadcast individual trigger
-                    await self._clients.broadcast(event_effect_triggered(cell, step.speed))
+                    if controller is not None:
+                        controller.trigger_effect(cell, step.speed)
+                    # Broadcast individual trigger with device_id
+                    await self._clients.broadcast(event_effect_triggered(cell, step.speed, device_id=device_id))
                 
                 # Wait for step duration
                 await asyncio.sleep(step.duration_ms / 1000.0)
                 
                 # Stop cells (speed 0)
                 for cell in step.cells:
-                    if self._controller is not None:
-                        self._controller.trigger_effect(cell, 0)
+                    if controller is not None:
+                        controller.trigger_effect(cell, 0)
                 
                 # Wait for delay before next step
                 if step.delay_ms > 0:
