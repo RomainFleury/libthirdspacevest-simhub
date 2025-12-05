@@ -78,6 +78,7 @@ from .gtav_manager import GTAVManager
 from .pistolwhip_manager import PistolWhipManager
 from .starcitizen_manager import StarCitizenManager
 from .l4d2_manager import L4D2Manager
+from .tf2_manager import TF2Manager
 from .protocol import (
     event_alyx_started,
     event_alyx_stopped,
@@ -110,6 +111,12 @@ from .protocol import (
     response_l4d2_start,
     response_l4d2_stop,
     response_l4d2_status,
+    event_tf2_started,
+    event_tf2_stopped,
+    event_tf2_game_event,
+    response_tf2_start,
+    response_tf2_stop,
+    response_tf2_status,
     # Predefined effects
     event_effect_started,
     event_effect_completed,
@@ -187,6 +194,12 @@ class VestDaemon:
             on_trigger=self._on_l4d2_trigger,
         )
         
+        # Team Fortress 2 manager
+        self._tf2_manager = TF2Manager(
+            on_game_event=self._on_tf2_game_event,
+            on_trigger=self._on_tf2_trigger,
+        )
+        
         self._loop: Optional[asyncio.AbstractEventLoop] = None
     
     @property
@@ -228,6 +241,10 @@ class VestDaemon:
         # Stop Alyx integration if running
         if self._alyx_manager.is_running:
             self._alyx_manager.stop()
+        
+        # Stop TF2 integration if running
+        if self._tf2_manager.is_running:
+            self._tf2_manager.stop()
         
         # Disconnect from all vests
         for device_id in list(self._registry._controllers.keys()):
@@ -480,6 +497,16 @@ class VestDaemon:
         
         if cmd_type == CommandType.L4D2_STATUS:
             return await self._cmd_l4d2_status(command)
+        
+        # Team Fortress 2 commands
+        if cmd_type == CommandType.TF2_START:
+            return await self._cmd_tf2_start(command)
+        
+        if cmd_type == CommandType.TF2_STOP:
+            return await self._cmd_tf2_stop(command)
+        
+        if cmd_type == CommandType.TF2_STATUS:
+            return await self._cmd_tf2_status(command)
         
         # Predefined effects commands
         if cmd_type == CommandType.PLAY_EFFECT:
@@ -1637,6 +1664,91 @@ class VestDaemon:
     def _on_l4d2_trigger(self, cell: int, speed: int):
         """
         Called when Left 4 Dead 2 manager wants to trigger a haptic effect.
+        
+        Triggers the effect on the main device.
+        """
+        # Get main device controller
+        main_device_id = self._registry.get_main_device_id()
+        if main_device_id is None:
+            return  # No device available
+        
+        controller = self._registry.get_controller(main_device_id)
+        if controller is None or not controller.status().connected:
+            return  # Device not connected
+        
+        # Trigger effect (synchronous, thread-safe)
+        controller.trigger_effect(cell, speed)
+        
+        # Broadcast event (async)
+        if self._loop is not None:
+            event = event_effect_triggered(cell, speed, device_id=main_device_id)
+            asyncio.run_coroutine_threadsafe(
+                self._clients.broadcast(event),
+                self._loop,
+            )
+    
+    # -------------------------------------------------------------------------
+    # Team Fortress 2 commands
+    # -------------------------------------------------------------------------
+    
+    async def _cmd_tf2_start(self, command: Command) -> Response:
+        """Start watching Team Fortress 2 console.log."""
+        logger.info(f"[TF2] Received start command: log_path={command.log_path}, player_name={command.message}")
+        log_path = command.log_path
+        player_name = command.message  # Using message field for player name
+        
+        success, error = self._tf2_manager.start(log_path=log_path, player_name=player_name)
+        
+        if success:
+            log_path_str = str(self._tf2_manager.log_path) if self._tf2_manager.log_path else None
+            await self._clients.broadcast(event_tf2_started(log_path_str or ""))
+            print(f"[TF2] Integration started, watching: {log_path_str}")
+            return response_tf2_start(success=True, log_path=log_path_str, req_id=command.req_id)
+        else:
+            return response_tf2_start(success=False, error=error, req_id=command.req_id)
+    
+    async def _cmd_tf2_stop(self, command: Command) -> Response:
+        """Stop watching Team Fortress 2 console.log."""
+        success = self._tf2_manager.stop()
+        if success:
+            await self._clients.broadcast(event_tf2_stopped())
+            print("[TF2] Integration stopped")
+        return response_tf2_stop(success=success, req_id=command.req_id)
+    
+    async def _cmd_tf2_status(self, command: Command) -> Response:
+        """Get Team Fortress 2 integration status."""
+        log_path_str = str(self._tf2_manager.log_path) if self._tf2_manager.log_path else None
+        return response_tf2_status(
+            running=self._tf2_manager.is_running,
+            events_received=self._tf2_manager.events_received,
+            last_event_ts=self._tf2_manager.last_event_ts,
+            last_event_type=self._tf2_manager.last_event_type,
+            log_path=log_path_str,
+            req_id=command.req_id,
+        )
+    
+    # -------------------------------------------------------------------------
+    # Team Fortress 2 callbacks
+    # -------------------------------------------------------------------------
+    
+    def _on_tf2_game_event(self, event_type: str, params: dict):
+        """
+        Called when Team Fortress 2 manager processes a game event.
+        
+        Broadcasts the event to all connected clients for UI display.
+        """
+        if self._loop is None:
+            return
+        
+        # Schedule broadcast in event loop
+        asyncio.run_coroutine_threadsafe(
+            self._clients.broadcast(event_tf2_game_event(event_type, params)),
+            self._loop,
+        )
+    
+    def _on_tf2_trigger(self, cell: int, speed: int):
+        """
+        Called when Team Fortress 2 manager wants to trigger a haptic effect.
         
         Triggers the effect on the main device.
         """

@@ -893,6 +893,70 @@ class DaemonBridge extends EventEmitter {
   }
 
   // -------------------------------------------------------------------------
+  // Team Fortress 2 Integration API
+  // -------------------------------------------------------------------------
+
+  /**
+   * Start Team Fortress 2 console log watcher.
+   * @param {string} [logPath] - Optional path to console.log (auto-detect if not provided)
+   * @param {string} [playerName] - Optional player name to detect player deaths
+   */
+  async tf2Start(logPath, playerName) {
+    try {
+      const params = {};
+      if (logPath) {
+        params.log_path = logPath;
+      }
+      if (playerName) {
+        params.message = playerName; // Using message field for player name
+      }
+      const response = await this.sendCommand("tf2_start", params);
+      return {
+        success: response.success ?? true,
+        log_path: response.log_path,
+        error: response.message,
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Stop Team Fortress 2 integration.
+   */
+  async tf2Stop() {
+    try {
+      await this.sendCommand("tf2_stop");
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Get Team Fortress 2 integration status.
+   */
+  async tf2Status() {
+    try {
+      const response = await this.sendCommand("tf2_status");
+      return {
+        success: true,
+        running: response.running ?? false,
+        events_received: response.events_received ?? 0,
+        last_event_ts: response.last_event_ts ?? null,
+        last_event_type: response.last_event_type ?? null,
+        log_path: response.log_path ?? null,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        running: false,
+        error: error.message,
+      };
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Predefined Effects Library API
   // -------------------------------------------------------------------------
 
