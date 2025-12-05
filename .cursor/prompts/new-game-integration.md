@@ -2,6 +2,9 @@
 
 Load this prompt when adding haptic support for a new game: `@.cursor/prompts/new-game-integration.md`
 
+**Related prompts:**
+- `@.cursor/prompts/pr-review-checklist.md` - For reviewing PRs with integration changes
+
 ---
 
 @.cursorrules @CHANGELOG.md @docs-external-integrations-ideas/DAEMON_ARCHITECTURE.md
@@ -93,6 +96,20 @@ Include:
 - Event-to-haptic mapping table (adapted for 8 cells)
 - Setup requirements for users
 - Implementation plan with phases
+
+---
+
+## Step 2.5: Run Baseline Tests (MANDATORY)
+
+Before implementing, run the existing tests to ensure a clean baseline:
+
+```bash
+cd modern-third-space
+pip install -e .  # If not already installed
+python3 -m pytest tests/test_game_integrations.py -v
+```
+
+All 27 tests must pass before proceeding. If any fail, fix them first.
 
 ---
 
@@ -223,6 +240,58 @@ Use constants from `vest/cell_layout.py`:
 
 ---
 
+## Step 5: Register and Test (MANDATORY)
+
+### 5.1 Register the Integration
+
+Add to `integrations/registry.py`:
+
+```python
+register_integration(GameIntegrationSpec(
+    game_id="{game_id}",
+    game_name="{Game Name}",
+    integration_type=IntegrationType.LOG_FILE,  # or TCP_CLIENT, HTTP_GSI
+    status=IntegrationStatus.STABLE,
+    manager_module="{game}_manager",
+    manager_class="{Game}Manager",
+    daemon_commands=["{game}_start", "{game}_stop", "{game}_status"],
+    event_types=["player_damage", "player_death", ...],
+    has_directional_damage=True,
+    docs_file="docs-external-integrations-ideas/{GAME}_INTEGRATION.md",
+    requires_external_mod=True,
+    mod_url="https://...",
+))
+```
+
+### 5.2 Update Snapshot Test
+
+Add to `tests/test_game_integrations.py` in `EXPECTED_INTEGRATIONS`:
+
+```python
+"{game_id}": {
+    "game_name": "{Game Name}",
+    "integration_type": "{log_file|tcp_client|http_gsi}",
+    "status": "stable",
+    "has_manager": True,
+    "event_count_min": 2,
+},
+```
+
+### 5.3 Run Tests
+
+```bash
+cd modern-third-space
+python3 -m pytest tests/test_game_integrations.py -v
+```
+
+**All tests must pass.** The test suite validates:
+- Registry consistency (all required fields)
+- Manager structure (correct methods)
+- Haptic mappings (using cell_layout)
+- Snapshot protection (existing integrations unchanged)
+
+---
+
 ## Ready?
 
 **Tell me the game name** and I'll:
@@ -230,4 +299,5 @@ Use constants from `vest/cell_layout.py`:
 2. Research the best integration approach
 3. Create a strategy document
 4. Implement the integration step by step
+5. Register in registry and ensure tests pass
 

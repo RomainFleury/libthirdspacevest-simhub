@@ -4,12 +4,118 @@ This document provides examples for testing all components of the `modern-third-
 
 ## Table of Contents
 
-1. [Quick Health Check](#quick-health-check)
-2. [Testing the Daemon](#testing-the-daemon)
-3. [Testing CS2 GSI Integration](#testing-cs2-gsi-integration)
-4. [Testing Half-Life: Alyx Integration](#testing-half-life-alyx-integration)
-5. [Testing with Python Scripts](#testing-with-python-scripts)
-6. [Simulated Game Payloads](#simulated-game-payloads)
+1. [Game Integration Consistency Tests](#game-integration-consistency-tests) ⭐ **NEW - RUN FIRST**
+2. [Quick Health Check](#quick-health-check)
+3. [Testing the Daemon](#testing-the-daemon)
+4. [Testing CS2 GSI Integration](#testing-cs2-gsi-integration)
+5. [Testing Half-Life: Alyx Integration](#testing-half-life-alyx-integration)
+6. [Testing with Python Scripts](#testing-with-python-scripts)
+7. [Simulated Game Payloads](#simulated-game-payloads)
+
+---
+
+## Game Integration Consistency Tests
+
+**⚠️ MANDATORY: Run these tests before adding or modifying game integrations.**
+
+### Install and Run
+
+```bash
+cd modern-third-space
+
+# Install the package in development mode (first time only)
+pip install -e .
+
+# Run all game integration tests
+python3 -m pytest tests/test_game_integrations.py -v
+```
+
+### Expected Output
+
+```
+======================== 27 passed, N warnings =================
+```
+
+All tests must pass. Warnings are advisory (documentation recommendations).
+
+### What the Tests Validate
+
+| Test Category | What It Checks |
+|---------------|----------------|
+| **Registry** | All integrations have unique IDs, required fields, proper naming |
+| **Manager Structure** | Managers are importable, have required methods (start/stop or process_event) |
+| **Haptic Mappings** | Mappings exist and use proper cell layout constants |
+| **Cell Layout** | Managers import from `vest.cell_layout`, use Cell constants |
+| **Event Types** | All integrations have damage/death events documented |
+| **Snapshot** | Existing integrations haven't been accidentally modified |
+| **Documentation** | STABLE integrations have docs (advisory warning if missing) |
+
+### Adding a New Integration
+
+When adding a new game integration, you must:
+
+1. **Register in `integrations/registry.py`**:
+   ```python
+   register_integration(GameIntegrationSpec(
+       game_id="newgame",
+       game_name="New Game",
+       # ... all required fields
+   ))
+   ```
+
+2. **Update Snapshot in `tests/test_game_integrations.py`**:
+   ```python
+   EXPECTED_INTEGRATIONS = {
+       # ... existing entries
+       "newgame": {
+           "game_name": "New Game",
+           "integration_type": "log_file",
+           "status": "stable",
+           "has_manager": True,
+           "event_count_min": 2,
+       },
+   }
+   ```
+
+3. **Run tests and ensure all pass**:
+   ```bash
+   python3 -m pytest tests/test_game_integrations.py -v
+   ```
+
+### Troubleshooting Failed Tests
+
+| Failure | Cause | Fix |
+|---------|-------|-----|
+| `Missing manager_module` | STABLE integration without manager | Add manager_module and manager_class |
+| `Daemon command should start with game_id_` | Wrong command naming | Prefix commands with `{game_id}_` |
+| `Missing map_event_to_haptics` | No haptic mapping logic | Add mapping function or `_trigger_*` methods |
+| `Should import from vest.cell_layout` | Using raw integers for cells | Import Cell constants from cell_layout |
+| `Integration removed without updating snapshot` | Removed integration | Update EXPECTED_INTEGRATIONS if intentional |
+
+### Automated Integration Checker
+
+For a quick pre-PR check, use the integration checker script:
+
+```bash
+cd modern-third-space
+python3 scripts/check_integrations.py
+```
+
+This script:
+- Verifies package installation
+- Runs all 27 game integration tests
+- Validates the registry
+- Checks snapshot consistency
+
+**Exit code 0** = All checks passed, safe to create PR
+**Exit code 1** = Issues found, fix before creating PR
+
+### CI/CD Integration
+
+See `.github/workflows/game-integrations.yml.example` for a GitHub Actions workflow
+that automatically runs these tests on PRs touching integration files.
+
+---
 
 ---
 

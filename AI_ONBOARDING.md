@@ -234,8 +234,29 @@ modern_third_space/
 - **Adding a UI component**: Create in `web/src/components/`, import in `web/src/App.tsx`
 - **Debugging Python daemon**: `daemon status`, check logs, test with `echo '{"cmd":"ping"}' | nc localhost 5050`
 - **Updating device info**: Modify `VestStatus` in `vest/status.py`, update TypeScript types, update UI components
-- **Adding game integrations**: Create manager in `server/` (see `cs2_manager.py` and `alyx_manager.py` as examples), add daemon commands in `daemon.py`, update protocol in `protocol.py`
+- **Adding game integrations**: See **Game Integration Testing** section below
 - **Reviewing integration strategies**: Check `docs-external-integrations-ideas/`, especially `DAEMON_ARCHITECTURE.md`, `CS2_INTEGRATION.md`, `ALYX_INTEGRATION.md`, and `MELONLOADER_INTEGRATION_STRATEGY.md`
+
+## Game Integration Testing (MANDATORY)
+
+When adding new game integrations, you **MUST** run the integration test suite:
+
+```bash
+cd modern-third-space
+pip install -e .  # Install in dev mode (first time only)
+python3 -m pytest tests/test_game_integrations.py -v
+```
+
+**All 27 tests must pass** before submitting changes.
+
+### Required Steps for New Integrations
+
+1. **Register in `integrations/registry.py`** - Add `GameIntegrationSpec` 
+2. **Create manager** in `server/{game}_manager.py`
+3. **Update snapshot test** in `tests/test_game_integrations.py` - Add to `EXPECTED_INTEGRATIONS`
+4. **Run tests** and ensure all pass
+
+See `modern-third-space/TESTING.md` for detailed instructions and troubleshooting.
 
 ## Before Making Changes
 

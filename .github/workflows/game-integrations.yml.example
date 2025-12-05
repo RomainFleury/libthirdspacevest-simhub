@@ -1,0 +1,47 @@
+# Example GitHub Actions workflow for game integration testing
+# 
+# To enable:
+# 1. Rename this file to game-integrations.yml
+# 2. Ensure the workflow runs on PRs that touch integration files
+#
+# This workflow ensures:
+# - All game integration tests pass
+# - New integrations are properly registered
+# - Existing integrations aren't accidentally broken
+
+name: Game Integration Tests
+
+on:
+  pull_request:
+    paths:
+      - 'modern-third-space/src/modern_third_space/server/*_manager.py'
+      - 'modern-third-space/src/modern_third_space/integrations/**'
+      - 'modern-third-space/tests/test_game_integrations.py'
+
+jobs:
+  test-integrations:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          cd modern-third-space
+          pip install -e .
+          pip install pytest pytest-asyncio
+      
+      - name: Run game integration tests
+        run: |
+          cd modern-third-space
+          python -m pytest tests/test_game_integrations.py -v --tb=short
+      
+      - name: Run integration checker
+        run: |
+          cd modern-third-space
+          python scripts/check_integrations.py
