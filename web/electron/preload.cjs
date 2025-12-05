@@ -105,6 +105,11 @@ contextBridge.exposeInMainWorld("vestBridge", {
   bf2GetConfigFilePath: () => ipcRenderer.invoke("bf2:getConfigFilePath"),
   bf2WriteConfigFile: () => ipcRenderer.invoke("bf2:writeConfigFile"),
 
+  // Among Us Integration API
+  amongusStart: () => ipcRenderer.invoke("amongus:start"),
+  amongusStop: () => ipcRenderer.invoke("amongus:stop"),
+  amongusStatus: () => ipcRenderer.invoke("amongus:status"),
+
   // Multi-Vest Management API
   listConnectedDevices: () => ipcRenderer.invoke("multivist:listConnectedDevices"),
   setMainDevice: (deviceId) => ipcRenderer.invoke("multivist:setMainDevice", deviceId),

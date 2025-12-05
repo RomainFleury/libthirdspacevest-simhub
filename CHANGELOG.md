@@ -6,7 +6,44 @@ This file helps AI assistants quickly understand recent project evolution.
 
 ---
 
-## 2025-11-27 (Latest)
+## 2025-12-05 (Latest)
+
+### Added
+
+- **Among Us Integration** - Complete BepInEx mod integration for Among Us
+  - BepInEx 6.x plugin for IL2CPP (Among Us uses IL2CPP, not Mono)
+  - **Mod Features**:
+    - Player killed detection (full-body dramatic feedback when impostor kills you)
+    - Ejection detection (falling sensation when voted out into space)
+    - Execute kill detection (visceral feedback when you kill as impostor)
+    - Emergency meeting alert pulse
+    - Vote cast confirmation feedback
+    - Body reported shock/alarm
+    - Task completion subtle positive feedback
+    - Vent enter/exit whoosh sensation
+    - Sabotage events (reactor, oxygen, lights, comms) with distinct patterns
+    - Game start/end victory and defeat patterns
+  - **Mod Files**: `amongus-mod/ThirdSpace_AmongUs/` (C# BepInEx project)
+    - `ThirdSpace_AmongUs.cs`: Main plugin with Harmony patches
+    - `DaemonClient.cs`: TCP client for daemon communication
+  - **Python Manager**: `server/amongus_manager.py`
+    - Processes all Among Us game events
+    - Maps events to appropriate vest cells
+    - Intensity/duration tuning for social deduction gameplay
+  - **Daemon Protocol**: Added `amongus_event`, `amongus_start`, `amongus_stop`, `amongus_status` commands
+  - **Electron UI**: Complete integration panel with live event log
+    - Status display (enabled/disabled, events received)
+    - Enable/disable controls
+    - Real-time event feed with icons
+    - Mod installation instructions
+    - Haptic effects reference
+  - **Build System**: `amongus-mod/build.ps1` - Build script for the plugin
+  - **Documentation**: `docs-external-integrations-ideas/AMONGUS_INTEGRATION.md`
+  - **Status**: Complete and ready for testing
+
+---
+
+## 2025-11-27
 
 ### Added
 

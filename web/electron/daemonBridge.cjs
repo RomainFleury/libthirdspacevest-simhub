@@ -950,6 +950,54 @@ class DaemonBridge extends EventEmitter {
       return { success: false, error: error.message };
     }
   }
+
+  // -------------------------------------------------------------------------
+  // Among Us Integration API
+  // -------------------------------------------------------------------------
+
+  /**
+   * Enable Among Us integration.
+   */
+  async amongusStart() {
+    try {
+      await this.sendCommand("amongus_start");
+      return { ok: true, success: true };
+    } catch (error) {
+      return { ok: false, success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Disable Among Us integration.
+   */
+  async amongusStop() {
+    try {
+      await this.sendCommand("amongus_stop");
+      return { ok: true, success: true };
+    } catch (error) {
+      return { ok: false, success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Get Among Us integration status.
+   */
+  async amongusStatus() {
+    try {
+      const response = await this.sendCommand("amongus_status");
+      return {
+        running: response.running ?? false,
+        events_received: response.events_received ?? 0,
+        last_event_ts: response.last_event_ts ?? null,
+        last_event_type: response.last_event_type ?? null,
+      };
+    } catch (error) {
+      return {
+        running: false,
+        error: error.message,
+      };
+    }
+  }
 }
 
 // Singleton instance
