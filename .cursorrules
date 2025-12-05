@@ -38,12 +38,56 @@ cd web && yarn dev                               # Start Electron
 ### Adding Features
 
 - **New daemon command**: Add to `server/protocol.py` + handler in `server/daemon.py`
-- **New game integration**: Create in `integrations/`, connect to daemon as TCP client
+- **New game integration**: See checklist below
 - **New UI feature**: Add component in `web/src/components/`
+
+### Adding Game Integrations (REQUIRED CHECKLIST)
+
+**Before starting**, run existing tests to ensure clean baseline:
+```bash
+cd modern-third-space && python3 -m pytest tests/test_game_integrations.py -v
+```
+
+**Required steps for new game integrations:**
+
+1. **Register in Registry** - Add to `integrations/registry.py`:
+   - Create `GameIntegrationSpec` with all required fields
+   - Call `register_integration()` to add to registry
+
+2. **Create Manager** - Add `server/{game}_manager.py` with:
+   - Manager class with `start()/stop()` for log watchers OR `process_event()` for TCP handlers
+   - Callback setters for event broadcasting
+   - Haptic mapping logic (via `map_event_to_haptics()` or `_trigger_*` methods)
+   - Import from `vest.cell_layout` for cell constants
+
+3. **Update Snapshot Test** - Add to `tests/test_game_integrations.py`:
+   - Add entry in `EXPECTED_INTEGRATIONS` dict in `TestIntegrationSnapshot`
+
+4. **Run Tests** - Must all pass:
+   ```bash
+   python3 -m pytest tests/test_game_integrations.py -v
+   ```
+
+**Pattern reference**: See `alyx_manager.py` for log watchers, `gtav_manager.py` for TCP handlers.
 
 ### Testing
 
 See `modern-third-space/TESTING.md` for curl examples and test scripts.
+
+**⚠️ MANDATORY: Run game integration tests before adding new integrations:**
+
+```bash
+cd modern-third-space
+pip install -e .  # If not already installed
+python3 -m pytest tests/test_game_integrations.py -v
+```
+
+All 27 tests must pass. The test suite validates:
+- Integration registry consistency
+- Manager class structure
+- Haptic mapping patterns
+- Cell layout usage
+- Snapshot protection for existing integrations
 
 ## Documentation to Read First
 
