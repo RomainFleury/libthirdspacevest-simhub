@@ -292,7 +292,7 @@ export function UTIntegrationPanel() {
           <li>Power-up pickups</li>
         </ul>
         <p className="mt-3 text-slate-500">
-          💡 For enhanced events, install the optional ThirdSpaceVest mutator.
+          Events are parsed from native game logs.
         </p>
       </div>
     </div>

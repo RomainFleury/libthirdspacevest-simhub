@@ -189,10 +189,10 @@ export function UTIntegrationPage() {
         </ul>
       </div>
 
-      <div className="rounded-lg bg-amber-900/30 ring-1 ring-amber-500/30 p-3 mt-4">
-        <p className="text-amber-200 text-xs">
-          <strong>💡 Enhanced Mode:</strong> For more detailed events, install the optional ThirdSpaceVest mutator. 
-          Without the mutator, basic events are parsed from native game logs.
+      <div className="rounded-lg bg-slate-700/30 ring-1 ring-slate-500/30 p-3 mt-4">
+        <p className="text-slate-300 text-xs">
+          <strong>ℹ️ Note:</strong> This integration parses native game logs for haptic events. 
+          Events detected include damage, kills, deaths, and weapon fire.
         </p>
       </div>
     </div>

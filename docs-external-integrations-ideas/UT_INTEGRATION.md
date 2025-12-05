@@ -7,14 +7,11 @@ This document describes the strategy and implementation for integrating haptic f
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Unreal Tournament                            │
-│  ┌────────────────────────────────────────────────────────┐    │
-│  │  ThirdSpaceVest Mutator (UnrealScript)                  │    │
-│  │  - Hooks into game events via event handlers            │    │
-│  │  - Writes formatted lines to game log                   │    │
-│  └────────────────────────────────────────────────────────┘    │
+│  • Game events logged to console/file                           │
+│  • Native log messages: kills, deaths, damage, etc.             │
 └─────────────────────────────────────────────────────────────────┘
                               │
-                              ▼ writes [ThirdSpace] {...}
+                              ▼ writes native log events
 ┌─────────────────────────────────────────────────────────────────┐
 │  Game Log File (UnrealTournament/Logs/UnrealTournament.log)     │
 │  Created when game launched                                     │
@@ -23,8 +20,8 @@ This document describes the strategy and implementation for integrating haptic f
                               ▼ tails/watches file
 ┌─────────────────────────────────────────────────────────────────┐
 │       Python Integration (server/ut_manager.py)                 │
-│  • File watcher (polling)                                       │
-│  • Line parser for [ThirdSpace] {EventType|params} format       │
+│  • File watcher (50ms polling)                                  │
+│  • Line parser for native UT log events                         │
 │  • Event-to-haptic mapper with directional support              │
 │  • Integrated with vest daemon                                  │
 └─────────────────────────────────────────────────────────────────┘
@@ -186,22 +183,7 @@ Damage direction (0-360°) maps to vest cells:
 
 ## User Setup
 
-### 1. Install the Mutator (Optional but Recommended)
-
-Copy the `ThirdSpaceVest` mutator files to:
-
-**UT Alpha (UE4):**
-```
-%LOCALAPPDATA%\UnrealTournament\Saved\Paks\DownloadedPaks\ThirdSpaceVest\
-```
-
-**UT2004:**
-```
-UT2004\System\ThirdSpaceVest.u
-UT2004\System\ThirdSpaceVest.int
-```
-
-### 2. Configure Game Logging
+### 1. Configure Game Logging
 
 **UT Alpha (UE4):**
 - Logging is enabled by default
@@ -213,7 +195,7 @@ UT2004\System\ThirdSpaceVest.int
   bEnableLogging=True
   ```
 
-### 3. Start the Integration
+### 2. Start the Integration
 
 ```bash
 # Via daemon command
@@ -289,9 +271,11 @@ echo "[ThirdSpace] {WeaponFire|FlakCannon|right}" >> /tmp/ut_test.log
 
 ## Status
 
-**Current:** 📋 **PLANNED**
-- Phase 1: Log Watcher ⏳
-- Phase 2: Event Parser ⏳  
-- Phase 3: Haptic Mapper ⏳
-- Phase 4: Daemon Integration ⏳
-- Phase 5: UI Integration ⏳
+**Current:** ✅ **IMPLEMENTED**
+- Phase 1: Log Watcher ✅
+- Phase 2: Event Parser ✅ (native log parsing)
+- Phase 3: Haptic Mapper ✅
+- Phase 4: Daemon Integration ✅
+- Phase 5: UI Integration ✅
+
+**Note:** The current implementation uses native game log parsing. A dedicated UnrealScript mutator is listed as a future enhancement that would provide more detailed event data.
