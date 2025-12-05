@@ -92,6 +92,14 @@ contextBridge.exposeInMainWorld("vestBridge", {
   l4d2CheckModInstalled: () => ipcRenderer.invoke("l4d2:checkModInstalled"),
   l4d2InstallMod: () => ipcRenderer.invoke("l4d2:installMod"),
 
+  // Unreal Tournament Integration API
+  utStart: (logPath) => ipcRenderer.invoke("ut:start", logPath),
+  utStop: () => ipcRenderer.invoke("ut:stop"),
+  utStatus: () => ipcRenderer.invoke("ut:status"),
+  utBrowseLogPath: () => ipcRenderer.invoke("ut:browseLogPath"),
+  utGetSettings: () => ipcRenderer.invoke("ut:getSettings"),
+  utSetLogPath: (logPath) => ipcRenderer.invoke("ut:setLogPath", logPath),
+
   // Predefined Effects Library API
   playEffect: (effectName) => ipcRenderer.invoke("effects:play", effectName),
   listEffectsLibrary: () => ipcRenderer.invoke("effects:list"),

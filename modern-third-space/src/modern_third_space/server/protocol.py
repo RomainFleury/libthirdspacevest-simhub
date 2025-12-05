@@ -84,6 +84,10 @@ class CommandType(Enum):
     L4D2_START = "l4d2_start"
     L4D2_STOP = "l4d2_stop"
     L4D2_STATUS = "l4d2_status"
+    # Unreal Tournament integration
+    UT_START = "ut_start"
+    UT_STOP = "ut_stop"
+    UT_STATUS = "ut_status"
     # Predefined effects
     PLAY_EFFECT = "play_effect"
     LIST_EFFECTS = "list_effects"
@@ -147,6 +151,10 @@ class EventType(Enum):
     L4D2_STARTED = "l4d2_started"
     L4D2_STOPPED = "l4d2_stopped"
     L4D2_GAME_EVENT = "l4d2_game_event"
+    # Unreal Tournament integration
+    UT_STARTED = "ut_started"
+    UT_STOPPED = "ut_stopped"
+    UT_GAME_EVENT = "ut_game_event"
     # Predefined effects
     EFFECT_STARTED = "effect_started"
     EFFECT_COMPLETED = "effect_completed"
@@ -1051,6 +1059,88 @@ def response_l4d2_status(
     """Response to l4d2_status command."""
     return Response(
         response="l4d2_status",
+        req_id=req_id,
+        running=running,
+        log_path=log_path,
+        events_received=events_received,
+        last_event_ts=last_event_ts,
+        last_event_type=last_event_type,
+    )
+
+
+# =============================================================================
+# Unreal Tournament Integration Protocol
+# =============================================================================
+
+def event_ut_started(log_path: str) -> Event:
+    """Event when Unreal Tournament integration starts."""
+    return Event(event=EventType.UT_STARTED.value, log_path=log_path)
+
+
+def event_ut_stopped() -> Event:
+    """Event when Unreal Tournament integration stops."""
+    return Event(event=EventType.UT_STOPPED.value)
+
+
+def event_ut_game_event(
+    event_type: str,
+    params: Optional[Dict[str, Any]] = None,
+) -> Event:
+    """
+    Unreal Tournament game event (PlayerDamage, PlayerDeath, WeaponFire, etc.).
+    
+    Args:
+        event_type: Type of event ("PlayerDamage", "PlayerDeath", "WeaponFire", etc.)
+        params: Event parameters (damage, direction, weapon, etc.)
+    """
+    return Event(
+        event=EventType.UT_GAME_EVENT.value,
+        event_type=event_type,
+        params=params,
+    )
+
+
+def response_ut_start(
+    success: bool,
+    log_path: Optional[str] = None,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to ut_start command."""
+    return Response(
+        response="ut_start",
+        req_id=req_id,
+        success=success,
+        log_path=log_path,
+        message=error,
+    )
+
+
+def response_ut_stop(
+    success: bool,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to ut_stop command."""
+    return Response(
+        response="ut_stop",
+        req_id=req_id,
+        success=success,
+        message=error,
+    )
+
+
+def response_ut_status(
+    running: bool,
+    log_path: Optional[str] = None,
+    events_received: int = 0,
+    last_event_ts: Optional[float] = None,
+    last_event_type: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to ut_status command."""
+    return Response(
+        response="ut_status",
         req_id=req_id,
         running=running,
         log_path=log_path,

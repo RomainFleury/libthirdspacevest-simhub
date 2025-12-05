@@ -893,6 +893,66 @@ class DaemonBridge extends EventEmitter {
   }
 
   // -------------------------------------------------------------------------
+  // Unreal Tournament Integration API
+  // -------------------------------------------------------------------------
+
+  /**
+   * Start Unreal Tournament game log watcher.
+   * @param {string} [logPath] - Optional path to game log (auto-detect if not provided)
+   */
+  async utStart(logPath) {
+    try {
+      const params = {};
+      if (logPath) {
+        params.log_path = logPath;
+      }
+      const response = await this.sendCommand("ut_start", params);
+      return {
+        success: response.success ?? true,
+        log_path: response.log_path,
+        error: response.message,
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Stop Unreal Tournament integration.
+   */
+  async utStop() {
+    try {
+      await this.sendCommand("ut_stop");
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Get Unreal Tournament integration status.
+   */
+  async utStatus() {
+    try {
+      const response = await this.sendCommand("ut_status");
+      return {
+        success: true,
+        running: response.running ?? false,
+        events_received: response.events_received ?? 0,
+        last_event_ts: response.last_event_ts ?? null,
+        last_event_type: response.last_event_type ?? null,
+        log_path: response.log_path ?? null,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        running: false,
+        error: error.message,
+      };
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Predefined Effects Library API
   // -------------------------------------------------------------------------
 
