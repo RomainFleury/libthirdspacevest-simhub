@@ -1,0 +1,19 @@
+{
+    "Name": "Third Space Vest Integration",
+    "Description": "Haptic feedback integration for Third Space Gaming Vest. Sends game events (damage, weapon fire, vehicle impacts) to the Third Space Vest daemon for immersive tactile feedback.",
+    "Author": "Third Space Vest Community",
+    "Version": "0.1.0",
+    "Dependencies": [
+        {
+            "ID": "ArmaReforger",
+            "Name": "Arma Reforger",
+            "Version": "1.0.0"
+        }
+    ],
+    "Scenarios": [],
+    "Tags": [
+        "Haptics",
+        "Immersion",
+        "Accessibility"
+    ]
+}
