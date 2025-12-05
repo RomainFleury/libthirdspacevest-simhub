@@ -92,6 +92,11 @@ contextBridge.exposeInMainWorld("vestBridge", {
   l4d2CheckModInstalled: () => ipcRenderer.invoke("l4d2:checkModInstalled"),
   l4d2InstallMod: () => ipcRenderer.invoke("l4d2:installMod"),
 
+  // Arma Reforger Integration API
+  armaReforgerStart: () => ipcRenderer.invoke("armareforger:start"),
+  armaReforgerStop: () => ipcRenderer.invoke("armareforger:stop"),
+  armaReforgerStatus: () => ipcRenderer.invoke("armareforger:status"),
+
   // Predefined Effects Library API
   playEffect: (effectName) => ipcRenderer.invoke("effects:play", effectName),
   listEffectsLibrary: () => ipcRenderer.invoke("effects:list"),

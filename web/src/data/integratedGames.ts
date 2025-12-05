@@ -83,6 +83,17 @@ export const integratedGames: IntegratedGameConfig[] = [
     hasSetupGuide: true,
     tags: ["fps", "coop", "valve", "zombie"],
   },
+  {
+    id: "armareforger",
+    name: "Arma Reforger",
+    description: "TCP mod-based haptic feedback for military simulation",
+    icon: "🎖️",
+    steamAppId: 1874880,
+    requiresMod: true,
+    hasConfiguration: true,
+    hasSetupGuide: true,
+    tags: ["fps", "milsim", "tactical"],
+  },
 ];
 
 /**

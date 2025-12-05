@@ -84,6 +84,11 @@ class CommandType(Enum):
     L4D2_START = "l4d2_start"
     L4D2_STOP = "l4d2_stop"
     L4D2_STATUS = "l4d2_status"
+    # Arma Reforger integration
+    ARMAREFORGER_EVENT = "armareforger_event"
+    ARMAREFORGER_START = "armareforger_start"
+    ARMAREFORGER_STOP = "armareforger_stop"
+    ARMAREFORGER_STATUS = "armareforger_status"
     # Predefined effects
     PLAY_EFFECT = "play_effect"
     LIST_EFFECTS = "list_effects"
@@ -147,6 +152,10 @@ class EventType(Enum):
     L4D2_STARTED = "l4d2_started"
     L4D2_STOPPED = "l4d2_stopped"
     L4D2_GAME_EVENT = "l4d2_game_event"
+    # Arma Reforger integration
+    ARMAREFORGER_STARTED = "armareforger_started"
+    ARMAREFORGER_STOPPED = "armareforger_stopped"
+    ARMAREFORGER_GAME_EVENT = "armareforger_game_event"
     # Predefined effects
     EFFECT_STARTED = "effect_started"
     EFFECT_COMPLETED = "effect_completed"
@@ -179,6 +188,9 @@ class Command:
     damage: Optional[float] = None  # Damage amount
     health_remaining: Optional[float] = None  # Remaining health
     cause: Optional[str] = None  # Death cause
+    # Arma Reforger params
+    distance: Optional[float] = None  # Distance for nearby events
+    severity: Optional[float] = None  # Collision severity (0.0-1.0)
     # Predefined effects params
     effect_name: Optional[str] = None  # Effect to play
     # Multi-vest support
@@ -208,6 +220,8 @@ class Command:
             damage=data.get("damage"),
             health_remaining=data.get("health_remaining"),
             cause=data.get("cause"),
+            distance=data.get("distance"),
+            severity=data.get("severity"),
             effect_name=data.get("effect_name"),
             device_id=data.get("device_id"),
             player_id=data.get("player_id"),
@@ -1054,6 +1068,84 @@ def response_l4d2_status(
         req_id=req_id,
         running=running,
         log_path=log_path,
+        events_received=events_received,
+        last_event_ts=last_event_ts,
+        last_event_type=last_event_type,
+    )
+
+
+# =============================================================================
+# Arma Reforger Integration Protocol
+# =============================================================================
+
+def event_armareforger_started() -> Event:
+    """Event when Arma Reforger integration starts."""
+    return Event(event=EventType.ARMAREFORGER_STARTED.value)
+
+
+def event_armareforger_stopped() -> Event:
+    """Event when Arma Reforger integration stops."""
+    return Event(event=EventType.ARMAREFORGER_STOPPED.value)
+
+
+def event_armareforger_game_event(
+    event_type: str,
+    params: Optional[Dict[str, Any]] = None,
+) -> Event:
+    """
+    Arma Reforger game event (player_damage, weapon_fire, vehicle_collision, etc.).
+    
+    Args:
+        event_type: Type of event ("player_damage", "weapon_fire_rifle", etc.)
+        params: Event parameters (angle, damage, distance, severity, etc.)
+    """
+    return Event(
+        event=EventType.ARMAREFORGER_GAME_EVENT.value,
+        event_type=event_type,
+        params=params,
+    )
+
+
+def response_armareforger_start(
+    success: bool,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to armareforger_start command."""
+    return Response(
+        response="armareforger_start",
+        req_id=req_id,
+        success=success,
+        message=error,
+    )
+
+
+def response_armareforger_stop(
+    success: bool,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to armareforger_stop command."""
+    return Response(
+        response="armareforger_stop",
+        req_id=req_id,
+        success=success,
+        message=error,
+    )
+
+
+def response_armareforger_status(
+    enabled: bool,
+    events_received: int = 0,
+    last_event_ts: Optional[float] = None,
+    last_event_type: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to armareforger_status command."""
+    return Response(
+        response="armareforger_status",
+        req_id=req_id,
+        running=enabled,
         events_received=events_received,
         last_event_ts=last_event_ts,
         last_event_type=last_event_type,
