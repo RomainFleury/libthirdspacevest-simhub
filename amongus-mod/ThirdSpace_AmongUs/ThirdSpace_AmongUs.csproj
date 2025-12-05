@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>ThirdSpace_AmongUs</AssemblyName>
+    <Description>Third Space Vest haptic integration for Among Us</Description>
+    <Version>1.0.0</Version>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <Optimize>false</Optimize>
+    <DebugType>full</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <Optimize>true</Optimize>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- BepInEx Core -->
+    <PackageReference Include="BepInEx.Unity.IL2CPP" Version="6.0.0-be.*" />
+    
+    <!-- IL2CPP interop (Assembly-CSharp from Among Us) -->
+    <!-- Note: Users need to generate IL2CPP assemblies after installing BepInEx -->
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 
+      Reference paths for development. 
+      Adjust these to point to your local BepInEx install and Among Us game folder.
+    -->
+    <Reference Include="Assembly-CSharp" Condition="Exists('$(AmongUsPath)\BepInEx\interop\Assembly-CSharp.dll')">
+      <HintPath>$(AmongUsPath)\BepInEx\interop\Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine" Condition="Exists('$(AmongUsPath)\BepInEx\interop\UnityEngine.dll')">
+      <HintPath>$(AmongUsPath)\BepInEx\interop\UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule" Condition="Exists('$(AmongUsPath)\BepInEx\interop\UnityEngine.CoreModule.dll')">
+      <HintPath>$(AmongUsPath)\BepInEx\interop\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

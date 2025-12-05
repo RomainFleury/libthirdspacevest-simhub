@@ -78,6 +78,7 @@ from .gtav_manager import GTAVManager
 from .pistolwhip_manager import PistolWhipManager
 from .starcitizen_manager import StarCitizenManager
 from .l4d2_manager import L4D2Manager
+from .amongus_manager import AmongUsManager
 from .protocol import (
     event_alyx_started,
     event_alyx_stopped,
@@ -110,6 +111,11 @@ from .protocol import (
     response_l4d2_start,
     response_l4d2_stop,
     response_l4d2_status,
+    # Among Us integration
+    event_amongus_started,
+    event_amongus_stopped,
+    event_amongus_game_event,
+    response_amongus_status,
     # Predefined effects
     event_effect_started,
     event_effect_completed,
@@ -186,6 +192,11 @@ class VestDaemon:
             on_game_event=self._on_l4d2_game_event,
             on_trigger=self._on_l4d2_trigger,
         )
+        
+        # Among Us manager
+        self._amongus_manager = AmongUsManager()
+        self._amongus_manager.set_event_callback(self._on_amongus_game_event)
+        self._amongus_manager.set_trigger_callback(self._on_amongus_trigger)
         
         self._loop: Optional[asyncio.AbstractEventLoop] = None
     
@@ -490,6 +501,19 @@ class VestDaemon:
         
         if cmd_type == CommandType.STOP_EFFECT:
             return await self._cmd_stop_effect(command)
+        
+        # Among Us commands
+        if cmd_type == CommandType.AMONGUS_EVENT:
+            return await self._cmd_amongus_event(command)
+        
+        if cmd_type == CommandType.AMONGUS_START:
+            return await self._cmd_amongus_start(command)
+        
+        if cmd_type == CommandType.AMONGUS_STOP:
+            return await self._cmd_amongus_stop(command)
+        
+        if cmd_type == CommandType.AMONGUS_STATUS:
+            return await self._cmd_amongus_status(command)
         
         return response_error(f"Command not implemented: {command.cmd}", command.req_id)
     
@@ -1637,6 +1661,97 @@ class VestDaemon:
     def _on_l4d2_trigger(self, cell: int, speed: int):
         """
         Called when Left 4 Dead 2 manager wants to trigger a haptic effect.
+        
+        Triggers the effect on the main device.
+        """
+        # Get main device controller
+        main_device_id = self._registry.get_main_device_id()
+        if main_device_id is None:
+            return  # No device available
+        
+        controller = self._registry.get_controller(main_device_id)
+        if controller is None or not controller.status().connected:
+            return  # Device not connected
+        
+        # Trigger effect (synchronous, thread-safe)
+        controller.trigger_effect(cell, speed)
+        
+        # Broadcast event (async)
+        if self._loop is not None:
+            event = event_effect_triggered(cell, speed, device_id=main_device_id)
+            asyncio.run_coroutine_threadsafe(
+                self._clients.broadcast(event),
+                self._loop,
+            )
+    
+    # -------------------------------------------------------------------------
+    # Among Us command handlers
+    # -------------------------------------------------------------------------
+    
+    async def _cmd_amongus_event(self, command: Command) -> Response:
+        """
+        Process an Among Us game event from the BepInEx mod.
+        
+        This is the main entry point for events from the game.
+        """
+        if not command.event:
+            return response_error("Missing event name", command.req_id)
+        
+        success = self._amongus_manager.process_event(
+            event_name=command.event,
+            priority=command.priority or 0,
+        )
+        
+        if success:
+            return response_ok(command.req_id)
+        else:
+            return response_error(f"Failed to process event: {command.event}", command.req_id)
+    
+    async def _cmd_amongus_start(self, command: Command) -> Response:
+        """Enable Among Us event processing."""
+        self._amongus_manager.enable()
+        await self._clients.broadcast(event_amongus_started())
+        return response_ok(command.req_id)
+    
+    async def _cmd_amongus_stop(self, command: Command) -> Response:
+        """Disable Among Us event processing."""
+        self._amongus_manager.disable()
+        await self._clients.broadcast(event_amongus_stopped())
+        return response_ok(command.req_id)
+    
+    async def _cmd_amongus_status(self, command: Command) -> Response:
+        """Get Among Us integration status."""
+        status = self._amongus_manager.get_status()
+        return response_amongus_status(
+            enabled=status["enabled"],
+            events_received=status["events_received"],
+            last_event_ts=status["last_event_ts"],
+            last_event_type=status.get("last_event_type"),
+            req_id=command.req_id,
+        )
+    
+    # -------------------------------------------------------------------------
+    # Among Us callbacks
+    # -------------------------------------------------------------------------
+    
+    def _on_amongus_game_event(self, event_type: str, event_name: str):
+        """
+        Called when Among Us manager processes a game event.
+        
+        Broadcasts the event to all connected clients for UI display.
+        """
+        if self._loop is None:
+            return
+        
+        event = event_amongus_game_event(event_name)
+        asyncio.run_coroutine_threadsafe(
+            self._clients.broadcast(event),
+            self._loop,
+        )
+    
+    def _on_amongus_trigger(self, cell: int, speed: int):
+        """
+        Called when Among Us manager wants to trigger a haptic effect.
         
         Triggers the effect on the main device.
         """

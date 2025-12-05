@@ -88,6 +88,11 @@ class CommandType(Enum):
     PLAY_EFFECT = "play_effect"
     LIST_EFFECTS = "list_effects"
     STOP_EFFECT = "stop_effect"
+    # Among Us integration
+    AMONGUS_EVENT = "amongus_event"
+    AMONGUS_START = "amongus_start"
+    AMONGUS_STOP = "amongus_stop"
+    AMONGUS_STATUS = "amongus_status"
 
 
 class EventType(Enum):
@@ -150,6 +155,10 @@ class EventType(Enum):
     # Predefined effects
     EFFECT_STARTED = "effect_started"
     EFFECT_COMPLETED = "effect_completed"
+    # Among Us integration
+    AMONGUS_STARTED = "amongus_started"
+    AMONGUS_STOPPED = "amongus_stopped"
+    AMONGUS_GAME_EVENT = "amongus_game_event"
 
 
 @dataclass
@@ -1103,5 +1112,54 @@ def response_list_effects(
         req_id=req_id,
         effects=effects,
         categories=categories,
+    )
+
+
+# -------------------------------------------------------------------------
+# Among Us events and responses
+# -------------------------------------------------------------------------
+
+def event_amongus_started() -> Event:
+    """Event when Among Us integration starts."""
+    return Event(
+        event=EventType.AMONGUS_STARTED.value,
+    )
+
+
+def event_amongus_stopped() -> Event:
+    """Event when Among Us integration stops."""
+    return Event(
+        event=EventType.AMONGUS_STOPPED.value,
+    )
+
+
+def event_amongus_game_event(event_type: str) -> Event:
+    """
+    Among Us game event (player_killed, ejected, task_complete, etc.).
+    
+    Args:
+        event_type: Type of event ("player_killed", "ejected", "execute_kill", etc.)
+    """
+    return Event(
+        event=EventType.AMONGUS_GAME_EVENT.value,
+        event_type=event_type,
+    )
+
+
+def response_amongus_status(
+    enabled: bool,
+    events_received: int = 0,
+    last_event_ts: Optional[float] = None,
+    last_event_type: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to amongus_status command."""
+    return Response(
+        response="amongus_status",
+        req_id=req_id,
+        running=enabled,
+        events_received=events_received,
+        last_event_ts=last_event_ts,
+        last_event_type=last_event_type,
     )
 
