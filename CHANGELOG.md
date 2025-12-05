@@ -6,7 +6,42 @@ This file helps AI assistants quickly understand recent project evolution.
 
 ---
 
-## 2025-11-27 (Latest)
+## 2025-12-05 (Latest)
+
+### Added
+
+- **Unreal Tournament Integration** - Game log-based haptic feedback for arena combat
+  - **Supported Games**: UT Alpha (2014), UT3, UT2004, UT99
+  - **Integration Method**: Log file watching (similar to Half-Life: Alyx)
+    - Monitors game log for haptic events
+    - Optional ThirdSpaceVest mutator for enhanced events
+    - Native log parsing fallback for basic events
+  - **Python Manager**: `server/ut_manager.py`
+    - `UTLogWatcher`: Tails game log with 50ms polling
+    - Parses both ThirdSpace mutator format and native log events
+    - Directional damage mapping (angle → cells)
+    - Damage intensity scaling
+  - **Haptic Events**:
+    - Core: Player damage (directional), player death, weapon fire, reload
+    - Movement: Dodge direction, jump boots, translocator
+    - Arena: Killing sprees, multi-kills, headshots
+    - CTF: Flag grabs, captures, returns
+    - Pickups: Health, armor, power-ups
+  - **Daemon Protocol**: Added `ut_start`, `ut_stop`, `ut_status` commands
+    - Events: `ut_started`, `ut_stopped`, `ut_game_event`
+  - **Electron UI**: Complete integration panel
+    - Status display (running, events received)
+    - Log path configuration with browse button
+    - Auto-detection for multiple UT versions
+    - Real-time event feed with icons
+    - Setup guide with supported games list
+  - **IPC Handlers**: `utHandlers.cjs` with electron-store for settings
+  - **Documentation**: `docs-external-integrations-ideas/UT_INTEGRATION.md`
+  - **Status**: Complete and ready for testing
+
+---
+
+## 2025-11-27
 
 ### Added
 
@@ -251,6 +286,7 @@ After (Daemon-based):
 - [x] ~~Half-Life: Alyx integration~~ ✅ Done
 - [x] ~~Effect patterns/presets system~~ ✅ Done (Effects Library)
 - [x] ~~GTA V integration (Phase 1)~~ ✅ Done (damage/death)
+- [x] ~~Unreal Tournament integration~~ ✅ Done (log watching)
 - [ ] GTA V Phase 2: Vehicle events (crashes, G-forces, acceleration/braking)
 - [ ] Daemon auto-start from Electron
 - [ ] Pistol Whip integration (planned)

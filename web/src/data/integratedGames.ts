@@ -83,6 +83,15 @@ export const integratedGames: IntegratedGameConfig[] = [
     hasSetupGuide: true,
     tags: ["fps", "coop", "valve", "zombie"],
   },
+  {
+    id: "ut",
+    name: "Unreal Tournament",
+    description: "Game log-based haptic feedback for arena combat",
+    icon: "🎮",
+    hasConfiguration: true,
+    hasSetupGuide: true,
+    tags: ["fps", "arena", "classic"],
+  },
 ];
 
 /**

@@ -78,6 +78,7 @@ from .gtav_manager import GTAVManager
 from .pistolwhip_manager import PistolWhipManager
 from .starcitizen_manager import StarCitizenManager
 from .l4d2_manager import L4D2Manager
+from .ut_manager import UTManager, get_mod_info as get_ut_mod_info
 from .protocol import (
     event_alyx_started,
     event_alyx_stopped,
@@ -110,6 +111,13 @@ from .protocol import (
     response_l4d2_start,
     response_l4d2_stop,
     response_l4d2_status,
+    # Unreal Tournament integration
+    event_ut_started,
+    event_ut_stopped,
+    event_ut_game_event,
+    response_ut_start,
+    response_ut_stop,
+    response_ut_status,
     # Predefined effects
     event_effect_started,
     event_effect_completed,
@@ -185,6 +193,12 @@ class VestDaemon:
         self._l4d2_manager = L4D2Manager(
             on_game_event=self._on_l4d2_game_event,
             on_trigger=self._on_l4d2_trigger,
+        )
+        
+        # Unreal Tournament manager
+        self._ut_manager = UTManager(
+            on_game_event=self._on_ut_game_event,
+            on_trigger=self._on_ut_trigger,
         )
         
         self._loop: Optional[asyncio.AbstractEventLoop] = None
@@ -480,6 +494,16 @@ class VestDaemon:
         
         if cmd_type == CommandType.L4D2_STATUS:
             return await self._cmd_l4d2_status(command)
+        
+        # Unreal Tournament commands
+        if cmd_type == CommandType.UT_START:
+            return await self._cmd_ut_start(command)
+        
+        if cmd_type == CommandType.UT_STOP:
+            return await self._cmd_ut_stop(command)
+        
+        if cmd_type == CommandType.UT_STATUS:
+            return await self._cmd_ut_status(command)
         
         # Predefined effects commands
         if cmd_type == CommandType.PLAY_EFFECT:
@@ -1637,6 +1661,90 @@ class VestDaemon:
     def _on_l4d2_trigger(self, cell: int, speed: int):
         """
         Called when Left 4 Dead 2 manager wants to trigger a haptic effect.
+        
+        Triggers the effect on the main device.
+        """
+        # Get main device controller
+        main_device_id = self._registry.get_main_device_id()
+        if main_device_id is None:
+            return  # No device available
+        
+        controller = self._registry.get_controller(main_device_id)
+        if controller is None or not controller.status().connected:
+            return  # Device not connected
+        
+        # Trigger effect (synchronous, thread-safe)
+        controller.trigger_effect(cell, speed)
+        
+        # Broadcast event (async)
+        if self._loop is not None:
+            event = event_effect_triggered(cell, speed, device_id=main_device_id)
+            asyncio.run_coroutine_threadsafe(
+                self._clients.broadcast(event),
+                self._loop,
+            )
+    
+    # -------------------------------------------------------------------------
+    # Unreal Tournament commands
+    # -------------------------------------------------------------------------
+    
+    async def _cmd_ut_start(self, command: Command) -> Response:
+        """Start watching Unreal Tournament game log."""
+        logger.info(f"[UT] Received start command: log_path={command.log_path}")
+        log_path = command.log_path
+        
+        success, error = self._ut_manager.start(log_path=log_path)
+        
+        if success:
+            log_path_str = str(self._ut_manager.log_path) if self._ut_manager.log_path else None
+            await self._clients.broadcast(event_ut_started(log_path_str or ""))
+            print(f"[UT] Integration started, watching: {log_path_str}")
+            return response_ut_start(success=True, log_path=log_path_str, req_id=command.req_id)
+        else:
+            return response_ut_start(success=False, error=error, req_id=command.req_id)
+    
+    async def _cmd_ut_stop(self, command: Command) -> Response:
+        """Stop watching Unreal Tournament game log."""
+        success = self._ut_manager.stop()
+        if success:
+            await self._clients.broadcast(event_ut_stopped())
+            print("[UT] Integration stopped")
+        return response_ut_stop(success=success, req_id=command.req_id)
+    
+    async def _cmd_ut_status(self, command: Command) -> Response:
+        """Get Unreal Tournament integration status."""
+        log_path_str = str(self._ut_manager.log_path) if self._ut_manager.log_path else None
+        return response_ut_status(
+            running=self._ut_manager.is_running,
+            events_received=self._ut_manager.events_received,
+            last_event_ts=self._ut_manager.last_event_ts,
+            last_event_type=self._ut_manager.last_event_type,
+            log_path=log_path_str,
+            req_id=command.req_id,
+        )
+    
+    # -------------------------------------------------------------------------
+    # Unreal Tournament callbacks
+    # -------------------------------------------------------------------------
+    
+    def _on_ut_game_event(self, event_type: str, params: dict):
+        """
+        Called when Unreal Tournament manager processes a game event.
+        
+        Broadcasts the event to all connected clients for UI display.
+        """
+        if self._loop is None:
+            return
+        
+        # Schedule broadcast in event loop
+        asyncio.run_coroutine_threadsafe(
+            self._clients.broadcast(event_ut_game_event(event_type, params)),
+            self._loop,
+        )
+    
+    def _on_ut_trigger(self, cell: int, speed: int):
+        """
+        Called when Unreal Tournament manager wants to trigger a haptic effect.
         
         Triggers the effect on the main device.
         """
