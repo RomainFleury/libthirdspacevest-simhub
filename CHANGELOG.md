@@ -6,7 +6,39 @@ This file helps AI assistants quickly understand recent project evolution.
 
 ---
 
-## 2025-11-27 (Latest)
+## 2025-12-05 (Latest)
+
+### Added
+
+- **Age of Empires 2: Definitive Edition Integration** - Experimental haptic feedback for RTS gameplay
+  - Integration via Capture Age WebSocket API (community spectating tool)
+  - **Supported Events**:
+    - Unit damaged/killed (front cells, light/medium intensity)
+    - Building damaged/destroyed (back cells, stronger feedback)
+    - Age advancement (celebratory full-body wave)
+    - Research completed (upper cells pulse)
+    - Combat started (alert pulse)
+    - Victory/Defeat (full body patterns)
+  - **Architecture**:
+    - `server/aoe2_manager.py`: WebSocket client for Capture Age + haptic mapping
+    - Daemon commands: `aoe2_start`, `aoe2_stop`, `aoe2_status`
+    - Protocol events: `aoe2_started`, `aoe2_stopped`, `aoe2_game_event`
+  - **CLI Commands**:
+    - `python -m modern_third_space.cli aoe2 start --player 1`
+    - `python -m modern_third_space.cli aoe2 stop`
+    - `python -m modern_third_space.cli aoe2 status`
+    - `python -m modern_third_space.cli aoe2 info` (setup instructions)
+  - **Requirements**:
+    - Capture Age installed (https://captureage.com/)
+    - Capture Age connected to AoE2:DE game
+    - websockets Python package for WebSocket communication
+  - **Documentation**: `docs-external-integrations-ideas/AOE2_INTEGRATION.md`
+  - **Status**: Experimental - requires Capture Age for real-time events
+  - **Note**: This is a unique RTS integration - haptic feedback for strategy games!
+
+---
+
+## 2025-11-27
 
 ### Added
 
@@ -251,6 +283,8 @@ After (Daemon-based):
 - [x] ~~Half-Life: Alyx integration~~ ✅ Done
 - [x] ~~Effect patterns/presets system~~ ✅ Done (Effects Library)
 - [x] ~~GTA V integration (Phase 1)~~ ✅ Done (damage/death)
+- [x] ~~Age of Empires 2 integration~~ ✅ Done (via Capture Age)
 - [ ] GTA V Phase 2: Vehicle events (crashes, G-forces, acceleration/braking)
 - [ ] Daemon auto-start from Electron
 - [ ] Pistol Whip integration (planned)
+- [ ] AoE2 UI panel in Electron

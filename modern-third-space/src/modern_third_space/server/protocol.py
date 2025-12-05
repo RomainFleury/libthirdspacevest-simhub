@@ -84,6 +84,10 @@ class CommandType(Enum):
     L4D2_START = "l4d2_start"
     L4D2_STOP = "l4d2_stop"
     L4D2_STATUS = "l4d2_status"
+    # Age of Empires 2 integration
+    AOE2_START = "aoe2_start"
+    AOE2_STOP = "aoe2_stop"
+    AOE2_STATUS = "aoe2_status"
     # Predefined effects
     PLAY_EFFECT = "play_effect"
     LIST_EFFECTS = "list_effects"
@@ -147,6 +151,10 @@ class EventType(Enum):
     L4D2_STARTED = "l4d2_started"
     L4D2_STOPPED = "l4d2_stopped"
     L4D2_GAME_EVENT = "l4d2_game_event"
+    # Age of Empires 2 integration
+    AOE2_STARTED = "aoe2_started"
+    AOE2_STOPPED = "aoe2_stopped"
+    AOE2_GAME_EVENT = "aoe2_game_event"
     # Predefined effects
     EFFECT_STARTED = "effect_started"
     EFFECT_COMPLETED = "effect_completed"
@@ -186,6 +194,8 @@ class Command:
     player_id: Optional[str] = None  # Target global player's device
     game_id: Optional[str] = None  # Game identifier for game-specific mapping
     player_num: Optional[int] = None  # Player number (1, 2, 3...) for game-specific mapping
+    # Age of Empires 2 params
+    player_number: Optional[int] = None  # AoE2 player number (1-8)
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Command":
@@ -213,6 +223,7 @@ class Command:
             player_id=data.get("player_id"),
             game_id=data.get("game_id"),
             player_num=data.get("player_num"),
+            player_number=data.get("player_number"),
         )
     
     @classmethod
@@ -1054,6 +1065,81 @@ def response_l4d2_status(
         req_id=req_id,
         running=running,
         log_path=log_path,
+        events_received=events_received,
+        last_event_ts=last_event_ts,
+        last_event_type=last_event_type,
+    )
+
+
+# =============================================================================
+# Age of Empires 2 Integration Protocol
+# =============================================================================
+
+def event_aoe2_started(player_number: int) -> Event:
+    """Event when Age of Empires 2 integration starts."""
+    return Event(event=EventType.AOE2_STARTED.value, player_num=player_number)
+
+
+def event_aoe2_stopped() -> Event:
+    """Event when Age of Empires 2 integration stops."""
+    return Event(event=EventType.AOE2_STOPPED.value)
+
+
+def event_aoe2_game_event(
+    event_type: str,
+    params: Optional[Dict[str, Any]] = None,
+) -> Event:
+    """
+    Age of Empires 2 game event (unit_death, building_destroyed, age_up, etc.).
+    
+    Args:
+        event_type: Type of event ("unit_death", "building_destroyed", "age_up", etc.)
+        params: Event parameters (unit_type, building_type, age, etc.)
+    """
+    return Event(
+        event=EventType.AOE2_GAME_EVENT.value,
+        event_type=event_type,
+        params=params,
+    )
+
+
+def response_aoe2_start(
+    success: bool,
+    player_number: Optional[int] = None,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to aoe2_start command."""
+    return Response(
+        response="aoe2_start",
+        req_id=req_id,
+        success=success,
+        message=error,
+    )
+
+
+def response_aoe2_stop(success: bool, req_id: Optional[str] = None) -> Response:
+    """Response to aoe2_stop command."""
+    return Response(
+        response="aoe2_stop",
+        req_id=req_id,
+        success=success,
+    )
+
+
+def response_aoe2_status(
+    running: bool,
+    player_number: Optional[int] = None,
+    events_received: int = 0,
+    last_event_ts: Optional[float] = None,
+    last_event_type: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to aoe2_status command."""
+    return Response(
+        response="aoe2_status",
+        req_id=req_id,
+        running=running,
         events_received=events_received,
         last_event_ts=last_event_ts,
         last_event_type=last_event_type,
