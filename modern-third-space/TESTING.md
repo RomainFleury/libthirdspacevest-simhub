@@ -92,6 +92,29 @@ When adding a new game integration, you must:
 | `Should import from vest.cell_layout` | Using raw integers for cells | Import Cell constants from cell_layout |
 | `Integration removed without updating snapshot` | Removed integration | Update EXPECTED_INTEGRATIONS if intentional |
 
+### Automated Integration Checker
+
+For a quick pre-PR check, use the integration checker script:
+
+```bash
+cd modern-third-space
+python3 scripts/check_integrations.py
+```
+
+This script:
+- Verifies package installation
+- Runs all 27 game integration tests
+- Validates the registry
+- Checks snapshot consistency
+
+**Exit code 0** = All checks passed, safe to create PR
+**Exit code 1** = Issues found, fix before creating PR
+
+### CI/CD Integration
+
+See `.github/workflows/game-integrations.yml.example` for a GitHub Actions workflow
+that automatically runs these tests on PRs touching integration files.
+
 ---
 
 ---

@@ -2,6 +2,9 @@
 
 Load this prompt when adding haptic support for a new game: `@.cursor/prompts/new-game-integration.md`
 
+**Related prompts:**
+- `@.cursor/prompts/pr-review-checklist.md` - For reviewing PRs with integration changes
+
 ---
 
 @.cursorrules @CHANGELOG.md @docs-external-integrations-ideas/DAEMON_ARCHITECTURE.md

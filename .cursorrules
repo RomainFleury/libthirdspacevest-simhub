@@ -95,6 +95,22 @@ All 27 tests must pass. The test suite validates:
 2. `docs-external-integrations-ideas/DAEMON_ARCHITECTURE.md` - Daemon protocol
 3. `docs-external-integrations-ideas/CS2_INTEGRATION.md` - Game integration example
 
+## PR Review Requirements
+
+**When reviewing or creating PRs that touch game integrations:**
+
+Load the PR review checklist: `@.cursor/prompts/pr-review-checklist.md`
+
+Or run the automated checker:
+```bash
+cd modern-third-space && python3 scripts/check_integrations.py
+```
+
+**Key requirements:**
+- All 27 game integration tests must pass
+- New integrations must update the snapshot in `tests/test_game_integrations.py`
+- Existing integrations must not be accidentally modified
+
 ## Code Style
 
 - Python: Use type hints, dataclasses, asyncio for daemon code

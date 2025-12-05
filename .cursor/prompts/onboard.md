@@ -13,13 +13,17 @@ I'm ready to help with the **Third Space Vest** project. I understand:
 - 🚫 **Never modify** `legacy-do-not-change/`
 - 🔌 **Daemon-centric**: All vest commands → TCP 5050 → Python Daemon
 - 📦 **Isolation**: `vest/` package stays separate from integrations
-- 🎮 **Game integrations**: CS2 GSI and Half-Life: Alyx already implemented
+- 🎮 **Game integrations**: 7 games implemented (CS2, Alyx, L4D2, GTAV, SUPERHOT, Pistol Whip, Star Citizen)
+- 🧪 **Testing**: Game integration tests MUST pass before PRs
 
 ## Key Commands
 
 ```bash
 python3 -m modern_third_space.cli daemon start   # Start daemon (required!)
 cd web && yarn dev                                # Start Electron UI
+
+# MANDATORY for integration changes:
+cd modern-third-space && python3 -m pytest tests/test_game_integrations.py -v
 ```
 
 ## Specialized Prompts
@@ -27,6 +31,7 @@ cd web && yarn dev                                # Start Electron UI
 | Prompt | When to Use |
 |--------|-------------|
 | `@.cursor/prompts/new-game-integration.md` | Adding haptic support for a new game |
+| `@.cursor/prompts/pr-review-checklist.md` | Reviewing/creating PRs with integration changes |
 
 ## What would you like to work on?
 
