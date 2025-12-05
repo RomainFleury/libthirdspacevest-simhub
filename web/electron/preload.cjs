@@ -92,6 +92,11 @@ contextBridge.exposeInMainWorld("vestBridge", {
   l4d2CheckModInstalled: () => ipcRenderer.invoke("l4d2:checkModInstalled"),
   l4d2InstallMod: () => ipcRenderer.invoke("l4d2:installMod"),
 
+  // Assassin's Creed Mirage Integration API
+  acmirageStart: (logPath) => ipcRenderer.invoke("acmirage:start", logPath),
+  acmirageStop: () => ipcRenderer.invoke("acmirage:stop"),
+  acmirageStatus: () => ipcRenderer.invoke("acmirage:status"),
+
   // Predefined Effects Library API
   playEffect: (effectName) => ipcRenderer.invoke("effects:play", effectName),
   listEffectsLibrary: () => ipcRenderer.invoke("effects:list"),

@@ -6,7 +6,36 @@ This file helps AI assistants quickly understand recent project evolution.
 
 ---
 
-## 2025-11-27 (Latest)
+## 2025-12-04 (Latest)
+
+### Added
+
+- **Assassin's Creed Mirage Integration** - Log-based haptic feedback for AC Mirage
+  - **Integration Method**: Log file watching (similar to Star Citizen/L4D2)
+  - **Supported Events**:
+    - Player damage (directional: front, back, left, right)
+    - Player death (full vest pulse)
+    - Assassinations (hidden blade kills, air assassinations)
+    - Combat actions (sword strikes, dagger strikes, parry/block, counter-attacks)
+    - Environmental (fall damage, explosions, fire damage)
+    - Stealth (detection alerts, low health heartbeat)
+    - Abilities (eagle vision, focus)
+  - **Python Manager**: `server/acmirage_manager.py`
+    - Log file parser with pattern matching for game events
+    - Directional damage mapping based on damage source
+    - Intensity scaling based on damage amount
+  - **Daemon Protocol**: Added `acmirage_event`, `acmirage_start`, `acmirage_stop`, `acmirage_status` commands
+  - **Electron UI**: Complete integration panel with live event log
+    - Status display (running/stopped, events received)
+    - Custom log path configuration
+    - Real-time event feed with icons
+    - Setup instructions
+  - **Documentation**: `docs-external-integrations-ideas/ACMIRAGE_INTEGRATION.md`
+  - **Status**: Ready for testing (log patterns may need refinement based on actual game logs)
+
+---
+
+## 2025-11-27
 
 ### Added
 

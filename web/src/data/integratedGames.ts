@@ -83,6 +83,15 @@ export const integratedGames: IntegratedGameConfig[] = [
     hasSetupGuide: true,
     tags: ["fps", "coop", "valve", "zombie"],
   },
+  {
+    id: "acmirage",
+    name: "Assassin's Creed Mirage",
+    description: "Log-based haptic feedback for stealth and combat",
+    icon: "🗡️",
+    hasConfiguration: true,
+    hasSetupGuide: true,
+    tags: ["action", "stealth", "ubisoft", "open-world"],
+  },
 ];
 
 /**
