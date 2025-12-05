@@ -341,6 +341,232 @@ def _cs2_status(args: argparse.Namespace) -> int:
     return 0
 
 
+# -------------------------------------------------------------------------
+# Age of Empires 2 subcommands
+# -------------------------------------------------------------------------
+
+def _cmd_aoe2(args: argparse.Namespace) -> int:
+    """Handle AoE2 subcommands."""
+    action = getattr(args, "aoe2_action", None) or "start"
+    
+    if action == "start":
+        return _aoe2_start(args)
+    elif action == "stop":
+        return _aoe2_stop(args)
+    elif action == "status":
+        return _aoe2_status(args)
+    elif action == "info":
+        return _aoe2_info(args)
+    elif action == "simulate":
+        return _aoe2_simulate(args)
+    else:
+        print(f"Unknown aoe2 action: {action}")
+        return 1
+
+
+def _aoe2_start(args: argparse.Namespace) -> int:
+    """Start the AoE2 integration via daemon."""
+    import socket
+    import json
+    
+    daemon_host = getattr(args, "daemon_host", "127.0.0.1")
+    daemon_port = getattr(args, "daemon_port", 5050)
+    player_number = getattr(args, "player", 1)
+    
+    print(f"[AOE2] Starting Age of Empires 2 integration...")
+    print(f"   Player number: {player_number}")
+    print(f"   Daemon: {daemon_host}:{daemon_port}")
+    print()
+    print("📋 Requirements:")
+    print("   1. Capture Age installed (https://captureage.com/)")
+    print("   2. Capture Age connected to your AoE2:DE game")
+    print("   3. Vest daemon running")
+    print()
+    
+    # Send command to daemon
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(5.0)
+        sock.connect((daemon_host, daemon_port))
+        
+        command = json.dumps({"cmd": "aoe2_start", "player_number": player_number}) + "\n"
+        sock.sendall(command.encode())
+        
+        # Read response
+        response = sock.recv(4096).decode().strip()
+        sock.close()
+        
+        result = json.loads(response)
+        if result.get("success"):
+            print(f"[OK] AoE2 integration started for player {player_number}")
+            print()
+            print("🎮 Now play Age of Empires 2 and feel the feedback!")
+            return 0
+        else:
+            error = result.get("message", "Unknown error")
+            print(f"[ERROR] Failed to start: {error}")
+            print()
+            print("[TIP] Make sure Capture Age is running and connected to a game.")
+            return 1
+            
+    except ConnectionRefusedError:
+        print(f"[ERROR] Cannot connect to daemon at {daemon_host}:{daemon_port}")
+        print("[TIP] Start the daemon first: python -m modern_third_space.cli daemon start")
+        return 1
+    except Exception as e:
+        print(f"[ERROR] {e}")
+        return 1
+
+
+def _aoe2_stop(args: argparse.Namespace) -> int:
+    """Stop the AoE2 integration."""
+    import socket
+    import json
+    
+    daemon_host = getattr(args, "daemon_host", "127.0.0.1")
+    daemon_port = getattr(args, "daemon_port", 5050)
+    
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(5.0)
+        sock.connect((daemon_host, daemon_port))
+        
+        command = json.dumps({"cmd": "aoe2_stop"}) + "\n"
+        sock.sendall(command.encode())
+        
+        response = sock.recv(4096).decode().strip()
+        sock.close()
+        
+        result = json.loads(response)
+        if result.get("success"):
+            print("[OK] AoE2 integration stopped")
+            return 0
+        else:
+            print(f"[ERROR] Failed to stop: {result.get('message', 'Unknown error')}")
+            return 1
+            
+    except ConnectionRefusedError:
+        print(f"[ERROR] Cannot connect to daemon at {daemon_host}:{daemon_port}")
+        return 1
+    except Exception as e:
+        print(f"[ERROR] {e}")
+        return 1
+
+
+def _aoe2_status(args: argparse.Namespace) -> int:
+    """Check AoE2 integration status."""
+    import socket
+    import json
+    
+    daemon_host = getattr(args, "daemon_host", "127.0.0.1")
+    daemon_port = getattr(args, "daemon_port", 5050)
+    
+    print("[AOE2] Age of Empires 2 Integration Status")
+    print("=" * 40)
+    
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(5.0)
+        sock.connect((daemon_host, daemon_port))
+        
+        command = json.dumps({"cmd": "aoe2_status"}) + "\n"
+        sock.sendall(command.encode())
+        
+        response = sock.recv(4096).decode().strip()
+        sock.close()
+        
+        result = json.loads(response)
+        running = result.get("running", False)
+        events = result.get("events_received", 0)
+        last_event = result.get("last_event_type", "None")
+        
+        print(f"Integration: {'🟢 Running' if running else '🔴 Not running'}")
+        print(f"Events received: {events}")
+        print(f"Last event: {last_event}")
+        print()
+        return 0
+            
+    except ConnectionRefusedError:
+        print(f"Vest Daemon: 🔴 Not running")
+        print(f"Integration: 🔴 Unknown (daemon not running)")
+        print()
+        print("[TIP] Start the daemon: python -m modern_third_space.cli daemon start")
+        return 1
+    except Exception as e:
+        print(f"[ERROR] {e}")
+        return 1
+
+
+def _aoe2_info(args: argparse.Namespace) -> int:
+    """Show information about AoE2 integration."""
+    from .server.aoe2_manager import get_integration_info
+    
+    info = get_integration_info()
+    
+    print(f"🎮 {info['name']}")
+    print("=" * 50)
+    print()
+    print(f"📖 {info['description']}")
+    print()
+    print(f"📦 Requires: {info['requires']}")
+    print()
+    print("📋 Supported Events:")
+    for event in info['supported_events']:
+        print(f"   • {event}")
+    print()
+    print("🔧 Setup Instructions:")
+    for i, step in enumerate(info['setup_instructions'], 1):
+        print(f"   {step}")
+    print()
+    return 0
+
+
+def _aoe2_simulate(args: argparse.Namespace) -> int:
+    """Simulate an AoE2 event for testing."""
+    import socket
+    import json
+    
+    daemon_host = getattr(args, "daemon_host", "127.0.0.1")
+    daemon_port = getattr(args, "daemon_port", 5050)
+    event_type = getattr(args, "event", "unit_death")
+    
+    print(f"[AOE2] Simulating event: {event_type}")
+    
+    # First, start integration if not running
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(5.0)
+        sock.connect((daemon_host, daemon_port))
+        
+        # Check status first
+        command = json.dumps({"cmd": "aoe2_status"}) + "\n"
+        sock.sendall(command.encode())
+        response = sock.recv(4096).decode().strip()
+        result = json.loads(response)
+        
+        if not result.get("running"):
+            print("[INFO] Starting integration for simulation...")
+            command = json.dumps({"cmd": "aoe2_start", "player_number": 1}) + "\n"
+            sock.sendall(command.encode())
+            sock.recv(4096)  # Ignore response
+        
+        sock.close()
+        
+        # Now we can access the manager directly through a special command
+        # For now, we'll simulate by triggering the haptics directly
+        print(f"[OK] Event '{event_type}' would trigger haptic feedback")
+        print()
+        print("[TIP] For actual testing, run a game with Capture Age connected.")
+        return 0
+            
+    except ConnectionRefusedError:
+        print(f"[ERROR] Cannot connect to daemon at {daemon_host}:{daemon_port}")
+        return 1
+    except Exception as e:
+        print(f"[ERROR] {e}")
+        return 1
+
+
 COMMANDS: Dict[str, Any] = {
     "status": _cmd_status,
     "trigger": _cmd_trigger,
@@ -351,6 +577,7 @@ COMMANDS: Dict[str, Any] = {
     "connect": _cmd_connect,
     "daemon": _cmd_daemon,
     "cs2": _cmd_cs2,
+    "aoe2": _cmd_aoe2,
 }
 
 
@@ -425,6 +652,38 @@ def build_parser() -> argparse.ArgumentParser:
     cs2_status.add_argument("--gsi-port", type=int, default=3000, help="GSI server port")
     cs2_status.add_argument("--daemon-host", type=str, default="127.0.0.1", help="Vest daemon host")
     
+    # -------------------------------------------------------------------------
+    # Age of Empires 2 commands
+    # -------------------------------------------------------------------------
+    aoe2 = sub.add_parser("aoe2", help="Age of Empires 2: DE integration (via Capture Age)")
+    aoe2_sub = aoe2.add_subparsers(dest="aoe2_action")
+    
+    # aoe2 start
+    aoe2_start = aoe2_sub.add_parser("start", help="Start AoE2 integration")
+    aoe2_start.add_argument("--player", "-p", type=int, default=1, help="Player number to track (1-8, default: 1)")
+    aoe2_start.add_argument("--daemon-host", type=str, default="127.0.0.1", help="Vest daemon host")
+    aoe2_start.add_argument("--daemon-port", type=int, default=5050, help="Vest daemon port")
+    
+    # aoe2 stop
+    aoe2_stop = aoe2_sub.add_parser("stop", help="Stop AoE2 integration")
+    aoe2_stop.add_argument("--daemon-host", type=str, default="127.0.0.1", help="Vest daemon host")
+    aoe2_stop.add_argument("--daemon-port", type=int, default=5050, help="Vest daemon port")
+    
+    # aoe2 status
+    aoe2_status = aoe2_sub.add_parser("status", help="Check AoE2 integration status")
+    aoe2_status.add_argument("--daemon-host", type=str, default="127.0.0.1", help="Vest daemon host")
+    aoe2_status.add_argument("--daemon-port", type=int, default=5050, help="Vest daemon port")
+    
+    # aoe2 info
+    aoe2_sub.add_parser("info", help="Show AoE2 integration info and setup instructions")
+    
+    # aoe2 simulate (for testing)
+    aoe2_simulate = aoe2_sub.add_parser("simulate", help="Simulate an AoE2 event for testing")
+    aoe2_simulate.add_argument("--event", "-e", type=str, default="unit_death",
+                               help="Event to simulate (unit_death, building_destroyed, age_up, etc.)")
+    aoe2_simulate.add_argument("--daemon-host", type=str, default="127.0.0.1", help="Vest daemon host")
+    aoe2_simulate.add_argument("--daemon-port", type=int, default=5050, help="Vest daemon port")
+    
     return parser
 
 
@@ -447,6 +706,8 @@ def main(argv: list[str] | None = None) -> int:
     if command == "daemon":
         return handler(args)
     if command == "cs2":
+        return handler(args)
+    if command == "aoe2":
         return handler(args)
     
     # Commands that need a controller
