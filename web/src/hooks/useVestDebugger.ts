@@ -173,6 +173,9 @@ export function useVestDebugger() {
     async (effect: VestEffect) => {
       setLoading(true);
       try {
+        // Add device_id if we have a main device selected and effect doesn't already specify one
+        const effectWithDevice = effect.device_id ? effect : { ...effect, device_id: mainDeviceId || undefined };
+        
         // Handle preset effects that trigger multiple cells
         if (effect.preset) {
           const cellsToTrigger: number[] = [];
@@ -191,11 +194,11 @@ export function useVestDebugger() {
           }
           // Trigger all cells in the preset
           for (const cell of cellsToTrigger) {
-            await triggerEffect({ ...effect, cell });
+            await triggerEffect({ ...effectWithDevice, cell });
           }
         } else {
           // Single cell trigger
-          await triggerEffect(effect);
+          await triggerEffect(effectWithDevice);
         }
         // Note: The log will come from the daemon event, not here
       } catch (error) {
@@ -207,13 +210,14 @@ export function useVestDebugger() {
         setLoading(false);
       }
     },
-    [pushLog]
+    [pushLog, mainDeviceId]
   );
 
   const haltAll = useCallback(async () => {
     setLoading(true);
     try {
-      await stopAll();
+      // Stop effects on main device if specified, otherwise stop all devices
+      await stopAll(mainDeviceId || undefined);
       // Note: The log will come from the daemon event, not here
       // pushLog("Stop all command sent");
     } catch (error) {
@@ -224,13 +228,18 @@ export function useVestDebugger() {
     } finally {
       setLoading(false);
     }
-  }, [pushLog]);
+  }, [pushLog, mainDeviceId]);
 
   const sendCustomCommand = useCallback(
     async (cell: number, speed: number) => {
       setLoading(true);
       try {
-        await triggerEffect({ label: `Custom Cell ${cell}`, cell, speed });
+        await triggerEffect({ 
+          label: `Custom Cell ${cell}`, 
+          cell, 
+          speed,
+          device_id: mainDeviceId || undefined 
+        });
       } catch (error) {
         pushLog(
           error instanceof Error ? error.message : "Failed to send custom command",
@@ -240,7 +249,7 @@ export function useVestDebugger() {
         setLoading(false);
       }
     },
-    [pushLog]
+    [pushLog, mainDeviceId]
   );
 
   // Subscribe to daemon events

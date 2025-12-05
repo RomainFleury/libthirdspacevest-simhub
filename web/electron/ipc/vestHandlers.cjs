@@ -80,13 +80,13 @@ function registerVestHandlers(getDaemonBridge) {
   });
 
   // Stop all
-  ipcMain.handle("vest:stop", async () => {
+  ipcMain.handle("vest:stop", async (_event, deviceId) => {
     try {
       const daemonBridge = getDaemonBridge();
       if (!daemonBridge?.connected) {
         return { success: false, error: "Not connected to daemon" };
       }
-      return await daemonBridge.stopAll();
+      return await daemonBridge.stopAll(deviceId);
     } catch (error) {
       console.error("Error in vest:stop:", error);
       return {

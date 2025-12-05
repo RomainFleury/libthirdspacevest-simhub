@@ -452,10 +452,12 @@ class DaemonBridge extends EventEmitter {
 
   /**
    * Stop all effects.
+   * @param {string} [deviceId] - Optional device ID to stop effects on
    */
-  async stopAll() {
+  async stopAll(deviceId) {
     try {
-      await this.sendCommand("stop");
+      const params = deviceId ? { device_id: deviceId } : {};
+      await this.sendCommand("stop", params);
       return { success: true };
     } catch (error) {
       return { success: false, error: error.message };

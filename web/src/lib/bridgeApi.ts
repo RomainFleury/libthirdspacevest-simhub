@@ -175,7 +175,7 @@ declare global {
       triggerEffect: (
         effect: VestEffect
       ) => Promise<{ success: boolean; error?: string } | void>;
-      stopAll: () => Promise<{ success: boolean; error?: string } | void>;
+      stopAll: (deviceId?: string) => Promise<{ success: boolean; error?: string } | void>;
       listDevices: () => Promise<VestDevice[]>;
       connectToDevice: (deviceInfo: Partial<VestDevice>) => Promise<VestStatus>;
       getDevicePreference: () => Promise<Partial<VestDevice> | null>;
@@ -436,8 +436,8 @@ export async function triggerEffect(effect: VestEffect): Promise<void> {
   }
 }
 
-export async function stopAll(): Promise<void> {
-  const result = await ensureBridge().stopAll();
+export async function stopAll(deviceId?: string): Promise<void> {
+  const result = await ensureBridge().stopAll(deviceId);
   // Check if the result indicates an error
   if (
     result &&

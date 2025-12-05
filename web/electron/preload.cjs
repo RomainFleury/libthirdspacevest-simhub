@@ -8,7 +8,7 @@ contextBridge.exposeInMainWorld("vestBridge", {
   getStatus: () => ipcRenderer.invoke("vest:status"),
   getEffects: () => ipcRenderer.invoke("vest:effects"),
   triggerEffect: (effect) => ipcRenderer.invoke("vest:trigger", effect),
-  stopAll: () => ipcRenderer.invoke("vest:stop"),
+  stopAll: (deviceId) => ipcRenderer.invoke("vest:stop", deviceId),
   listDevices: () => ipcRenderer.invoke("vest:listDevices"),
   connectToDevice: (deviceInfo) =>
     ipcRenderer.invoke("vest:connectToDevice", deviceInfo),
