@@ -78,6 +78,7 @@ from .gtav_manager import GTAVManager
 from .pistolwhip_manager import PistolWhipManager
 from .starcitizen_manager import StarCitizenManager
 from .l4d2_manager import L4D2Manager
+from .forhonor_manager import ForHonorManager, get_setup_info as get_forhonor_setup_info
 from .protocol import (
     event_alyx_started,
     event_alyx_stopped,
@@ -110,6 +111,13 @@ from .protocol import (
     response_l4d2_start,
     response_l4d2_stop,
     response_l4d2_status,
+    # For Honor integration
+    event_forhonor_started,
+    event_forhonor_stopped,
+    event_forhonor_game_event,
+    response_forhonor_start,
+    response_forhonor_stop,
+    response_forhonor_status,
     # Predefined effects
     event_effect_started,
     event_effect_completed,
@@ -185,6 +193,12 @@ class VestDaemon:
         self._l4d2_manager = L4D2Manager(
             on_game_event=self._on_l4d2_game_event,
             on_trigger=self._on_l4d2_trigger,
+        )
+        
+        # For Honor manager
+        self._forhonor_manager = ForHonorManager(
+            on_game_event=self._on_forhonor_game_event,
+            on_trigger=self._on_forhonor_trigger,
         )
         
         self._loop: Optional[asyncio.AbstractEventLoop] = None
@@ -480,6 +494,16 @@ class VestDaemon:
         
         if cmd_type == CommandType.L4D2_STATUS:
             return await self._cmd_l4d2_status(command)
+        
+        # For Honor commands
+        if cmd_type == CommandType.FORHONOR_START:
+            return await self._cmd_forhonor_start(command)
+        
+        if cmd_type == CommandType.FORHONOR_STOP:
+            return await self._cmd_forhonor_stop(command)
+        
+        if cmd_type == CommandType.FORHONOR_STATUS:
+            return await self._cmd_forhonor_status(command)
         
         # Predefined effects commands
         if cmd_type == CommandType.PLAY_EFFECT:
@@ -1637,6 +1661,90 @@ class VestDaemon:
     def _on_l4d2_trigger(self, cell: int, speed: int):
         """
         Called when Left 4 Dead 2 manager wants to trigger a haptic effect.
+        
+        Triggers the effect on the main device.
+        """
+        # Get main device controller
+        main_device_id = self._registry.get_main_device_id()
+        if main_device_id is None:
+            return  # No device available
+        
+        controller = self._registry.get_controller(main_device_id)
+        if controller is None or not controller.status().connected:
+            return  # Device not connected
+        
+        # Trigger effect (synchronous, thread-safe)
+        controller.trigger_effect(cell, speed)
+        
+        # Broadcast event (async)
+        if self._loop is not None:
+            event = event_effect_triggered(cell, speed, device_id=main_device_id)
+            asyncio.run_coroutine_threadsafe(
+                self._clients.broadcast(event),
+                self._loop,
+            )
+    
+    # -------------------------------------------------------------------------
+    # For Honor commands
+    # -------------------------------------------------------------------------
+    
+    async def _cmd_forhonor_start(self, command: Command) -> Response:
+        """Start watching For Honor log file."""
+        logger.info(f"[FORHONOR] Received start command: log_path={command.log_path}")
+        log_path = command.log_path
+        
+        success, error = self._forhonor_manager.start(log_path=log_path)
+        
+        if success:
+            log_path_str = str(self._forhonor_manager.log_path) if self._forhonor_manager.log_path else None
+            await self._clients.broadcast(event_forhonor_started(log_path_str or ""))
+            print(f"[FORHONOR] Integration started, watching: {log_path_str}")
+            return response_forhonor_start(success=True, log_path=log_path_str, req_id=command.req_id)
+        else:
+            return response_forhonor_start(success=False, error=error, req_id=command.req_id)
+    
+    async def _cmd_forhonor_stop(self, command: Command) -> Response:
+        """Stop watching For Honor log file."""
+        success = self._forhonor_manager.stop()
+        if success:
+            await self._clients.broadcast(event_forhonor_stopped())
+            print("[FORHONOR] Integration stopped")
+        return response_forhonor_stop(success=success, req_id=command.req_id)
+    
+    async def _cmd_forhonor_status(self, command: Command) -> Response:
+        """Get For Honor integration status."""
+        log_path_str = str(self._forhonor_manager.log_path) if self._forhonor_manager.log_path else None
+        return response_forhonor_status(
+            running=self._forhonor_manager.is_running,
+            log_path=log_path_str,
+            events_received=self._forhonor_manager.events_received,
+            last_event_ts=self._forhonor_manager.last_event_ts,
+            last_event_type=self._forhonor_manager.last_event_type,
+            req_id=command.req_id,
+        )
+    
+    # -------------------------------------------------------------------------
+    # For Honor callbacks
+    # -------------------------------------------------------------------------
+    
+    def _on_forhonor_game_event(self, event_type: str, params: dict):
+        """
+        Called when For Honor manager processes a game event.
+        
+        Broadcasts the event to all connected clients for UI display.
+        """
+        if self._loop is None:
+            return
+        
+        # Schedule broadcast in event loop
+        asyncio.run_coroutine_threadsafe(
+            self._clients.broadcast(event_forhonor_game_event(event_type, params)),
+            self._loop,
+        )
+    
+    def _on_forhonor_trigger(self, cell: int, speed: int):
+        """
+        Called when For Honor manager wants to trigger a haptic effect.
         
         Triggers the effect on the main device.
         """
