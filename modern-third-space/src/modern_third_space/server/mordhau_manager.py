@@ -43,9 +43,10 @@ logger = logging.getLogger(__name__)
 @dataclass
 class MordhauEvent:
     """Parsed event from Mordhau log file."""
-    type: str
-    direction: str
-    intensity: int
+    type: str  # DAMAGE, PARRY, FALL_DAMAGE
+    direction: str  # front, back, left, right, unknown
+    damage_type: str  # generic, melee, ranged, fall, fire
+    amount: float  # Damage amount (0 for parry)
     timestamp: float = 0.0
     
     def __post_init__(self):
@@ -55,9 +56,11 @@ class MordhauEvent:
 
 def parse_mordhau_line(line: str) -> Optional[MordhauEvent]:
     """
-    Parse a damage event line from log file.
+    Parse an event line from Mordhau log file.
     
-    Format: timestamp|DAMAGE|direction|intensity
+    Supports two formats:
+    - Plan B (screen capture): timestamp|DAMAGE|direction|intensity
+    - Plan C (Blueprint mod): timestamp|EVENT_TYPE|direction|damage_type|amount
     
     Returns MordhauEvent if valid, None otherwise.
     """
@@ -66,29 +69,71 @@ def parse_mordhau_line(line: str) -> Optional[MordhauEvent]:
         return None
     
     parts = line.split('|')
-    if len(parts) != 4:
-        return None
     
-    try:
-        timestamp_ms = int(parts[0])
-        event_type = parts[1]
-        direction = parts[2]
-        intensity = int(parts[3])
-        
-        if event_type != "DAMAGE":
+    # Plan C format: 5 fields (timestamp|EVENT_TYPE|direction|damage_type|amount)
+    if len(parts) == 5:
+        try:
+            timestamp_ms = int(parts[0])
+            event_type = parts[1]
+            direction = parts[2]
+            damage_type = parts[3]
+            amount = float(parts[4])
+            
+            # Validate event type
+            if event_type not in ("DAMAGE", "PARRY", "FALL_DAMAGE"):
+                return None
+            
+            # Validate damage type (case-insensitive)
+            damage_type_lower = damage_type.lower()
+            valid_damage_types = ("generic", "melee", "ranged", "fall", "fire")
+            if damage_type_lower not in valid_damage_types:
+                # If invalid, default to generic
+                damage_type = "generic"
+            else:
+                damage_type = damage_type_lower
+            
+            # Convert timestamp from milliseconds to seconds
+            timestamp = timestamp_ms / 1000.0
+            
+            return MordhauEvent(
+                type=event_type,
+                direction=direction,
+                damage_type=damage_type,
+                amount=amount,
+                timestamp=timestamp,
+            )
+        except (ValueError, IndexError):
             return None
-        
-        # Convert timestamp from milliseconds to seconds
-        timestamp = timestamp_ms / 1000.0
-        
-        return MordhauEvent(
-            type=event_type,
-            direction=direction,
-            intensity=intensity,
-            timestamp=timestamp,
-        )
-    except (ValueError, IndexError):
-        return None
+    
+    # Plan B format: 4 fields (timestamp|DAMAGE|direction|intensity) - legacy support
+    elif len(parts) == 4:
+        try:
+            timestamp_ms = int(parts[0])
+            event_type = parts[1]
+            direction = parts[2]
+            intensity = int(parts[3])
+            
+            if event_type != "DAMAGE":
+                return None
+            
+            # Convert timestamp from milliseconds to seconds
+            timestamp = timestamp_ms / 1000.0
+            
+            # Convert intensity (0-100) to amount (approximate)
+            # For Plan B, we don't have exact damage amount, so use intensity as proxy
+            amount = float(intensity)
+            
+            return MordhauEvent(
+                type=event_type,
+                direction=direction,
+                damage_type="generic",  # Unknown for Plan B
+                amount=amount,
+                timestamp=timestamp,
+            )
+        except (ValueError, IndexError):
+            return None
+    
+    return None
 
 
 # =============================================================================
@@ -125,27 +170,47 @@ def direction_to_cells(direction: str) -> List[int]:
         return ALL_CELLS
 
 
-def intensity_to_speed(intensity: int) -> int:
+def damage_to_speed(amount: float, damage_type: str) -> int:
     """
-    Convert intensity (0-100) to haptic speed (0-10).
+    Convert damage amount to haptic speed (0-10).
     
-    Maps intensity to appropriate haptic strength.
+    Maps damage amount and type to appropriate haptic strength.
     """
-    # Clamp intensity to 0-100
-    intensity = max(0, min(100, intensity))
-    
-    # Map to speed 0-10
-    # Higher intensity = stronger haptic feedback
-    if intensity >= 80:
-        return 9
-    elif intensity >= 60:
-        return 7
-    elif intensity >= 40:
-        return 5
-    elif intensity >= 20:
-        return 4
+    # Base speed from damage amount
+    # Mordhau damage typically ranges from 5-100+
+    if amount >= 80:
+        base_speed = 9
+    elif amount >= 60:
+        base_speed = 7
+    elif amount >= 40:
+        base_speed = 6
+    elif amount >= 20:
+        base_speed = 5
+    elif amount >= 10:
+        base_speed = 4
     else:
-        return 3
+        base_speed = 3
+    
+    # Adjust based on damage type
+    # Melee = close combat, usually significant impact
+    # Ranged = projectile, quick/sharp impact
+    # Fall = heavy landing impact
+    # Fire = burning, sustained impact
+    # Generic = unknown, use base speed
+    if damage_type == "melee":
+        # Melee damage is usually significant
+        return min(10, base_speed + 1)
+    elif damage_type == "ranged":
+        # Ranged damage is quick/sharp
+        return min(10, base_speed + 1)
+    elif damage_type == "fall":
+        # Fall damage is usually significant
+        return min(10, base_speed + 1)
+    elif damage_type == "fire":
+        # Fire damage is sustained
+        return min(10, base_speed + 1)
+    else:  # generic
+        return base_speed
 
 
 def map_event_to_haptics(event: MordhauEvent) -> List[tuple[int, int]]:
@@ -158,7 +223,24 @@ def map_event_to_haptics(event: MordhauEvent) -> List[tuple[int, int]]:
     
     if event.type == "DAMAGE":
         cells = direction_to_cells(event.direction)
-        speed = intensity_to_speed(event.intensity)
+        speed = damage_to_speed(event.amount, event.damage_type)
+        
+        for cell in cells:
+            commands.append((cell, speed))
+    
+    elif event.type == "PARRY":
+        # Parry: Light feedback on front cells (arms/chest)
+        # Parry feels like a successful block - quick, light pulse
+        cells = FRONT_CELLS  # Front cells for parry (arms/chest)
+        speed = 4  # Light feedback
+        
+        for cell in cells:
+            commands.append((cell, speed))
+    
+    elif event.type == "FALL_DAMAGE":
+        # Fall damage: Strong feedback on back cells (landing impact)
+        cells = BACK_CELLS  # Back cells for landing impact
+        speed = damage_to_speed(event.amount, "fall")
         
         for cell in cells:
             commands.append((cell, speed))
@@ -293,8 +375,11 @@ class MordhauManager:
                    (cell, speed) -> None
     """
     
-    # Default path for haptic_events.log
-    DEFAULT_LOG_PATH = Path(os.environ.get("LOCALAPPDATA", ".")) / "Mordhau" / "haptic_events.log"
+    # Default paths for log files
+    # Plan B (screen capture): Custom log file
+    DEFAULT_PLAN_B_LOG_PATH = Path(os.environ.get("LOCALAPPDATA", ".")) / "Mordhau" / "haptic_events.log"
+    # Plan C (Blueprint mod): Main game log file (filtered for our events)
+    DEFAULT_PLAN_C_LOG_PATH = Path(os.environ.get("LOCALAPPDATA", ".")) / "Mordhau" / "Saved" / "Logs" / "Mordhau.log"
     
     def __init__(
         self,
@@ -334,7 +419,7 @@ class MordhauManager:
         Start watching for Mordhau events.
         
         Args:
-            log_path: Path to haptic_events.log, or None for default
+            log_path: Path to log file, or None for default (tries Plan C main log, then Plan B custom log)
             
         Returns:
             (success, error_message)
@@ -346,7 +431,11 @@ class MordhauManager:
         if log_path:
             self._log_path = Path(log_path)
         else:
-            self._log_path = self.DEFAULT_LOG_PATH
+            # Try Plan C main log first (Blueprint mod), then Plan B custom log (screen capture)
+            if self.DEFAULT_PLAN_C_LOG_PATH.exists():
+                self._log_path = self.DEFAULT_PLAN_C_LOG_PATH
+            else:
+                self._log_path = self.DEFAULT_PLAN_B_LOG_PATH
         
         # Create watcher
         self._watcher = EventLogWatcher(
@@ -385,13 +474,14 @@ class MordhauManager:
         self._last_event_ts = event.timestamp
         self._last_event_type = event.type
         
-        logger.debug(f"Mordhau event: {event.type} - direction={event.direction}, intensity={event.intensity}")
+        logger.debug(f"Mordhau event: {event.type} - direction={event.direction}, damage_type={event.damage_type}, amount={event.amount}")
         
         # Emit event to callback (for broadcasting)
         if self.on_game_event:
             self.on_game_event(event.type, {
                 "direction": event.direction,
-                "intensity": event.intensity,
+                "damage_type": event.damage_type,
+                "amount": event.amount,
                 "timestamp": event.timestamp,
             })
         

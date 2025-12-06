@@ -645,6 +645,32 @@ export async function alyxGetModInfo(): Promise<AlyxModInfoResult> {
 }
 
 // -------------------------------------------------------------------------
+// Mordhau Integration
+// -------------------------------------------------------------------------
+
+/**
+ * Start the Mordhau log watcher.
+ * @param logPath Optional path to log file (auto-detect if not provided)
+ */
+export async function mordhauStart(logPath?: string): Promise<MordhauStartResult> {
+  return await ensureBridge().mordhauStart(logPath);
+}
+
+/**
+ * Stop the Mordhau log watcher.
+ */
+export async function mordhauStop(): Promise<MordhauStopResult> {
+  return await ensureBridge().mordhauStop();
+}
+
+/**
+ * Get Mordhau integration status.
+ */
+export async function mordhauStatus(): Promise<MordhauStatus> {
+  return await ensureBridge().mordhauStatus();
+}
+
+// -------------------------------------------------------------------------
 // Predefined Effects Library
 // -------------------------------------------------------------------------
 

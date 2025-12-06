@@ -89,6 +89,7 @@ export const integratedGames: IntegratedGameConfig[] = [
     description: "Screen capture-based haptic feedback for medieval combat",
     icon: "⚔️",
     steamAppId: 629760,
+    steamLaunchOptions: "-dev -log",
     hasSetupGuide: true,
     tags: ["melee", "medieval", "combat"],
   },
