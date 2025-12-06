@@ -1,0 +1,18 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "1.0.0",
+  "FriendlyName": "Third Space Haptics",
+  "Description": "Logs player damage events for Third Space Vest haptic feedback integration. Writes damage direction, amount, and type to a log file for external processing.",
+  "Category": "Gameplay",
+  "CreatedBy": "Third Space Vest Team",
+  "CreatedByURL": "",
+  "DocsURL": "",
+  "MarketplaceURL": "",
+  "SupportURL": "",
+  "CanContainContent": true,
+  "IsBetaVersion": false,
+  "IsExperimentalVersion": false,
+  "Installed": false,
+  "Modules": []
+}
