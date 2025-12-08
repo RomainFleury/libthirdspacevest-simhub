@@ -17,6 +17,7 @@ const { registerL4D2Handlers } = require("./l4d2Handlers.cjs");
 const { registerEffectsHandlers } = require("./effectsHandlers.cjs");
 const { registerBF2Handlers } = require("./bf2Handlers.cjs");
 const { registerMultiVestHandlers } = require("./multiVestHandlers.cjs");
+const { registerModsHandlers } = require("./modsHandlers.cjs");
 
 /**
  * Register all IPC handlers.
@@ -57,6 +58,9 @@ function registerAllHandlers(getDaemonBridge, getMainWindow, reconnectToDaemon) 
 
   // Multi-vest management handlers
   registerMultiVestHandlers(getDaemonBridge);
+
+  // Bundled game mods handlers
+  registerModsHandlers(getMainWindow);
 
   console.log("✓ IPC handlers registered");
 }

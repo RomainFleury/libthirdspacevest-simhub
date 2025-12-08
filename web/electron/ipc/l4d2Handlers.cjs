@@ -8,8 +8,39 @@ const l4d2Storage = require("../l4d2Storage.cjs");
 const path = require("path");
 const fs = require("fs");
 
-// Path to the mod files (relative to project root)
-const MOD_SOURCE_PATH = path.resolve(__dirname, "..", "..", "..", "misc-documentations", "bhaptics-svg-24-nov", "l4d2", "third-space-vest-mod", "scripts", "vscripts");
+// Detect if we're running in production (packaged) mode
+const IS_PACKAGED = !process.env.VITE_DEV_SERVER_URL;
+
+/**
+ * Get the path to L4D2 mod files.
+ * In production: resources/mods/l4d2/
+ * In development: misc-documentations/.../l4d2/third-space-vest-mod/scripts/vscripts/
+ */
+function getModSourcePath() {
+  if (IS_PACKAGED) {
+    // Production: use bundled mod files from resources
+    const bundledPath = path.join(process.resourcesPath, "mods", "l4d2");
+    if (fs.existsSync(bundledPath)) {
+      console.log(`[l4d2] Using bundled mods: ${bundledPath}`);
+      return bundledPath;
+    }
+    console.warn(`[l4d2] Bundled mods not found at: ${bundledPath}`);
+  }
+  
+  // Development: use source files
+  const devPath = path.resolve(__dirname, "..", "..", "..", "misc-documentations", "bhaptics-svg-24-nov", "l4d2", "third-space-vest-mod", "scripts", "vscripts");
+  console.log(`[l4d2] Using dev mod path: ${devPath}`);
+  return devPath;
+}
+
+// Lazy-loaded path (computed on first use)
+let MOD_SOURCE_PATH = null;
+function getModPath() {
+  if (MOD_SOURCE_PATH === null) {
+    MOD_SOURCE_PATH = getModSourcePath();
+  }
+  return MOD_SOURCE_PATH;
+}
 
 function registerL4D2Handlers(getMainWindow) {
   // Start Left 4 Dead 2 integration
@@ -192,8 +223,9 @@ function registerL4D2Handlers(getMainWindow) {
       }
 
       // Check if source files exist
-      if (!fs.existsSync(MOD_SOURCE_PATH)) {
-        return { success: false, error: `Mod source files not found at: ${MOD_SOURCE_PATH}` };
+      const modPath = getModPath();
+      if (!fs.existsSync(modPath)) {
+        return { success: false, error: `Mod source files not found at: ${modPath}` };
       }
 
       // Create scripts/vscripts directory if it doesn't exist
@@ -205,7 +237,7 @@ function registerL4D2Handlers(getMainWindow) {
       const copiedFiles = [];
 
       for (const file of filesToCopy) {
-        const srcPath = path.join(MOD_SOURCE_PATH, file);
+        const srcPath = path.join(modPath, file);
         const destPath = path.join(vscriptsPath, file);
         
         if (!fs.existsSync(srcPath)) {

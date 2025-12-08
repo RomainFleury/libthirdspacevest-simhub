@@ -37,6 +37,21 @@ This opens two windows:
 | `start-all.bat` | Starts daemon + app together |
 | `run.bat` | Starts just the Electron app |
 | `start-daemon.bat` | Starts just the Python daemon |
+| `build-release.bat` | Builds a distributable installer (see below) |
+
+---
+
+## Building a Release
+
+To create a standalone Windows installer that doesn't require Python or Node.js:
+
+**Double-click** `build-release.bat`
+
+This creates:
+- `web/release/Third Space Vest Setup 1.0.0.exe` - Windows installer
+- `web/release/Third Space Vest-1.0.0-portable.zip` - Portable version
+
+See [BUILD-RELEASE.md](../BUILD-RELEASE.md) for detailed build instructions.
 
 ## Detailed Instructions
 

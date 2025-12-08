@@ -6,20 +6,28 @@
  * - Sends commands and receives responses
  * - Emits events received from the daemon
  *
- * Replaces the old pythonBridge.cjs which spawned CLI processes.
+ * In production (packaged app):
+ * - Spawns the bundled vest-daemon.exe from resources/daemon/
+ *
+ * In development:
+ * - Spawns Python directly from modern-third-space/src/
  */
 
 const net = require("net");
 const { EventEmitter } = require("events");
 const { spawn } = require("child_process");
 const path = require("path");
+const fs = require("fs");
 
 const DEFAULT_HOST = "127.0.0.1";
 const DEFAULT_PORT = 5050;
 const RECONNECT_DELAY_MS = 2000;
 const CONNECT_TIMEOUT_MS = 5000;
 
-// Path to the modern-third-space src directory
+// Detect if we're running in production (packaged) mode
+const IS_PACKAGED = !process.env.VITE_DEV_SERVER_URL;
+
+// Path to the modern-third-space src directory (development)
 const PYTHON_SRC_PATH = path.resolve(
   __dirname,
   "..",
@@ -27,6 +35,35 @@ const PYTHON_SRC_PATH = path.resolve(
   "modern-third-space",
   "src"
 );
+
+/**
+ * Get the path to the daemon executable.
+ * In production: resources/daemon/vest-daemon.exe
+ * In development: Python script
+ */
+function getDaemonPath() {
+  if (IS_PACKAGED) {
+    // Production: use bundled executable
+    // process.resourcesPath points to the resources folder in the packaged app
+    const bundledDaemon = path.join(
+      process.resourcesPath,
+      "daemon",
+      process.platform === "win32" ? "vest-daemon.exe" : "vest-daemon"
+    );
+    
+    if (fs.existsSync(bundledDaemon)) {
+      console.log(`[daemon] Using bundled daemon: ${bundledDaemon}`);
+      return { type: "exe", path: bundledDaemon };
+    }
+    
+    console.warn(`[daemon] Bundled daemon not found at: ${bundledDaemon}`);
+    console.warn("[daemon] Falling back to Python mode");
+  }
+  
+  // Development: use Python
+  console.log(`[daemon] Using Python daemon from: ${PYTHON_SRC_PATH}`);
+  return { type: "python", path: PYTHON_SRC_PATH };
+}
 
 class DaemonBridge extends EventEmitter {
   constructor(host = DEFAULT_HOST, port = DEFAULT_PORT) {
@@ -116,32 +153,50 @@ class DaemonBridge extends EventEmitter {
 
   /**
    * Start the daemon process.
+   * Uses bundled executable in production, Python in development.
    */
   _startDaemon() {
     return new Promise((resolve, reject) => {
       console.log("Starting daemon process...");
 
-      const pythonArgs = [
-        "-u",
-        "-m",
-        "modern_third_space.cli",
-        "daemon",
-        "--port",
-        String(this.port),
-      ];
+      const daemonInfo = getDaemonPath();
+      let cmd, args, options;
 
-      // Try to find Python executable (Windows uses 'python', Unix uses 'python3')
-      const pythonCmd = process.platform === "win32" ? "python" : "python3";
-      
-      this.daemonProcess = spawn(pythonCmd, pythonArgs, {
-        cwd: PYTHON_SRC_PATH,
-        env: {
-          ...process.env,
-          PYTHONPATH: PYTHON_SRC_PATH,
-        },
-        detached: true,
-        stdio: ["ignore", "pipe", "pipe"],
-      });
+      if (daemonInfo.type === "exe") {
+        // Production: run bundled executable
+        cmd = daemonInfo.path;
+        args = ["daemon", "--port", String(this.port)];
+        options = {
+          cwd: path.dirname(daemonInfo.path),
+          detached: true,
+          stdio: ["ignore", "pipe", "pipe"],
+        };
+        console.log(`[daemon] Spawning: ${cmd} ${args.join(" ")}`);
+      } else {
+        // Development: run Python
+        const pythonCmd = process.platform === "win32" ? "python" : "python3";
+        cmd = pythonCmd;
+        args = [
+          "-u",
+          "-m",
+          "modern_third_space.cli",
+          "daemon",
+          "--port",
+          String(this.port),
+        ];
+        options = {
+          cwd: daemonInfo.path,
+          env: {
+            ...process.env,
+            PYTHONPATH: daemonInfo.path,
+          },
+          detached: true,
+          stdio: ["ignore", "pipe", "pipe"],
+        };
+        console.log(`[daemon] Spawning: ${cmd} ${args.join(" ")} (cwd: ${daemonInfo.path})`);
+      }
+
+      this.daemonProcess = spawn(cmd, args, options);
 
       // Don't keep Electron alive just for the daemon
       this.daemonProcess.unref();
@@ -151,7 +206,7 @@ class DaemonBridge extends EventEmitter {
       this.daemonProcess.stdout.on("data", (data) => {
         const output = data.toString();
         console.log("[daemon]", output.trim());
-        if (output.includes("listening") && !started) {
+        if ((output.includes("listening") || output.includes("Starting")) && !started) {
           started = true;
           resolve();
         }
