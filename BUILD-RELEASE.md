@@ -139,13 +139,17 @@ web/release/
 
 ### Bundled Game Mods
 
-Some game mods are bundled with the app and can be installed from the UI:
+Game mods are bundled with the app in `resources/mods/`:
 
 | Game | Files | Install Method |
 |------|-------|----------------|
 | Left 4 Dead 2 | `*.nut` VScripts | Click "Install Mod" in UI |
+| SUPERHOT VR | `ThirdSpace_SuperhotVR.dll` | Download from UI |
+| Pistol Whip | `ThirdSpace_PistolWhip.dll` | Download from UI |
+| GTA V | `ThirdSpaceGTAV.dll` | Download from UI |
+| Half-Life: Alyx | Link to NexusMods | External download |
 
-Other mods (SUPERHOT VR, Pistol Whip, GTA V) are MelonLoader DLLs that users download separately from GitHub Releases.
+**Note:** The DLL mods must be compiled before building a release. See `mods/README.md` for build instructions.
 
 ## Distribution
 

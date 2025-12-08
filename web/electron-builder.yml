@@ -29,12 +29,44 @@ extraResources:
     filter:
       - "vest-daemon*"
   
-  # Game mod files that users can install from the UI
-  # L4D2 VScript mod files
+  # =========================================================================
+  # Bundled Game Mods
+  # These are pre-built mod files that users can download/install from the UI
+  # =========================================================================
+  
+  # L4D2 VScript mod files (auto-install from UI)
   - from: "../misc-documentations/bhaptics-svg-24-nov/l4d2/third-space-vest-mod/scripts/vscripts/"
     to: "mods/l4d2/"
     filter:
       - "*.nut"
+  
+  # SUPERHOT VR MelonLoader mod
+  - from: "../mods/superhot-vr/"
+    to: "mods/superhot-vr/"
+    filter:
+      - "*.dll"
+      - "README.md"
+  
+  # Pistol Whip MelonLoader mod  
+  - from: "../mods/pistolwhip/"
+    to: "mods/pistolwhip/"
+    filter:
+      - "*.dll"
+      - "README.md"
+  
+  # GTA V SHVDN mod
+  - from: "../mods/gta5/"
+    to: "mods/gta5/"
+    filter:
+      - "*.dll"
+      - "README.md"
+  
+  # Half-Life: Alyx (README only - mod from NexusMods)
+  - from: "../mods/alyx/"
+    to: "mods/alyx/"
+    filter:
+      - "*.lua"
+      - "README.md"
 
 # Don't pack into asar (easier debugging, daemon access)
 asar: true

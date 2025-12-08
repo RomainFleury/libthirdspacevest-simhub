@@ -119,4 +119,12 @@ contextBridge.exposeInMainWorld("vestBridge", {
   listGamePlayerMappings: (gameId) => ipcRenderer.invoke("multivist:listGamePlayerMappings", gameId),
   createMockDevice: () => ipcRenderer.invoke("multivist:createMockDevice"),
   removeMockDevice: (deviceId) => ipcRenderer.invoke("multivist:removeMockDevice", deviceId),
+
+  // Bundled Game Mods API
+  modsListAll: () => ipcRenderer.invoke("mods:list"),
+  modsCheckBundled: (modId) => ipcRenderer.invoke("mods:checkBundled", modId),
+  modsSaveToFolder: (modId) => ipcRenderer.invoke("mods:saveToFolder", modId),
+  modsDownloadFile: (modId, fileName) => ipcRenderer.invoke("mods:downloadFile", modId, fileName),
+  modsOpenFolder: (modId) => ipcRenderer.invoke("mods:openFolder", modId),
+  modsGetReadme: (modId) => ipcRenderer.invoke("mods:getReadme", modId),
 });
