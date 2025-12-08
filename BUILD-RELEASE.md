@@ -129,9 +129,23 @@ web/release/
 └── win-unpacked/                        # Unpacked app directory
     ├── Third Space Vest.exe
     └── resources/
-        └── daemon/
-            └── vest-daemon.exe
+        ├── daemon/
+        │   └── vest-daemon.exe          # Python daemon (PyInstaller)
+        └── mods/
+            └── l4d2/                     # Bundled game mods
+                ├── coop.nut
+                └── thirdspacevest_haptics.nut
 ```
+
+### Bundled Game Mods
+
+Some game mods are bundled with the app and can be installed from the UI:
+
+| Game | Files | Install Method |
+|------|-------|----------------|
+| Left 4 Dead 2 | `*.nut` VScripts | Click "Install Mod" in UI |
+
+Other mods (SUPERHOT VR, Pistol Whip, GTA V) are MelonLoader DLLs that users download separately from GitHub Releases.
 
 ## Distribution
 

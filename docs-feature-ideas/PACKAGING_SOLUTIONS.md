@@ -274,7 +274,30 @@ web/
 
 ## Game Mods Distribution
 
+### Bundled Mods (Installed via UI)
+
+Some mods are bundled with the app and can be installed with one click:
+
+| Game | Mod Type | Location in Package |
+|------|----------|---------------------|
+| Left 4 Dead 2 | VScript (.nut) | `resources/mods/l4d2/` |
+
+These mods are copied to the user's game directory when they click "Install Mod" in the UI.
+
+### External Mods (Download Links)
+
 The C# game mods (GTA5, SUPERHOT, PistolWhip) are **separate** from the main app:
+
+| Game | Mod Type | Distribution |
+|------|----------|--------------|
+| Half-Life: Alyx | Lua script | NexusMods download |
+| SUPERHOT VR | MelonLoader DLL | GitHub Releases |
+| Pistol Whip | MelonLoader DLL | GitHub Releases |
+| GTA V | SHVDN DLL | GitHub Releases |
+
+The app shows download links to these external mods. Users download and install manually.
+
+### Why External Mods?
 
 1. Pre-compile `.dll` files during CI
 2. Include in installer as optional component, OR

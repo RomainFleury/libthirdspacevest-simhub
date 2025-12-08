@@ -28,6 +28,13 @@ extraResources:
     to: "daemon/"
     filter:
       - "vest-daemon*"
+  
+  # Game mod files that users can install from the UI
+  # L4D2 VScript mod files
+  - from: "../misc-documentations/bhaptics-svg-24-nov/l4d2/third-space-vest-mod/scripts/vscripts/"
+    to: "mods/l4d2/"
+    filter:
+      - "*.nut"
 
 # Don't pack into asar (easier debugging, daemon access)
 asar: true
