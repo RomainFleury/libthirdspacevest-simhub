@@ -92,14 +92,58 @@ Get Game Time In Seconds
    - **FALSE**:
      - **Set LastHealth** = Current Health
 
-### Step 7: Test
+### Step 7: Create an Actor to Attach the Component
 
-1. Compile and save
-2. Package as .pak file
-3. Place in `CustomPaks` folder
-4. Launch Mordhau and take damage
-5. Check log: `%LOCALAPPDATA%\Mordhau\Saved\Logs\Mordhau.log`
-6. Look for: `12345|DAMAGE|unknown|generic|25.5`
+**⚠️ CRITICAL:** Actor Components don't run unless attached to an Actor that's spawned in the game!
+
+**⚠️ IMPORTANT:** The Actor MUST be in the same folder as your Component!
+
+1. In Content Browser, navigate to the SAME folder where your `BP_ThirdSpaceHaptics` component is located
+   - If your component is in `/ThirdSpaceHaptics/Content/`, create the Actor there too
+2. Right-click in that folder → **Blueprint Class**
+3. Select **Actor** (NOT Actor Component) as parent class
+4. Name it: `BP_ThirdSpaceHapticsActor`
+5. Open `BP_ThirdSpaceHapticsActor`
+6. In the **Components** panel (left side), click **Add Component** → Search for and select `BP_ThirdSpaceHaptics` (your component)
+7. The component should now appear in the Components list
+8. **Compile and Save** the Actor
+
+### Step 8: Configure Game.ini to Spawn the Actor
+
+1. Find your Mordhau `Game.ini` file:
+   ```
+   %LOCALAPPDATA%\Mordhau\Saved\Config\WindowsClient\Game.ini
+   ```
+   (Usually: `C:\Users\<YourUsername>\AppData\Local\Mordhau\Saved\Config\WindowsClient\Game.ini`)
+
+2. Open `Game.ini` in a text editor
+
+3. Find or create the section `[/Script/Mordhau.MordhauGameMode]`
+
+4. Add this line (adjust the path to match your Blueprint's ACTUAL location in Content Browser):
+   ```
+   SpawnServerActorsOnMapLoad=/ThirdSpaceHaptics/Content/BP_ThirdSpaceHapticsActor.BP_ThirdSpaceHapticsActor_C
+   ```
+   
+   **⚠️ CRITICAL:** The path MUST match where your Actor Blueprint actually is!
+   - If your Component is at `/ThirdSpaceHaptics/Content/BP_ThirdSpaceHaptics`, the Actor should be at `/ThirdSpaceHaptics/Content/BP_ThirdSpaceHapticsActor`
+   - The path format is: `/YourModFolder/YourSubFolder/BlueprintName.BlueprintName_C`
+   - **To find the exact path:** In Content Browser, right-click your Actor Blueprint → **Copy Reference** → Paste it somewhere to see the full path
+   - **Common mistake:** Don't use `/Game/` unless your Blueprint is actually in the `/Game/` folder!
+
+5. Save `Game.ini`
+
+### Step 9: Test
+
+1. **Package both Blueprints** (the Component AND the Actor) as .pak file
+2. Place in `CustomPaks` folder:
+   ```
+   SteamLibrary\steamapps\common\Mordhau\Mordhau\Content\CustomPaks\
+   ```
+3. Launch Mordhau with `-dev -log` flags
+4. Check log: `%LOCALAPPDATA%\Mordhau\Saved\Logs\Mordhau.log`
+5. Look for your "Print String" message from Begin Play
+6. Take damage and look for: `12345|DAMAGE|unknown|generic|25.5`
 
 **That's it!** The daemon will automatically detect and process these events.
 
@@ -554,15 +598,76 @@ The Python daemon will watch the log file (see `mordhau_manager.py`). Make sure:
 
 ## Troubleshooting
 
+### ⚠️ CRITICAL: Mod Not Loading / Component Not Running
+
+**Problem:** Nothing is logged, mod seems inactive.
+
+**Root Cause:** Actor Components don't run automatically - they must be attached to an Actor that exists in the game.
+
+**Solution Options:**
+
+#### Option 1: Create a Game Mode Actor (Recommended)
+
+1. Create a new **Blueprint Class** → Select **Actor** (not Actor Component)
+2. Name it: `BP_ThirdSpaceHapticsActor`
+3. In the Actor's **Components** panel, click **Add Component** → Select your `BP_ThirdSpaceHaptics` component
+4. In the Actor's **Begin Play** event, add:
+   ```
+   Begin Play
+     → Print String: "ThirdSpace Haptics Mod Loaded!"
+   ```
+5. Package this Actor (not just the component)
+6. **Add to Game Mode** (see Option 2 below)
+
+#### Option 2: Spawn via Game Mode Configuration
+
+1. Find your Mordhau `Game.ini` file (usually in `%LOCALAPPDATA%\Mordhau\Saved\Config\WindowsClient\`)
+2. Add under `[/Script/Mordhau.MordhauGameMode]`:
+   ```
+   SpawnServerActorsOnMapLoad=/Game/BP_ThirdSpaceHapticsActor.BP_ThirdSpaceHapticsActor_C
+   ```
+   (Adjust path to match your Blueprint's actual path in the Content Browser)
+
+#### Option 3: Attach to Player Character (Advanced)
+
+If MSDK provides a way to modify the player character Blueprint, you can add the component directly to it. This is more complex and may require server-side setup.
+
+#### Verification Steps:
+
+1. **Check if mod is loaded:**
+   - Launch Mordhau with `-dev -log` flags
+   - Check the log file for any errors about the mod
+   - Look for your "Print String" debug message
+
+2. **Verify .pak file location:**
+   ```
+   SteamLibrary\steamapps\common\Mordhau\Mordhau\Content\CustomPaks\
+   ```
+   - Make sure the folder exists
+   - Check the .pak file name (should match your Blueprint name)
+
+3. **Check log file for errors:**
+   ```
+   %LOCALAPPDATA%\Mordhau\Saved\Logs\Mordhau.log
+   ```
+   - Look for "Failed to load" or "Could not find" errors
+   - Look for your component's Begin Play message
+
+4. **Test with a simple print:**
+   - Add a "Print String" node in Begin Play that says "MOD LOADED"
+   - If you don't see this in the log, the component isn't running
+
 ### File Not Created
 - Check file path is correct
 - Verify game has write permissions
 - Try absolute path instead of environment variable
+- Make sure the component is actually running (see above)
 
 ### Events Not Detected
 - Check if MSDK nodes are available
 - Verify event hooks are connected
 - Add debug prints to verify events fire
+- **Verify component is attached and running** (see above)
 
 ### Wrong Direction/Amount
 - Verify MSDK provides correct data
