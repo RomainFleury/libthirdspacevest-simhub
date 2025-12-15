@@ -78,6 +78,15 @@ These documents outline approaches, patterns, and implementation strategies for 
   - Source available: bHaptics and OWO GitHub repos
   - 📋 **PLANNED** - Ready for implementation
 
+- **`DEEP_ROCK_GALACTIC_INTEGRATION.md`** - Deep Rock Galactic integration via UE4 Blueprint mod
+  - 1-4 player co-op FPS/mining game by Ghost Ship Games
+  - Unreal Engine 4 with official mod.io support
+  - Existing bHaptics mod provides reference implementation
+  - 4 classes (Scout, Driller, Engineer, Gunner) with unique weapons
+  - Events: damage, weapon fire, mining, drilling, fall damage, shields, hazards
+  - Directional damage support using attacker position
+  - 📋 **RESEARCH COMPLETE** - Strategy documented, ready for implementation
+
 - **`MELONLOADER_INTEGRATION_STRATEGY.md`** - Comprehensive strategy for integrating MelonLoader-based game mods (Unity games like SUPERHOT VR, Drunkn Bar Fight, etc.)
   - Multiple integration approaches (file logging, HTTP/WebSocket, IPC)
   - Event mapping strategies
