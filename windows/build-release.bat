@@ -83,8 +83,23 @@ if %ERRORLEVEL% neq 0 (
 )
 echo.
 
+:: Step 4.5: Copy daemon to dist/daemon for bundling
+echo [4.5/5] Preparing daemon for bundling...
+if not exist "dist\daemon" mkdir dist\daemon
+if exist "..\modern-third-space\build\dist\vest-daemon.exe" (
+    copy /Y "..\modern-third-space\build\dist\vest-daemon.exe" "dist\daemon\" >nul
+    echo [OK] Daemon copied to dist/daemon/
+) else (
+    echo [ERROR] Daemon executable not found!
+    echo Please run: cd modern-third-space\build && python build-daemon.py
+    pause
+    exit /b 1
+)
+echo.
+
 :: Step 5: Package with electron-builder
 echo [5/5] Packaging with Electron Builder...
+set CSC_IDENTITY_AUTO_DISCOVERY=false
 call yarn electron-builder --win --config electron-builder.yml
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Failed to package application!

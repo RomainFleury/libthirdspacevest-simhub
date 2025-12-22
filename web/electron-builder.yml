@@ -18,16 +18,16 @@ files:
   # Exclude dev files
   - "!**/*.map"
   - "!**/node_modules/.cache"
+  # Exclude daemon from asar (it goes to extraResources)
+  - "!dist/daemon/**/*"
 
 # Extra resources (copied to resources folder, not asar)
 # NOTE: Build the daemon first! (python modern-third-space/build/build-daemon.py)
 extraResources:
   # The daemon executable (built by PyInstaller)
   # On Windows: vest-daemon.exe, on Linux/macOS: vest-daemon
-  - from: "../modern-third-space/build/dist/"
-    to: "daemon/"
-    filter:
-      - "vest-daemon*"
+  - from: "dist/daemon"
+    to: "daemon"
   
   # =========================================================================
   # Bundled Game Mods
@@ -83,6 +83,10 @@ win:
   # icon: build/icon.ico
   # Request admin rights if needed for USB access
   requestedExecutionLevel: asInvoker
+  # Disable code signing completely (avoids symlink permission errors)
+  sign: false
+  verifyUpdateCodeSignature: false
+  signingHashAlgorithms: []
 
 # NSIS installer configuration  
 nsis:

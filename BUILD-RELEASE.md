@@ -31,6 +31,24 @@ pip install pyinstaller libusb
 corepack enable  # Enables Yarn
 ```
 
+### Windows Developer Mode (Recommended)
+
+To avoid symbolic link permission errors during the build, enable Windows Developer Mode:
+
+**Option 1: Via Settings (Recommended)**
+1. Open Windows Settings (Win + I)
+2. Go to **Privacy & Security** → **For developers**
+3. Enable **"Developer Mode"**
+4. Restart your terminal/PowerShell
+
+**Option 2: Via Registry (Requires Admin)**
+Run PowerShell as Administrator and execute:
+```powershell
+reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" /t REG_DWORD /f /v AllowDevelopmentWithoutDevLicense /d 1
+```
+
+**Why?** Electron-Builder needs to extract code signing tools that contain symbolic links. Without Developer Mode, you'll get "A required privilege is not held by the client" errors.
+
 ## Quick Build (Windows)
 
 **Double-click to build:**
@@ -189,6 +207,35 @@ corepack enable
 npm install -g yarn
 ```
 
+### "Cannot create symbolic link: A required privilege is not held by the client"
+
+This warning occurs when electron-builder tries to extract code signing tools. Solutions:
+
+1. **Enable Windows Developer Mode** (Recommended - see Prerequisites above)
+2. **Run PowerShell as Administrator** when building
+3. **The build will still complete** - this is just a warning about code signing tools
+
+Code signing is already disabled in the config, but electron-builder may still download the tools.
+
+### "file source doesn't exist from=...\dist\daemon"
+
+**Error:** `file source doesn't exist from=C:\...\web\dist\daemon`
+
+**Solution:** The daemon must be copied to `dist/daemon/` before electron-builder runs. The `build-release.bat` script does this automatically. If building manually:
+
+```bash
+# Ensure daemon is built first
+cd modern-third-space/build
+python build-daemon.py
+
+# Copy daemon to dist/daemon for bundling
+cd ../../web
+mkdir -p dist/daemon
+copy ..\modern-third-space\build\dist\vest-daemon.exe dist\daemon\
+```
+
+The `prebuild:electron` script in `package.json` handles this automatically when using `yarn build:electron`.
+
 ### Anti-virus false positive
 
 PyInstaller executables sometimes trigger false positives. Solutions:
@@ -196,13 +243,24 @@ PyInstaller executables sometimes trigger false positives. Solutions:
 2. Code-sign the executable (requires certificate)
 3. Submit to anti-virus vendors for whitelisting
 
-### Build fails on "extraResources"
+### Build fails on "extraResources" or "file source doesn't exist"
 
-Make sure the daemon was built first:
+**Error:** `file source doesn't exist from=...\dist\daemon`
+
+**Solution:** The daemon must be copied to `dist/daemon/` before electron-builder runs. The build script does this automatically, but if building manually:
+
 ```bash
+# Ensure daemon is built first
 cd modern-third-space/build
 python build-daemon.py
+
+# Copy daemon to dist/daemon for bundling
+cd ../../web
+mkdir -p dist/daemon
+copy ..\modern-third-space\build\dist\vest-daemon.exe dist\daemon\
 ```
+
+The `prebuild:electron` script in `package.json` handles this automatically when using `yarn build:electron`.
 
 ## CI/CD (Future)
 
