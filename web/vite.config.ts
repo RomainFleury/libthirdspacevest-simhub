@@ -8,6 +8,7 @@ export default defineConfig({
   },
   build: {
     outDir: "dist",
+    emptyOutDir: false, // Don't clean dist - preserve daemon/ directory
   },
 });
 
