@@ -26,8 +26,8 @@ files:
 extraResources:
   # The daemon executable (built by PyInstaller)
   # On Windows: vest-daemon.exe, on Linux/macOS: vest-daemon
-  - from: "dist/daemon"
-    to: "daemon"
+  - from: "dist/daemon/vest-daemon.exe"
+    to: "daemon/vest-daemon.exe"
   
   # =========================================================================
   # Bundled Game Mods
