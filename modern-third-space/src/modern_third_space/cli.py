@@ -128,7 +128,7 @@ def _daemon_start(args: argparse.Namespace) -> int:
     host = args.host
     port = args.port
     
-    print(f"[VEST] Starting vest daemon on {host}:{port}...")
+    print(f"[VEST] Starting vest daemon on {host}:{port}...", flush=True)
     run_daemon(host=host, port=port)
     return 0
 

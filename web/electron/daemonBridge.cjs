@@ -169,7 +169,14 @@ class DaemonBridge extends EventEmitter {
         options = {
           cwd: path.dirname(daemonInfo.path),
           detached: true,
-          stdio: ["ignore", "pipe", "pipe"],
+          // Use 'inherit' so console window shows output
+          // We detect startup by connecting to TCP port instead of parsing stdout
+          stdio: ["ignore", "inherit", "inherit"],
+          // On Windows, create a new console window for the detached process
+          ...(process.platform === "win32" && {
+            windowsVerbatimArguments: false,
+            windowsHide: false, // Show the console window
+          }),
         };
         console.log(`[daemon] Spawning: ${cmd} ${args.join(" ")}`);
       } else {
@@ -203,18 +210,40 @@ class DaemonBridge extends EventEmitter {
 
       let started = false;
 
-      this.daemonProcess.stdout.on("data", (data) => {
-        const output = data.toString();
-        console.log("[daemon]", output.trim());
-        if ((output.includes("listening") || output.includes("Starting")) && !started) {
-          started = true;
-          resolve();
+      // Since we're using 'inherit' for stdio (so console window shows output),
+      // we can't read stdout/stderr. Instead, detect startup by connecting to TCP port.
+      const checkPort = () => {
+        const testSocket = new net.Socket();
+        testSocket.setTimeout(500);
+        
+        testSocket.on("connect", () => {
+          testSocket.destroy();
+          if (!started) {
+            started = true;
+            console.log("[daemon] Detected daemon started (port connected)");
+            resolve();
+          }
+        });
+        
+        testSocket.on("error", () => {
+          // Port not ready yet, try again
+          setTimeout(checkPort, 200);
+        });
+        
+        testSocket.on("timeout", () => {
+          testSocket.destroy();
+          setTimeout(checkPort, 200);
+        });
+        
+        try {
+          testSocket.connect(this.port, this.host);
+        } catch (err) {
+          setTimeout(checkPort, 200);
         }
-      });
+      };
 
-      this.daemonProcess.stderr.on("data", (data) => {
-        console.error("[daemon stderr]", data.toString().trim());
-      });
+      // Start checking for port after a short delay
+      setTimeout(checkPort, 500);
 
       this.daemonProcess.on("error", (err) => {
         console.error("Failed to start daemon:", err.message);
@@ -223,14 +252,14 @@ class DaemonBridge extends EventEmitter {
         }
       });
 
-      // Timeout if daemon doesn't start
+      // Timeout if daemon doesn't start (fallback)
       setTimeout(() => {
         if (!started) {
           started = true;
-          // Assume it started even without the log message
+          console.warn("[daemon] Startup detection timeout - assuming daemon started");
           resolve();
         }
-      }, 3000);
+      }, 5000);
     });
   }
 

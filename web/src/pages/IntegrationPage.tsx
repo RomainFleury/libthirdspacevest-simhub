@@ -45,7 +45,7 @@ export function IntegrationPage() {
             The integration page for this game is not yet available.
           </p>
           <a
-            href="/games"
+            href="#/games"
             className="inline-flex items-center gap-2 rounded-lg bg-blue-600/80 px-4 py-2 font-medium text-white transition hover:bg-blue-600"
           >
             ← Back to Games
