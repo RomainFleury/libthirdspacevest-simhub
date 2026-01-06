@@ -18,6 +18,7 @@ const { EventEmitter } = require("events");
 const { spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs");
+const { createWriteStream } = require("fs");
 
 const DEFAULT_HOST = "127.0.0.1";
 const DEFAULT_PORT = 5050;
@@ -94,11 +95,18 @@ class DaemonBridge extends EventEmitter {
     } catch (error) {
       if (autoStartDaemon) {
         console.log("Daemon not running, attempting to start...");
-        await this._startDaemon();
-        // Wait a moment for daemon to start
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        await this._tryConnect();
-        return true;
+        try {
+          await this._startDaemon();
+          console.log("[daemon] Startup detection completed, waiting for daemon to be ready...");
+          // Wait a bit longer for daemon to fully initialize and start listening
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          console.log("[daemon] Attempting connection...");
+          await this._tryConnect();
+          return true;
+        } catch (startError) {
+          console.error("[daemon] Failed to start daemon:", startError.message);
+          throw startError;
+        }
       }
       throw error;
     }
@@ -161,24 +169,32 @@ class DaemonBridge extends EventEmitter {
 
       const daemonInfo = getDaemonPath();
       let cmd, args, options;
+      let logStream = null;
 
       if (daemonInfo.type === "exe") {
         // Production: run bundled executable
         cmd = daemonInfo.path;
         args = ["daemon", "--port", String(this.port)];
+        
+        // Create log file for daemon output
+        const logDir = path.join(require("os").tmpdir(), "third-space-vest");
+        if (!fs.existsSync(logDir)) {
+          fs.mkdirSync(logDir, { recursive: true });
+        }
+        const logFile = path.join(logDir, `daemon-${this.port}.log`);
+        logStream = createWriteStream(logFile, { flags: "a" });
+        logStream.write(`\n=== Daemon started at ${new Date().toISOString()} ===\n`);
+        
         options = {
           cwd: path.dirname(daemonInfo.path),
           detached: true,
-          // Use 'inherit' so console window shows output
-          // We detect startup by connecting to TCP port instead of parsing stdout
-          stdio: ["ignore", "inherit", "inherit"],
-          // On Windows, create a new console window for the detached process
-          ...(process.platform === "win32" && {
-            windowsVerbatimArguments: false,
-            windowsHide: false, // Show the console window
-          }),
+          // Pipe stdout/stderr so we can detect startup AND write to log file
+          // Note: Console window will be empty because output is piped
+          // Check log file for daemon output: %TEMP%\third-space-vest\daemon-{port}.log
+          stdio: ["ignore", "pipe", "pipe"],
         };
         console.log(`[daemon] Spawning: ${cmd} ${args.join(" ")}`);
+        console.log(`[daemon] Log file: ${logFile}`);
       } else {
         // Development: run Python
         const pythonCmd = process.platform === "win32" ? "python" : "python3";
@@ -210,9 +226,48 @@ class DaemonBridge extends EventEmitter {
 
       let started = false;
 
-      // Since we're using 'inherit' for stdio (so console window shows output),
-      // we can't read stdout/stderr. Instead, detect startup by connecting to TCP port.
+      // Write stdout to log file and check for startup messages
+      this.daemonProcess.stdout.on("data", (data) => {
+        const output = data.toString();
+        if (logStream) {
+          logStream.write(output);
+        }
+        console.log("[daemon]", output.trim());
+        
+        // Check for startup messages
+        if ((output.includes("listening") || 
+             output.includes("Starting") || 
+             output.includes("Daemon started") || 
+             output.includes("started on")) && !started) {
+          started = true;
+          console.log("[daemon] Detected daemon started from output");
+          resolve();
+        }
+      });
+
+      // Write stderr to log file and check for startup messages
+      this.daemonProcess.stderr.on("data", (data) => {
+        const output = data.toString();
+        if (logStream) {
+          logStream.write(`[stderr] ${output}`);
+        }
+        console.error("[daemon stderr]", output.trim());
+        
+        // Also check stderr for startup messages
+        if ((output.includes("listening") || 
+             output.includes("Starting") || 
+             output.includes("Daemon started") || 
+             output.includes("started on")) && !started) {
+          started = true;
+          console.log("[daemon] Detected daemon started from stderr");
+          resolve();
+        }
+      });
+
+      // Also check TCP port as a fallback detection method
       const checkPort = () => {
+        if (started) return;
+        
         const testSocket = new net.Socket();
         testSocket.setTimeout(500);
         
@@ -242,13 +297,28 @@ class DaemonBridge extends EventEmitter {
         }
       };
 
-      // Start checking for port after a short delay
+      // Start checking for port after a short delay (fallback)
       setTimeout(checkPort, 500);
 
       this.daemonProcess.on("error", (err) => {
-        console.error("Failed to start daemon:", err.message);
+        console.error("[daemon] Process spawn error:", err.message);
+        if (logStream) {
+          logStream.write(`[ERROR] Process spawn failed: ${err.message}\n`);
+          logStream.end();
+        }
         if (!started) {
           reject(err);
+        }
+      });
+
+      this.daemonProcess.on("exit", (code, signal) => {
+        console.error(`[daemon] Process exited with code ${code}, signal ${signal}`);
+        if (logStream) {
+          logStream.write(`[EXIT] Process exited with code ${code}, signal ${signal}\n`);
+          logStream.end();
+        }
+        if (!started && code !== 0) {
+          reject(new Error(`Daemon process exited with code ${code}`));
         }
       });
 

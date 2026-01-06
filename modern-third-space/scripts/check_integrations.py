@@ -38,7 +38,7 @@ def main():
     project_root = script_dir.parent
     
     print("=" * 60)
-    print("🔍 Game Integration Consistency Checker")
+    print("Game Integration Consistency Checker")
     print("=" * 60)
     print()
     
@@ -46,25 +46,25 @@ def main():
     warnings = []
     
     # 1. Check if package is installed
-    print("📦 Checking package installation...")
+    print("[CHECK] Checking package installation...")
     code, output = run_command([sys.executable, "-c", "import modern_third_space"])
     if code != 0:
-        print("   ⚠️  Package not installed, installing in dev mode...")
+        print("   [WARN] Package not installed, installing in dev mode...")
         code, output = run_command(
             [sys.executable, "-m", "pip", "install", "-e", "."],
             cwd=project_root
         )
         if code != 0:
             errors.append("Failed to install package")
-            print(f"   ❌ Installation failed: {output}")
+            print(f"   [ERROR] Installation failed: {output}")
         else:
-            print("   ✅ Package installed")
+            print("   [OK] Package installed")
     else:
-        print("   ✅ Package already installed")
+        print("   [OK] Package already installed")
     
     # 2. Run the game integration tests
     print()
-    print("🧪 Running game integration tests...")
+    print("[TEST] Running game integration tests...")
     code, output = run_command(
         [sys.executable, "-m", "pytest", "tests/test_game_integrations.py", "-v", "--tb=short"],
         cwd=project_root
@@ -73,7 +73,7 @@ def main():
     if code != 0:
         errors.append("Game integration tests failed")
         print(output)
-        print("   ❌ Tests failed!")
+        print("   [ERROR] Tests failed!")
     else:
         # Count passed tests
         import re
@@ -85,11 +85,11 @@ def main():
         if warning_match:
             warnings.append(f"{warning_match.group(1)} test warnings (advisory)")
         
-        print(f"   ✅ All {passed_count} tests passed")
+        print(f"   [OK] All {passed_count} tests passed")
     
     # 3. Validate registry
     print()
-    print("📋 Validating integration registry...")
+    print("[VALIDATE] Validating integration registry...")
     try:
         from modern_third_space.integrations.registry import (
             validate_all_integrations,
@@ -101,17 +101,17 @@ def main():
             for game_id, errs in validation_errors.items():
                 for err in errs:
                     errors.append(f"{game_id}: {err}")
-            print(f"   ❌ {len(validation_errors)} integrations have validation errors")
+            print(f"   [ERROR] {len(validation_errors)} integrations have validation errors")
         else:
-            print(f"   ✅ All {len(GAME_INTEGRATIONS)} integrations validated")
+            print(f"   [OK] All {len(GAME_INTEGRATIONS)} integrations validated")
             
     except ImportError as e:
         errors.append(f"Cannot import registry: {e}")
-        print(f"   ❌ Import error: {e}")
+        print(f"   [ERROR] Import error: {e}")
     
     # 4. Check for snapshot consistency
     print()
-    print("📸 Checking snapshot consistency...")
+    print("[SNAPSHOT] Checking snapshot consistency...")
     try:
         from tests.test_game_integrations import TestIntegrationSnapshot
         
@@ -124,34 +124,34 @@ def main():
         
         if missing:
             errors.append(f"Integrations removed without updating snapshot: {missing}")
-            print(f"   ❌ Missing from registry: {missing}")
+            print(f"   [ERROR] Missing from registry: {missing}")
         
         if extra:
             warnings.append(f"New integrations not in snapshot: {extra}")
-            print(f"   ⚠️  New integrations (need snapshot update): {extra}")
+            print(f"   [WARN] New integrations (need snapshot update): {extra}")
         
         if not missing and not extra:
-            print("   ✅ Snapshot consistent")
+            print("   [OK] Snapshot consistent")
             
     except Exception as e:
         warnings.append(f"Could not check snapshot: {e}")
-        print(f"   ⚠️  Snapshot check skipped: {e}")
+        print(f"   [WARN] Snapshot check skipped: {e}")
     
     # Summary
     print()
     print("=" * 60)
     if errors:
-        print("❌ FAILED - Issues found:")
+        print("[FAILED] Issues found:")
         for err in errors:
             print(f"   • {err}")
         print()
         print("Please fix these issues before creating/merging a PR.")
         sys.exit(1)
     else:
-        print("✅ PASSED - All checks passed!")
+        print("[PASSED] All checks passed!")
         if warnings:
             print()
-            print("⚠️  Warnings (advisory):")
+            print("[WARN] Warnings (advisory):")
             for warn in warnings:
                 print(f"   • {warn}")
         sys.exit(0)

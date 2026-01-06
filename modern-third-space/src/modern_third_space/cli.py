@@ -160,7 +160,7 @@ def _daemon_status(args: argparse.Namespace) -> int:
     
     is_running, pid, message = get_daemon_status(host, port)
     
-    print(f"Daemon: {'🟢 Running' if is_running else '🔴 Not running'}")
+    print(f"Daemon: {'[RUNNING]' if is_running else '[NOT RUNNING]'}")
     print(f"Status: {message}")
     print(f"PID file: {get_pid_file_path(port)}")
     
@@ -214,7 +214,7 @@ def _cs2_start(args: argparse.Namespace) -> int:
     else:
         print(f"   Daemon: auto-discover on {daemon_host}")
     print()
-    print("📋 Make sure CS2 has the GSI config file:")
+    print("[INFO] Make sure CS2 has the GSI config file:")
     print("   Run: python -m modern_third_space.cli cs2 generate-config")
     print()
     
@@ -312,18 +312,18 @@ def _cs2_status(args: argparse.Namespace) -> int:
         sock.close()
         
         if result == 0:
-            print(f"GSI Server: 🟢 Running on port {gsi_port}")
+            print(f"GSI Server: [RUNNING] on port {gsi_port}")
         else:
-            print(f"GSI Server: 🔴 Not running")
+            print(f"GSI Server: [NOT RUNNING]")
     except Exception:
-        print(f"GSI Server: 🔴 Not running")
+        print(f"GSI Server: [NOT RUNNING]")
     
     # Check daemon
     daemon_port = find_daemon_port(daemon_host)
     if daemon_port:
-        print(f"Vest Daemon: 🟢 Running on port {daemon_port}")
+        print(f"Vest Daemon: [RUNNING] on port {daemon_port}")
     else:
-        print(f"Vest Daemon: 🔴 Not running")
+        print(f"Vest Daemon: [NOT RUNNING]")
     
     # Check CS2 config file
     cs2_cfg_path = get_cs2_cfg_path()

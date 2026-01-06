@@ -241,7 +241,7 @@ class VestDaemon:
             await self._server.wait_closed()
         
         logger.info("Vest daemon stopped")
-        print("🛑 Vest daemon stopped")
+        print("[VEST] Daemon stopped", flush=True)
     
     async def _handle_client(
         self,
@@ -252,7 +252,7 @@ class VestDaemon:
         client = await self._clients.add_client(writer)
         addr = writer.get_extra_info("peername")
         logger.info(f"Client {client.id} connected from {addr}")
-        print(f"📱 Client {client.id} connected from {addr}")
+        print(f"[VEST] Client {client.id} connected from {addr}", flush=True)
         
         try:
             while self._running:
@@ -1943,7 +1943,7 @@ def run_daemon(
     asyncio.set_event_loop(loop)
     
     def shutdown_handler():
-        print("\n⏹️  Shutting down...", flush=True)
+        print("\n[VEST] Shutting down...", flush=True)
         loop.create_task(daemon.stop())
     
     # Register signal handlers

@@ -95,19 +95,19 @@ def test_basic_functionality():
     assert info == device_info2, "Should get correct device info"
     print("✓ Get device info works")
     
-    print("\n✅ All tests passed!")
+    print("\n[OK] All tests passed!")
 
 
 if __name__ == "__main__":
     try:
         test_basic_functionality()
-        print("\n🎉 VestControllerRegistry is working correctly!")
+        print("\n[SUCCESS] VestControllerRegistry is working correctly!")
         sys.exit(0)
     except AssertionError as e:
-        print(f"\n❌ Test failed: {e}")
+        print(f"\n[ERROR] Test failed: {e}")
         sys.exit(1)
     except Exception as e:
-        print(f"\n❌ Error: {e}")
+        print(f"\n[ERROR] Error: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)
