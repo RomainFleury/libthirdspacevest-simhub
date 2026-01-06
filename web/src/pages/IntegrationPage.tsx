@@ -2,8 +2,6 @@ import { useParams, Navigate } from "react-router-dom";
 import { 
   CS2IntegrationPage, 
   AlyxIntegrationPage,
-  SuperHotIntegrationPage,
-  PistolWhipIntegrationPage,
   L4D2IntegrationPage,
 } from "./integrations";
 
@@ -13,13 +11,7 @@ import {
 const INTEGRATION_PAGES: Record<string, React.ComponentType> = {
   cs2: CS2IntegrationPage,
   alyx: AlyxIntegrationPage,
-  superhot: SuperHotIntegrationPage,
-  pistolwhip: PistolWhipIntegrationPage,
   l4d2: L4D2IntegrationPage,
-  // Future integrations:
-  // bf2: BF2IntegrationPage,
-  // ultrakill: UltrakillIntegrationPage,
-  // gtav: GTAVIntegrationPage,
 };
 
 /**

@@ -22,14 +22,10 @@ src/modern_third_space/server/client_manager.py
 src/modern_third_space/server/cs2_manager.py
 src/modern_third_space/server/daemon.py
 src/modern_third_space/server/game_player_mapping.py
-src/modern_third_space/server/gtav_manager.py
 src/modern_third_space/server/l4d2_manager.py
 src/modern_third_space/server/lifecycle.py
-src/modern_third_space/server/pistolwhip_manager.py
 src/modern_third_space/server/player_manager.py
 src/modern_third_space/server/protocol.py
-src/modern_third_space/server/starcitizen_manager.py
-src/modern_third_space/server/superhot_manager.py
 src/modern_third_space/server/vest_registry.py
 src/modern_third_space/vest/__init__.py
 src/modern_third_space/vest/cell_layout.py

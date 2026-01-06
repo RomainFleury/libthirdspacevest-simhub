@@ -31,27 +31,6 @@ function getModsBasePath() {
  * Mod configuration - maps mod IDs to their files and metadata.
  */
 const MOD_CONFIG = {
-  "superhot-vr": {
-    name: "SUPERHOT VR",
-    directory: "superhot-vr",
-    files: ["ThirdSpace_SuperhotVR.dll"],
-    targetFolder: "Mods", // Relative to game install
-    description: "MelonLoader mod for SUPERHOT VR haptic feedback",
-  },
-  "pistolwhip": {
-    name: "Pistol Whip",
-    directory: "pistolwhip",
-    files: ["ThirdSpace_PistolWhip.dll"],
-    targetFolder: "Mods",
-    description: "MelonLoader mod for Pistol Whip haptic feedback",
-  },
-  "gta5": {
-    name: "GTA V",
-    directory: "gta5",
-    files: ["ThirdSpaceGTAV.dll"],
-    targetFolder: "scripts",
-    description: "ScriptHookVDotNet mod for GTA V haptic feedback",
-  },
   "l4d2": {
     name: "Left 4 Dead 2",
     directory: "l4d2",

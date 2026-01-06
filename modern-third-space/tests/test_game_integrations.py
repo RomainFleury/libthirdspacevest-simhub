@@ -481,34 +481,6 @@ class TestIntegrationSnapshot:
             "has_manager": True,
             "event_count_min": 4,
         },
-        "gtav": {
-            "game_name": "Grand Theft Auto V",
-            "integration_type": "tcp_client",
-            "status": "stable",
-            "has_manager": True,
-            "event_count_min": 2,
-        },
-        "superhot": {
-            "game_name": "SUPERHOT VR",
-            "integration_type": "tcp_client",
-            "status": "stable",
-            "has_manager": True,
-            "event_count_min": 2,
-        },
-        "pistolwhip": {
-            "game_name": "Pistol Whip",
-            "integration_type": "tcp_client",
-            "status": "stable",
-            "has_manager": True,
-            "event_count_min": 2,
-        },
-        "starcitizen": {
-            "game_name": "Star Citizen",
-            "integration_type": "log_file",
-            "status": "beta",
-            "has_manager": True,
-            "event_count_min": 1,
-        },
     }
     
     def test_expected_integrations_exist(self, registry):

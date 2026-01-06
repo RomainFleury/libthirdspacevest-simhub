@@ -171,61 +171,6 @@ register_integration(GameIntegrationSpec(
     launch_options="-condebug",
 ))
 
-# GTA V
-register_integration(GameIntegrationSpec(
-    game_id="gtav",
-    game_name="Grand Theft Auto V",
-    integration_type=IntegrationType.TCP_CLIENT,
-    status=IntegrationStatus.STABLE,
-    manager_module="gtav_manager",
-    manager_class="GTAVManager",
-    daemon_commands=["gtav_status", "gtav_enable", "gtav_disable"],
-    event_types=["player_damage", "player_death"],
-    has_directional_damage=True,
-    requires_external_mod=True,
-))
-
-# SUPERHOT VR
-register_integration(GameIntegrationSpec(
-    game_id="superhot",
-    game_name="SUPERHOT VR",
-    integration_type=IntegrationType.TCP_CLIENT,
-    status=IntegrationStatus.STABLE,
-    manager_module="superhot_manager",
-    manager_class="SuperHotManager",  # Note: Pascal case "SuperHot"
-    daemon_commands=["superhot_status", "superhot_enable", "superhot_disable"],
-    event_types=["death", "pistol_recoil", "shotgun_recoil", "punch_hit", "grab_object"],
-    has_directional_damage=True,
-    requires_external_mod=True,
-))
-
-# Pistol Whip
-register_integration(GameIntegrationSpec(
-    game_id="pistolwhip",
-    game_name="Pistol Whip",
-    integration_type=IntegrationType.TCP_CLIENT,
-    status=IntegrationStatus.STABLE,
-    manager_module="pistolwhip_manager",
-    manager_class="PistolWhipManager",
-    daemon_commands=["pistolwhip_status", "pistolwhip_enable", "pistolwhip_disable"],
-    event_types=["player_hit", "death", "gun_fire", "shotgun_fire", "melee_hit"],
-    has_directional_damage=False,
-    requires_external_mod=True,
-))
-
-# Star Citizen
-register_integration(GameIntegrationSpec(
-    game_id="starcitizen",
-    game_name="Star Citizen",
-    integration_type=IntegrationType.LOG_FILE,
-    status=IntegrationStatus.BETA,
-    manager_module="starcitizen_manager",
-    manager_class="StarCitizenManager",
-    daemon_commands=["starcitizen_start", "starcitizen_stop", "starcitizen_status"],
-    event_types=["player_damage", "vehicle_damage"],
-    has_directional_damage=False,
-))
-
 
 # =============================================================================
 # VALIDATION UTILITIES
