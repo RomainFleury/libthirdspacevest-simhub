@@ -88,6 +88,11 @@ class CommandType(Enum):
     PLAY_EFFECT = "play_effect"
     LIST_EFFECTS = "list_effects"
     STOP_EFFECT = "stop_effect"
+    # Assassin's Creed Mirage integration
+    ACMIRAGE_EVENT = "acmirage_event"
+    ACMIRAGE_START = "acmirage_start"
+    ACMIRAGE_STOP = "acmirage_stop"
+    ACMIRAGE_STATUS = "acmirage_status"
 
 
 class EventType(Enum):
@@ -150,6 +155,10 @@ class EventType(Enum):
     # Predefined effects
     EFFECT_STARTED = "effect_started"
     EFFECT_COMPLETED = "effect_completed"
+    # Assassin's Creed Mirage integration
+    ACMIRAGE_STARTED = "acmirage_started"
+    ACMIRAGE_STOPPED = "acmirage_stopped"
+    ACMIRAGE_GAME_EVENT = "acmirage_game_event"
 
 
 @dataclass
@@ -1103,5 +1112,88 @@ def response_list_effects(
         req_id=req_id,
         effects=effects,
         categories=categories,
+    )
+
+
+# =============================================================================
+# Assassin's Creed Mirage Integration Protocol
+# =============================================================================
+
+def event_acmirage_started(log_path: Optional[str] = None) -> Event:
+    """Event when AC Mirage integration starts."""
+    return Event(event=EventType.ACMIRAGE_STARTED.value, log_path=log_path)
+
+
+def event_acmirage_stopped() -> Event:
+    """Event when AC Mirage integration stops."""
+    return Event(event=EventType.ACMIRAGE_STOPPED.value)
+
+
+def event_acmirage_game_event(
+    event_type: str,
+    params: Optional[Dict[str, Any]] = None,
+) -> Event:
+    """
+    Assassin's Creed Mirage game event.
+    
+    Args:
+        event_type: Type of event ("player_damage", "player_death", "assassination_kill", etc.)
+        params: Event parameters (damage, direction, etc.)
+    """
+    return Event(
+        event=EventType.ACMIRAGE_GAME_EVENT.value,
+        event_type=event_type,
+        params=params,
+    )
+
+
+def response_acmirage_start(
+    success: bool,
+    log_path: Optional[str] = None,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to acmirage_start command."""
+    return Response(
+        response="acmirage_start",
+        req_id=req_id,
+        success=success,
+        log_path=log_path,
+        message=error,
+    )
+
+
+def response_acmirage_stop(
+    success: bool,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to acmirage_stop command."""
+    return Response(
+        response="acmirage_stop",
+        req_id=req_id,
+        success=success,
+        message=error,
+    )
+
+
+def response_acmirage_status(
+    enabled: bool,
+    is_running: bool = False,
+    events_received: int = 0,
+    last_event_ts: Optional[float] = None,
+    last_event_type: Optional[str] = None,
+    log_path: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    """Response to acmirage_status command."""
+    return Response(
+        response="acmirage_status",
+        req_id=req_id,
+        running=is_running,
+        events_received=events_received,
+        last_event_ts=last_event_ts,
+        last_event_type=last_event_type,
+        log_path=log_path,
     )
 
