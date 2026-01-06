@@ -127,6 +127,19 @@ export type AlyxModInfoResult = {
   error?: string;
 };
 
+export type AlyxBrowseResult = {
+  success: boolean;
+  path?: string;
+  canceled?: boolean;
+  error?: string;
+};
+
+export type AlyxSettingsResult = {
+  success: boolean;
+  logPath?: string | null;
+  error?: string;
+};
+
 // Predefined Effects Library types
 export type EffectStep = {
   cells: number[];
@@ -207,6 +220,9 @@ declare global {
       alyxStop: () => Promise<AlyxStopResult>;
       alyxStatus: () => Promise<AlyxStatus>;
       alyxGetModInfo: () => Promise<AlyxModInfoResult>;
+      alyxBrowseLogPath: () => Promise<AlyxBrowseResult>;
+      alyxGetSettings: () => Promise<AlyxSettingsResult>;
+      alyxSetLogPath: (logPath: string | null) => Promise<{ success: boolean; error?: string }>;
       // SUPERHOT VR Integration API
       superhotStart: () => Promise<{ success: boolean; error?: string }>;
       superhotStop: () => Promise<{ success: boolean; error?: string }>;
@@ -619,6 +635,27 @@ export async function alyxStatus(): Promise<AlyxStatus> {
  */
 export async function alyxGetModInfo(): Promise<AlyxModInfoResult> {
   return await ensureBridge().alyxGetModInfo();
+}
+
+/**
+ * Browse for Alyx console.log file.
+ */
+export async function alyxBrowseLogPath(): Promise<AlyxBrowseResult> {
+  return await ensureBridge().alyxBrowseLogPath();
+}
+
+/**
+ * Get saved Alyx settings.
+ */
+export async function alyxGetSettings(): Promise<AlyxSettingsResult> {
+  return await ensureBridge().alyxGetSettings();
+}
+
+/**
+ * Set Alyx log path.
+ */
+export async function alyxSetLogPath(logPath: string | null): Promise<{ success: boolean; error?: string }> {
+  return await ensureBridge().alyxSetLogPath(logPath);
 }
 
 // -------------------------------------------------------------------------

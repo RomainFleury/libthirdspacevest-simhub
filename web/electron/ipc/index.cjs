@@ -36,7 +36,7 @@ function registerAllHandlers(getDaemonBridge, getMainWindow, reconnectToDaemon) 
   registerCS2Handlers(getDaemonBridge, getMainWindow);
 
   // Half-Life: Alyx integration handlers
-  registerAlyxHandlers();
+  registerAlyxHandlers(getMainWindow);
 
   // SUPERHOT VR integration handlers
   registerSuperHotHandlers();

@@ -4,6 +4,9 @@ import {
   alyxStop,
   alyxStatus,
   alyxGetModInfo,
+  alyxBrowseLogPath,
+  alyxGetSettings,
+  alyxSetLogPath,
   subscribeToDaemonEvents,
   AlyxStatus,
   AlyxModInfo,
@@ -30,16 +33,22 @@ export function useAlyxIntegration() {
   const [error, setError] = useState<string | null>(null);
   const [gameEvents, setGameEvents] = useState<AlyxGameEvent[]>([]);
   const [modInfo, setModInfo] = useState<AlyxModInfo | null>(null);
+  const [savedLogPath, setSavedLogPath] = useState<string | null>(null);
   const eventIdCounter = useRef(0);
 
   // Fetch status on mount and periodically
-  const fetchStatus = useCallback(async () => {
+  const fetchStatus = useCallback(async (preserveError = false) => {
     try {
       const result = await alyxStatus();
       setStatus(result);
-      setError(result.error || null);
+      // Only update error from status if not preserving a previous error
+      if (!preserveError) {
+        setError(result.error || null);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to get status");
+      if (!preserveError) {
+        setError(err instanceof Error ? err.message : "Failed to get status");
+      }
     }
   }, []);
 
@@ -55,13 +64,26 @@ export function useAlyxIntegration() {
     }
   }, []);
 
+  // Fetch saved settings on mount
+  const fetchSettings = useCallback(async () => {
+    try {
+      const result = await alyxGetSettings();
+      if (result.success) {
+        setSavedLogPath(result.logPath || null);
+      }
+    } catch (err) {
+      console.error("Failed to get Alyx settings:", err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchStatus();
     fetchModInfo();
-    // Poll status every 5 seconds
-    const interval = setInterval(fetchStatus, 5000);
+    fetchSettings();
+    // Poll status every 5 seconds, but preserve any existing error
+    const interval = setInterval(() => fetchStatus(true), 5000);
     return () => clearInterval(interval);
-  }, [fetchStatus, fetchModInfo]);
+  }, [fetchStatus, fetchModInfo, fetchSettings]);
 
   // Subscribe to daemon events for Alyx game events
   useEffect(() => {
@@ -103,12 +125,18 @@ export function useAlyxIntegration() {
     setLoading(true);
     setError(null);
     try {
+      console.log("[Alyx] Starting integration...", logPath);
       const result = await alyxStart(logPath);
+      console.log("[Alyx] Start result:", result);
       if (!result.success) {
-        setError(result.error || "Failed to start Alyx integration");
+        const errorMsg = result.error || "Failed to start Alyx integration";
+        console.error("[Alyx] Start failed:", errorMsg);
+        setError(errorMsg);
+        return; // Don't fetch status if failed
       }
       await fetchStatus();
     } catch (err) {
+      console.error("[Alyx] Start exception:", err);
       setError(err instanceof Error ? err.message : "Failed to start Alyx integration");
     } finally {
       setLoading(false);
@@ -135,15 +163,47 @@ export function useAlyxIntegration() {
     setGameEvents([]);
   }, []);
 
+  // Browse for log file
+  const browseLogPath = useCallback(async () => {
+    try {
+      const result = await alyxBrowseLogPath();
+      if (result.success && result.path) {
+        setSavedLogPath(result.path);
+        setError(null);
+        return result.path;
+      }
+      return null;
+    } catch (err) {
+      console.error("Failed to browse for log path:", err);
+      return null;
+    }
+  }, []);
+
+  // Set log path manually
+  const setLogPath = useCallback(async (logPath: string | null) => {
+    try {
+      const result = await alyxSetLogPath(logPath);
+      if (result.success) {
+        setSavedLogPath(logPath);
+        setError(null);
+      }
+    } catch (err) {
+      console.error("Failed to set log path:", err);
+    }
+  }, []);
+
   return {
     status,
     loading,
     error,
     gameEvents,
     modInfo,
+    savedLogPath,
     start,
     stop,
     clearEvents,
+    browseLogPath,
+    setLogPath,
     refresh: fetchStatus,
   };
 }

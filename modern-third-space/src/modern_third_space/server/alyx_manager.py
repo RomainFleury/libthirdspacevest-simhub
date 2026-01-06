@@ -169,6 +169,9 @@ def map_event_to_haptics(event: AlyxEvent) -> List[tuple[int, int]]:
     Returns list of (cell, speed) tuples.
     
     Uses correct hardware cell layout from cell_layout module.
+    
+    NOTE: Only damage and death events trigger haptics.
+    Other events (shooting, backpack, etc.) are logged but not haptic-enabled.
     """
     commands = []
     
@@ -188,70 +191,10 @@ def map_event_to_haptics(event: AlyxEvent) -> List[tuple[int, int]]:
         for cell in ALL_CELLS:
             commands.append((cell, 10))
     
-    elif event.type == "PlayerShootWeapon":
-        weapon = event.params.get("weapon", "")
-        if "shotgun" in weapon.lower():
-            speed = 7
-        elif "rapidfire" in weapon.lower() or "smg" in weapon.lower():
-            speed = 4
-        else:
-            speed = 5
-        # Recoil on front upper cells
-        commands.append((Cell.FRONT_UPPER_LEFT, speed))
-        commands.append((Cell.FRONT_UPPER_RIGHT, speed))
-    
-    elif event.type == "PlayerHealth":
-        health = event.params.get("health", 100)
-        if health <= 30:
-            # Heartbeat - subtle left side pulse
-            commands.append((Cell.FRONT_UPPER_LEFT, 3))
-            commands.append((Cell.FRONT_LOWER_LEFT, 3))
-    
-    elif event.type == "PlayerHeal":
-        # Soothing wave on front
-        for cell in FRONT_CELLS:
-            commands.append((cell, 2))
-    
-    elif event.type == "PlayerGrabbityPull":
-        # Light front upper pulse
-        commands.append((Cell.FRONT_UPPER_LEFT, 3))
-        commands.append((Cell.FRONT_UPPER_RIGHT, 3))
-    
-    elif event.type == "GrabbityGloveCatch":
-        # Quick front upper tap
-        commands.append((Cell.FRONT_UPPER_LEFT, 4))
-        commands.append((Cell.FRONT_UPPER_RIGHT, 4))
-    
-    elif event.type == "PlayerGrabbedByBarnacle":
-        # Strong pull-up effect on back upper cells
-        commands.append((Cell.BACK_UPPER_LEFT, 8))
-        commands.append((Cell.BACK_UPPER_RIGHT, 8))
-    
-    elif event.type == "PlayerCoughStart":
-        # Chest pulses (front cells)
-        for cell in FRONT_CELLS:
-            commands.append((cell, 2))
-    
-    elif event.type == "TwoHandStart":
-        # Subtle shoulder/upper feedback
-        commands.append((Cell.FRONT_UPPER_LEFT, 2))
-        commands.append((Cell.FRONT_UPPER_RIGHT, 2))
-    
-    elif event.type == "Reset":
-        # Quick full-body pulse on spawn
-        for cell in ALL_CELLS:
-            commands.append((cell, 3))
-    
-    # Backpack interactions - back upper shoulder taps
-    elif event.type in ("PlayerDropAmmoInBackpack", "PlayerDropResinInBackpack"):
-        left = event.params.get("left_side", False)
-        cell = Cell.BACK_UPPER_LEFT if left else Cell.BACK_UPPER_RIGHT
-        commands.append((cell, 3))
-    
-    elif event.type in ("PlayerRetrievedBackpackClip",):
-        left = event.params.get("left_side", False)
-        cell = Cell.BACK_UPPER_LEFT if left else Cell.BACK_UPPER_RIGHT
-        commands.append((cell, 4))
+    # All other events are tracked but don't trigger haptics
+    # This includes: PlayerShootWeapon, PlayerHealth, PlayerHeal, 
+    # PlayerGrabbityPull, GrabbityGloveCatch, PlayerGrabbedByBarnacle,
+    # PlayerCoughStart, TwoHandStart, Reset, backpack interactions, etc.
     
     return commands
 

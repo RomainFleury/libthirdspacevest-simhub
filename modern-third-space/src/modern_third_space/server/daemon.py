@@ -223,6 +223,10 @@ class VestDaemon:
                     )
                 except asyncio.CancelledError:
                     break
+                except (ConnectionResetError, BrokenPipeError, OSError) as e:
+                    # Client disconnected abruptly (common on Windows)
+                    logger.debug(f"Client {client.id} connection lost: {e}")
+                    break
                 
                 if not line:
                     # Client disconnected

@@ -44,9 +44,11 @@ export function AlyxIntegrationPage() {
     error,
     gameEvents,
     modInfo,
+    savedLogPath,
     start,
     stop,
     clearEvents,
+    browseLogPath,
   } = useAlyxIntegration();
 
   // Convert Alyx events to generic GameEvent format
@@ -64,6 +66,40 @@ export function AlyxIntegrationPage() {
     githubUrl: modInfo.github_url,
     installInstructions: modInfo.install_instructions.map(s => s.replace(/^\d+\.\s*/, "")),
   } : undefined;
+
+  // Configuration panel for log path
+  const configurationPanel = (
+    <div className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-slate-300 mb-2">
+          Console Log Path
+        </label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            readOnly
+            value={savedLogPath || status.log_path || ""}
+            placeholder="Auto-detect or browse to select..."
+            className="flex-1 rounded-lg bg-slate-900/50 border border-slate-600 px-3 py-2 text-sm text-slate-300 placeholder-slate-500"
+          />
+          <button
+            onClick={browseLogPath}
+            className="rounded-lg bg-slate-600 hover:bg-slate-500 px-4 py-2 text-sm font-medium text-white transition"
+          >
+            Browse...
+          </button>
+        </div>
+        <p className="mt-2 text-xs text-slate-500">
+          Usually located at: <code className="bg-slate-800 px-1 rounded">Steam/steamapps/common/Half-Life Alyx/game/hlvr/console.log</code>
+        </p>
+        {savedLogPath && (
+          <p className="mt-1 text-xs text-emerald-400">
+            ✓ Custom path saved
+          </p>
+        )}
+      </div>
+    </div>
+  );
 
   // Setup guide
   const setupGuide = modInfo ? (
@@ -109,6 +145,7 @@ export function AlyxIntegrationPage() {
       formatEventDetails={formatEventDetails}
       modInfo={modInfoData}
       setupGuide={setupGuide}
+      configurationPanel={configurationPanel}
       additionalStats={additionalStats}
     />
   );
