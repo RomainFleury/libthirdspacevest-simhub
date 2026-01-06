@@ -1,0 +1,135 @@
+# electron-builder configuration
+# https://www.electron.build/configuration/configuration
+
+appId: com.thirdspace.vest
+productName: Third Space Vest
+copyright: Copyright © 2024 Third Space Vest Contributors
+
+# Directories
+directories:
+  output: release
+  buildResources: build
+
+# Files to include in the app
+files:
+  - "dist/**/*"
+  - "electron/**/*"
+  - "package.json"
+  # Exclude dev files
+  - "!**/*.map"
+  - "!**/node_modules/.cache"
+  # Exclude daemon from asar (it goes to extraResources)
+  - "!dist/daemon/**/*"
+
+# Extra resources (copied to resources folder, not asar)
+# NOTE: Build the daemon first! (python modern-third-space/build/build-daemon.py)
+extraResources:
+  # The daemon executable (built by PyInstaller)
+  # On Windows: vest-daemon.exe, on Linux/macOS: vest-daemon
+  - from: "dist/daemon/vest-daemon.exe"
+    to: "daemon/vest-daemon.exe"
+  
+  # =========================================================================
+  # Bundled Game Mods
+  # These are pre-built mod files that users can download/install from the UI
+  # =========================================================================
+  
+  # L4D2 VScript mod files (auto-install from UI)
+  - from: "../misc-documentations/bhaptics-svg-24-nov/l4d2/third-space-vest-mod/scripts/vscripts/"
+    to: "mods/l4d2/"
+    filter:
+      - "*.nut"
+  
+  # SUPERHOT VR MelonLoader mod
+  - from: "../mods/superhot-vr/"
+    to: "mods/superhot-vr/"
+    filter:
+      - "*.dll"
+      - "README.md"
+  
+  # Pistol Whip MelonLoader mod  
+  - from: "../mods/pistolwhip/"
+    to: "mods/pistolwhip/"
+    filter:
+      - "*.dll"
+      - "README.md"
+  
+  # GTA V SHVDN mod
+  - from: "../mods/gta5/"
+    to: "mods/gta5/"
+    filter:
+      - "*.dll"
+      - "README.md"
+  
+  # Half-Life: Alyx (README only - mod from NexusMods)
+  - from: "../mods/alyx/"
+    to: "mods/alyx/"
+    filter:
+      - "*.lua"
+      - "README.md"
+
+# Don't pack into asar (easier debugging, daemon access)
+asar: true
+asarUnpack:
+  - "electron/**/*"
+
+# Windows configuration
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  # Icon is optional - remove line if icon.ico doesn't exist
+  # icon: build/icon.ico
+  # Request admin rights if needed for USB access
+  requestedExecutionLevel: asInvoker
+  # Disable code signing completely (avoids symlink permission errors)
+  sign: false
+  verifyUpdateCodeSignature: false
+  signingHashAlgorithms: []
+
+# NSIS installer configuration  
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  allowElevation: true
+  # Icons are optional - uncomment when icon.ico exists
+  # installerIcon: build/icon.ico
+  # uninstallerIcon: build/icon.ico
+  # installerHeaderIcon: build/icon.ico
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Third Space Vest
+  # License file (optional)
+  # license: LICENSE.txt
+  
+# Portable version (no installer, just zip)
+portable:
+  artifactName: "${productName}-${version}-portable.zip"
+
+# macOS configuration (for future)
+mac:
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+  icon: build/icon.icns
+  category: public.app-category.utilities
+
+# Linux configuration (for future)
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+  icon: build/icons
+  category: Utility
+
+# Publish configuration (for auto-updates)
+# Uncomment and configure when ready for releases
+# publish:
+#   provider: github
+#   owner: YourGitHubUsername
+#   repo: libthirdspacevest-simhub

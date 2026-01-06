@@ -37,3 +37,39 @@ export type LogEntry = {
   game_id?: string;    // Game that triggered the event
 };
 
+// Bundled Game Mods Types
+export type BundledMod = {
+  id: string;
+  name: string;
+  description: string;
+  bundled: boolean;        // Whether mod files are bundled with the app
+  files: string[];         // List of mod files
+  targetFolder: string;    // Where to install in game directory
+  externalUrl: string | null; // External download URL (if not bundled)
+};
+
+export type ModsListResult = {
+  success: boolean;
+  mods?: BundledMod[];
+  error?: string;
+};
+
+export type ModCheckResult = {
+  success: boolean;
+  bundled?: boolean;
+  files?: Record<string, boolean>;
+  modPath?: string;
+  reason?: string;
+  error?: string;
+};
+
+export type ModSaveResult = {
+  success: boolean;
+  copiedFiles?: string[];
+  destination?: string;
+  savedTo?: string;
+  canceled?: boolean;
+  errors?: string[];
+  error?: string;
+};
+

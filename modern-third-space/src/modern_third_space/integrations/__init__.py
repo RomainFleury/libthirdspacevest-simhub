@@ -17,9 +17,38 @@ ensures the UI can see all activity.
 
 Available integrations:
     - cs2_gsi: Counter-Strike 2 Game State Integration
+
+Registry:
+    The registry module contains the source of truth for all game integrations.
+    Use it to discover available integrations and validate new ones.
 """
 
 from .cs2_gsi import CS2GSIIntegration, run_cs2_gsi
+from .registry import (
+    GAME_INTEGRATIONS,
+    GameIntegrationSpec,
+    IntegrationType,
+    IntegrationStatus,
+    register_integration,
+    get_integration,
+    list_integrations,
+    validate_integration,
+    validate_all_integrations,
+)
 
-__all__ = ["CS2GSIIntegration", "run_cs2_gsi"]
+__all__ = [
+    # CS2 Integration
+    "CS2GSIIntegration",
+    "run_cs2_gsi",
+    # Registry
+    "GAME_INTEGRATIONS",
+    "GameIntegrationSpec",
+    "IntegrationType",
+    "IntegrationStatus",
+    "register_integration",
+    "get_integration",
+    "list_integrations",
+    "validate_integration",
+    "validate_all_integrations",
+]
 

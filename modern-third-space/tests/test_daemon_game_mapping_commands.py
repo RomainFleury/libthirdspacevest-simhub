@@ -131,21 +131,21 @@ async def test_game_mapping_commands():
             assert "not found" in response.message, "Should have error message"
             print("✓ Error handling works (non-existent device)")
     
-    print("\n✅ All daemon game mapping command tests passed!")
+    print("\n[OK] All daemon game mapping command tests passed!")
 
 
 if __name__ == "__main__":
     try:
         asyncio.run(test_game_mapping_commands())
-        print("\n🎉 All game mapping tests passed!")
+        print("\n[SUCCESS] All game mapping tests passed!")
         sys.exit(0)
     except AssertionError as e:
-        print(f"\n❌ Test failed: {e}")
+        print(f"\n[ERROR] Test failed: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)
     except Exception as e:
-        print(f"\n❌ Error: {e}")
+        print(f"\n[ERROR] Error: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

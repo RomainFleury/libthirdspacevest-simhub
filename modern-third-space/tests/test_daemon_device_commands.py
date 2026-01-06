@@ -83,7 +83,7 @@ async def test_device_commands():
                         assert response.device.get("device_id") == "device_123", "Should return device_id"
                         print("✓ SET_MAIN_DEVICE command works (broadcast error handled)")
     
-    print("\n✅ All device management command tests passed!")
+    print("\n[OK] All device management command tests passed!")
 
 
 if __name__ == "__main__":

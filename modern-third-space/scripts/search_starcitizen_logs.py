@@ -113,14 +113,14 @@ def print_results(results: Dict[str, List[str]], player_name: str):
     print()
     
     categories = [
-        ("deaths", "💀 Death Events"),
-        ("damage", "💥 Damage Events"),
-        ("shield", "🛡️ Shield Events"),
-        ("hull", "🔧 Hull/Armor Events"),
-        ("health", "❤️ Health Events"),
-        ("healing", "💚 Healing/Recovery Events"),
-        ("ship_hits", "🚀 Ship Hit/Impact Events"),
-        ("other_mentions", "📝 Other Mentions"),
+        ("deaths", "[DEATH] Death Events"),
+        ("damage", "[DAMAGE] Damage Events"),
+        ("shield", "[SHIELD] Shield Events"),
+        ("hull", "[HULL] Hull/Armor Events"),
+        ("health", "[HEALTH] Health Events"),
+        ("healing", "[HEAL] Healing/Recovery Events"),
+        ("ship_hits", "[HIT] Ship Hit/Impact Events"),
+        ("other_mentions", "[OTHER] Other Mentions"),
     ]
     
     for key, title in categories:
