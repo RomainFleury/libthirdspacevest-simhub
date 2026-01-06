@@ -212,7 +212,7 @@ class VestDaemon:
         
         addr = self._server.sockets[0].getsockname()
         logger.info(f"Vest daemon listening on {addr[0]}:{addr[1]}")
-        print(f"[VEST] Daemon started on {addr[0]}:{addr[1]}")
+        print(f"[VEST] Daemon started on {addr[0]}:{addr[1]}", flush=True)
         
         async with self._server:
             await self._server.serve_forever()
@@ -241,7 +241,7 @@ class VestDaemon:
             await self._server.wait_closed()
         
         logger.info("Vest daemon stopped")
-        print("🛑 Vest daemon stopped")
+        print("[VEST] Daemon stopped", flush=True)
     
     async def _handle_client(
         self,
@@ -252,7 +252,7 @@ class VestDaemon:
         client = await self._clients.add_client(writer)
         addr = writer.get_extra_info("peername")
         logger.info(f"Client {client.id} connected from {addr}")
-        print(f"📱 Client {client.id} connected from {addr}")
+        print(f"[VEST] Client {client.id} connected from {addr}", flush=True)
         
         try:
             while self._running:
@@ -1911,9 +1911,17 @@ def run_daemon(
         remove_pid_file,
     )
     
+    # Force unbuffered output for PyInstaller executables
+    import sys
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(line_buffering=True)
+    if hasattr(sys.stderr, 'reconfigure'):
+        sys.stderr.reconfigure(line_buffering=True)
+    
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
+        force=True,  # Force reconfiguration in case logging was already configured
     )
     
     # Check if daemon is already running
@@ -1935,7 +1943,7 @@ def run_daemon(
     asyncio.set_event_loop(loop)
     
     def shutdown_handler():
-        print("\n⏹️  Shutting down...")
+        print("\n[VEST] Shutting down...", flush=True)
         loop.create_task(daemon.stop())
     
     # Register signal handlers

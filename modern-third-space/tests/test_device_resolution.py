@@ -100,7 +100,7 @@ async def test_device_resolution():
         assert device_id == "device_123", "Should fall back to player mapping"
         print("✓ Non-existent game mapping fallback works")
     
-    print("\n✅ All device resolution tests passed!")
+    print("\n[OK] All device resolution tests passed!")
 
 
 async def test_trigger_with_resolution():
@@ -146,22 +146,22 @@ async def test_trigger_with_resolution():
         assert mock_controller.trigger_effect.called, "Controller should be called"
         print("✓ Trigger with game_id + player_num works")
     
-    print("✅ Trigger resolution tests passed!")
+    print("[OK] Trigger resolution tests passed!")
 
 
 if __name__ == "__main__":
     try:
         asyncio.run(test_device_resolution())
         asyncio.run(test_trigger_with_resolution())
-        print("\n🎉 All device resolution tests passed!")
+        print("\n[SUCCESS] All device resolution tests passed!")
         sys.exit(0)
     except AssertionError as e:
-        print(f"\n❌ Test failed: {e}")
+        print(f"\n[ERROR] Test failed: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)
     except Exception as e:
-        print(f"\n❌ Error: {e}")
+        print(f"\n[ERROR] Error: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

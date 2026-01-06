@@ -102,7 +102,7 @@ async def test_player_commands():
                 assert "not found" in response.message, "Should have error message"
             print("✓ Error handling works (non-existent device)")
     
-    print("\n✅ All daemon player command tests passed!")
+    print("\n[OK] All daemon player command tests passed!")
 
 
 async def test_player_id_resolution():
@@ -177,22 +177,22 @@ async def test_player_id_resolution():
             assert "device_main" in call_args, "Should have called get_controller with main device"
             print("✓ Unassigned player falls back to main device")
     
-    print("✅ Player ID resolution tests passed!")
+    print("[OK] Player ID resolution tests passed!")
 
 
 if __name__ == "__main__":
     try:
         asyncio.run(test_player_commands())
         asyncio.run(test_player_id_resolution())
-        print("\n🎉 All player management tests passed!")
+        print("\n[SUCCESS] All player management tests passed!")
         sys.exit(0)
     except AssertionError as e:
-        print(f"\n❌ Test failed: {e}")
+        print(f"\n[ERROR] Test failed: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)
     except Exception as e:
-        print(f"\n❌ Error: {e}")
+        print(f"\n[ERROR] Error: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

@@ -34,7 +34,7 @@ function getDaemonBridgeInstance() {
 function getIconPath() {
   return isDev
     ? path.join(__dirname, "..", "src", "assets", "round-icon-small.png")
-    : path.join(process.cwd(), "dist", "round-icon-small.png");
+    : path.join(app.getAppPath(), "dist", "round-icon-small.png");
 }
 
 async function createWindow() {
@@ -53,7 +53,10 @@ async function createWindow() {
     await mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
     // DevTools can be opened manually with Ctrl+Shift+I if needed
   } else {
-    await mainWindow.loadFile(path.join(process.cwd(), "dist", "index.html"));
+    // In production, files are in app.asar or app directory
+    // app.getAppPath() returns the path to app.asar or the unpacked app directory
+    const htmlPath = path.join(app.getAppPath(), "dist", "index.html");
+    await mainWindow.loadFile(htmlPath);
   }
 
   // Set up IPC handlers (using modular structure)

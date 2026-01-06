@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AppLayout } from "./components/layout/AppLayout";
 import { GamesPage } from "./pages/GamesPage";
 import { IntegrationPage } from "./pages/IntegrationPage";
@@ -9,7 +9,7 @@ import { VestsPage } from "./pages/VestsPage";
 
 function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <Routes>
         <Route path="/" element={<AppLayout />}>
           <Route index element={<Navigate to="/games" replace />} />
@@ -21,7 +21,7 @@ function App() {
           <Route path="mini-games/:gameId" element={<GamePage />} />
         </Route>
       </Routes>
-    </BrowserRouter>
+    </HashRouter>
   );
 }
 

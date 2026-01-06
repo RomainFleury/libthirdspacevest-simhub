@@ -249,6 +249,107 @@ python3 -m modern_third_space.cli list
 
 For more details, see `web/README.md`.
 
+## Building a Release
+
+This section describes how to build a distributable Windows installer. For detailed instructions, see [`BUILD-RELEASE.md`](./BUILD-RELEASE.md).
+
+### Prerequisites
+
+- **Python 3.11+** with `pyinstaller` and `libusb` installed
+- **Node.js 18+ (LTS)** with Yarn enabled (`corepack enable`)
+- **Yarn** - Use `--ignore-engines` flag if you have yarn 1.22.19 (repomix requires 1.22.22+)
+
+### Quick Build (Windows)
+
+**Option 1: Automated script**
+
+```bash
+windows/build-release.bat
+```
+
+**Option 2: Manual step-by-step**
+
+1. **Build the Python daemon:**
+
+   ```bash
+   cd modern-third-space/build
+   python build-daemon.py
+   ```
+
+   This creates `modern-third-space/build/dist/vest-daemon.exe` (~8-9 MB)
+
+2. **Install Node.js dependencies:**
+
+   ```bash
+   cd web
+   yarn install --ignore-engines
+   ```
+
+   Note: Use `--ignore-engines` if you get yarn version errors (repomix is a dev tool only).
+
+3. **Build the React app:**
+
+   ```bash
+   cd web
+   yarn build
+   ```
+
+   This creates `web/dist/` with the production React build.
+
+4. **Package with Electron-Builder:**
+
+   ```bash
+   cd web
+   yarn build:electron
+   ```
+
+   This creates:
+   - `web/release/Third Space Vest Setup 1.0.0.exe` - NSIS installer
+   - `web/release/Third Space Vest-1.0.0-portable.zip` - Portable version
+   - `web/release/win-unpacked/` - Unpacked app directory
+
+### Build Output
+
+After a successful build, you'll find:
+
+```
+web/release/
+├── Third Space Vest Setup 1.0.0.exe    # NSIS installer (~150-200 MB)
+├── Third Space Vest-1.0.0-portable.zip # Portable version
+└── win-unpacked/                        # Unpacked app directory
+    ├── Third Space Vest.exe
+    └── resources/
+        ├── daemon/
+        │   └── vest-daemon.exe          # Python daemon (PyInstaller)
+        └── mods/                         # Bundled game mods
+            └── l4d2/
+```
+
+### Troubleshooting
+
+**"PyInstaller not found"**
+```bash
+pip install pyinstaller
+```
+
+**"Yarn version incompatible"**
+```bash
+yarn install --ignore-engines
+```
+
+**"react-router-dom not found"**
+```bash
+cd web
+yarn install --ignore-engines
+```
+
+**Daemon not bundled in resources/**
+- Verify `vest-daemon.exe` exists at `modern-third-space/build/dist/vest-daemon.exe`
+- Check `web/electron-builder.yml` extraResources configuration
+- Ensure the daemon is built before running `yarn build:electron`
+
+For more detailed troubleshooting and build options, see [`BUILD-RELEASE.md`](./BUILD-RELEASE.md).
+
 ## Architecture: Python Daemon
 
 The project uses a **long-running Python daemon** for vest control:

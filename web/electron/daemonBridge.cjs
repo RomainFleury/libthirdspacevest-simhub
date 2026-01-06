@@ -6,20 +6,29 @@
  * - Sends commands and receives responses
  * - Emits events received from the daemon
  *
- * Replaces the old pythonBridge.cjs which spawned CLI processes.
+ * In production (packaged app):
+ * - Spawns the bundled vest-daemon.exe from resources/daemon/
+ *
+ * In development:
+ * - Spawns Python directly from modern-third-space/src/
  */
 
 const net = require("net");
 const { EventEmitter } = require("events");
 const { spawn } = require("child_process");
 const path = require("path");
+const fs = require("fs");
+const { createWriteStream } = require("fs");
 
 const DEFAULT_HOST = "127.0.0.1";
 const DEFAULT_PORT = 5050;
 const RECONNECT_DELAY_MS = 2000;
 const CONNECT_TIMEOUT_MS = 5000;
 
-// Path to the modern-third-space src directory
+// Detect if we're running in production (packaged) mode
+const IS_PACKAGED = !process.env.VITE_DEV_SERVER_URL;
+
+// Path to the modern-third-space src directory (development)
 const PYTHON_SRC_PATH = path.resolve(
   __dirname,
   "..",
@@ -27,6 +36,35 @@ const PYTHON_SRC_PATH = path.resolve(
   "modern-third-space",
   "src"
 );
+
+/**
+ * Get the path to the daemon executable.
+ * In production: resources/daemon/vest-daemon.exe
+ * In development: Python script
+ */
+function getDaemonPath() {
+  if (IS_PACKAGED) {
+    // Production: use bundled executable
+    // process.resourcesPath points to the resources folder in the packaged app
+    const bundledDaemon = path.join(
+      process.resourcesPath,
+      "daemon",
+      process.platform === "win32" ? "vest-daemon.exe" : "vest-daemon"
+    );
+    
+    if (fs.existsSync(bundledDaemon)) {
+      console.log(`[daemon] Using bundled daemon: ${bundledDaemon}`);
+      return { type: "exe", path: bundledDaemon };
+    }
+    
+    console.warn(`[daemon] Bundled daemon not found at: ${bundledDaemon}`);
+    console.warn("[daemon] Falling back to Python mode");
+  }
+  
+  // Development: use Python
+  console.log(`[daemon] Using Python daemon from: ${PYTHON_SRC_PATH}`);
+  return { type: "python", path: PYTHON_SRC_PATH };
+}
 
 class DaemonBridge extends EventEmitter {
   constructor(host = DEFAULT_HOST, port = DEFAULT_PORT) {
@@ -57,11 +95,18 @@ class DaemonBridge extends EventEmitter {
     } catch (error) {
       if (autoStartDaemon) {
         console.log("Daemon not running, attempting to start...");
-        await this._startDaemon();
-        // Wait a moment for daemon to start
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        await this._tryConnect();
-        return true;
+        try {
+          await this._startDaemon();
+          console.log("[daemon] Startup detection completed, waiting for daemon to be ready...");
+          // Wait a bit longer for daemon to fully initialize and start listening
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          console.log("[daemon] Attempting connection...");
+          await this._tryConnect();
+          return true;
+        } catch (startError) {
+          console.error("[daemon] Failed to start daemon:", startError.message);
+          throw startError;
+        }
       }
       throw error;
     }
@@ -116,66 +161,175 @@ class DaemonBridge extends EventEmitter {
 
   /**
    * Start the daemon process.
+   * Uses bundled executable in production, Python in development.
    */
   _startDaemon() {
     return new Promise((resolve, reject) => {
       console.log("Starting daemon process...");
 
-      const pythonArgs = [
-        "-u",
-        "-m",
-        "modern_third_space.cli",
-        "daemon",
-        "--port",
-        String(this.port),
-      ];
+      const daemonInfo = getDaemonPath();
+      let cmd, args, options;
+      let logStream = null;
 
-      // Try to find Python executable (Windows uses 'python', Unix uses 'python3')
-      const pythonCmd = process.platform === "win32" ? "python" : "python3";
-      
-      this.daemonProcess = spawn(pythonCmd, pythonArgs, {
-        cwd: PYTHON_SRC_PATH,
-        env: {
-          ...process.env,
-          PYTHONPATH: PYTHON_SRC_PATH,
-        },
-        detached: true,
-        stdio: ["ignore", "pipe", "pipe"],
-      });
+      if (daemonInfo.type === "exe") {
+        // Production: run bundled executable
+        cmd = daemonInfo.path;
+        args = ["daemon", "--port", String(this.port)];
+        
+        // Create log file for daemon output
+        const logDir = path.join(require("os").tmpdir(), "third-space-vest");
+        if (!fs.existsSync(logDir)) {
+          fs.mkdirSync(logDir, { recursive: true });
+        }
+        const logFile = path.join(logDir, `daemon-${this.port}.log`);
+        logStream = createWriteStream(logFile, { flags: "a" });
+        logStream.write(`\n=== Daemon started at ${new Date().toISOString()} ===\n`);
+        
+        options = {
+          cwd: path.dirname(daemonInfo.path),
+          detached: true,
+          // Pipe stdout/stderr so we can detect startup AND write to log file
+          // Note: Console window will be empty because output is piped
+          // Check log file for daemon output: %TEMP%\third-space-vest\daemon-{port}.log
+          stdio: ["ignore", "pipe", "pipe"],
+        };
+        console.log(`[daemon] Spawning: ${cmd} ${args.join(" ")}`);
+        console.log(`[daemon] Log file: ${logFile}`);
+      } else {
+        // Development: run Python
+        const pythonCmd = process.platform === "win32" ? "python" : "python3";
+        cmd = pythonCmd;
+        args = [
+          "-u",
+          "-m",
+          "modern_third_space.cli",
+          "daemon",
+          "--port",
+          String(this.port),
+        ];
+        options = {
+          cwd: daemonInfo.path,
+          env: {
+            ...process.env,
+            PYTHONPATH: daemonInfo.path,
+          },
+          detached: true,
+          stdio: ["ignore", "pipe", "pipe"],
+        };
+        console.log(`[daemon] Spawning: ${cmd} ${args.join(" ")} (cwd: ${daemonInfo.path})`);
+      }
+
+      this.daemonProcess = spawn(cmd, args, options);
 
       // Don't keep Electron alive just for the daemon
       this.daemonProcess.unref();
 
       let started = false;
 
+      // Write stdout to log file and check for startup messages
       this.daemonProcess.stdout.on("data", (data) => {
         const output = data.toString();
+        if (logStream) {
+          logStream.write(output);
+        }
         console.log("[daemon]", output.trim());
-        if (output.includes("listening") && !started) {
+        
+        // Check for startup messages
+        if ((output.includes("listening") || 
+             output.includes("Starting") || 
+             output.includes("Daemon started") || 
+             output.includes("started on")) && !started) {
           started = true;
+          console.log("[daemon] Detected daemon started from output");
           resolve();
         }
       });
 
+      // Write stderr to log file and check for startup messages
       this.daemonProcess.stderr.on("data", (data) => {
-        console.error("[daemon stderr]", data.toString().trim());
+        const output = data.toString();
+        if (logStream) {
+          logStream.write(`[stderr] ${output}`);
+        }
+        console.error("[daemon stderr]", output.trim());
+        
+        // Also check stderr for startup messages
+        if ((output.includes("listening") || 
+             output.includes("Starting") || 
+             output.includes("Daemon started") || 
+             output.includes("started on")) && !started) {
+          started = true;
+          console.log("[daemon] Detected daemon started from stderr");
+          resolve();
+        }
       });
 
+      // Also check TCP port as a fallback detection method
+      const checkPort = () => {
+        if (started) return;
+        
+        const testSocket = new net.Socket();
+        testSocket.setTimeout(500);
+        
+        testSocket.on("connect", () => {
+          testSocket.destroy();
+          if (!started) {
+            started = true;
+            console.log("[daemon] Detected daemon started (port connected)");
+            resolve();
+          }
+        });
+        
+        testSocket.on("error", () => {
+          // Port not ready yet, try again
+          setTimeout(checkPort, 200);
+        });
+        
+        testSocket.on("timeout", () => {
+          testSocket.destroy();
+          setTimeout(checkPort, 200);
+        });
+        
+        try {
+          testSocket.connect(this.port, this.host);
+        } catch (err) {
+          setTimeout(checkPort, 200);
+        }
+      };
+
+      // Start checking for port after a short delay (fallback)
+      setTimeout(checkPort, 500);
+
       this.daemonProcess.on("error", (err) => {
-        console.error("Failed to start daemon:", err.message);
+        console.error("[daemon] Process spawn error:", err.message);
+        if (logStream) {
+          logStream.write(`[ERROR] Process spawn failed: ${err.message}\n`);
+          logStream.end();
+        }
         if (!started) {
           reject(err);
         }
       });
 
-      // Timeout if daemon doesn't start
+      this.daemonProcess.on("exit", (code, signal) => {
+        console.error(`[daemon] Process exited with code ${code}, signal ${signal}`);
+        if (logStream) {
+          logStream.write(`[EXIT] Process exited with code ${code}, signal ${signal}\n`);
+          logStream.end();
+        }
+        if (!started && code !== 0) {
+          reject(new Error(`Daemon process exited with code ${code}`));
+        }
+      });
+
+      // Timeout if daemon doesn't start (fallback)
       setTimeout(() => {
         if (!started) {
           started = true;
-          // Assume it started even without the log message
+          console.warn("[daemon] Startup detection timeout - assuming daemon started");
           resolve();
         }
-      }, 3000);
+      }, 5000);
     });
   }
 
