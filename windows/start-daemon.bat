@@ -35,14 +35,13 @@ if %ERRORLEVEL% neq 0 (
 for /f "tokens=*" %%i in ('%PYTHON_CMD% --version') do set PYTHON_VERSION=%%i
 echo [OK] %PYTHON_VERSION% found
 
-:: Add libusb DLL to PATH for PyUSB
-for /f "tokens=*" %%i in ('%PYTHON_CMD% -c "import sys; print(sys.prefix)"') do set PYTHON_PREFIX=%%i
-set LIBUSB_PATH=%PYTHON_PREFIX%\Lib\site-packages\libusb\_platform\_windows\x64
-if exist "%LIBUSB_PATH%\libusb-1.0.dll" (
-    set PATH=%LIBUSB_PATH%;%PATH%
-    echo [OK] libusb DLL found
-) else (
-    echo [WARN] libusb DLL not found - USB devices may not be detected
+:: Install and validate libusb DLL
+call "%~dp0install-validate-libusb.bat"
+if %ERRORLEVEL% neq 0 (
+    echo.
+    echo This is required for USB device communication.
+    pause
+    exit /b 1
 )
 
 :: Navigate to Python source directory

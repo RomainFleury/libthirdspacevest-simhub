@@ -50,6 +50,16 @@ cd modern-third-space
 pip install -e . >nul 2>&1
 pip install pyinstaller libusb >nul 2>&1
 cd ..
+
+:: Install and validate libusb DLL
+echo [CHECK] Verifying libusb DLL installation...
+call "%~dp0install-validate-libusb.bat"
+if %ERRORLEVEL% neq 0 (
+    echo.
+    echo This is required for USB device communication and must be available for the build.
+    pause
+    exit /b 1
+)
 echo [OK] Python dependencies installed
 echo.
 
@@ -57,7 +67,9 @@ echo.
 echo [2/5] Building Python daemon (vest-daemon.exe)...
 cd modern-third-space\build
 set SRC_DIR=%CD%\..\src
-python -m PyInstaller --onefile --name vest-daemon --console --clean --paths "%SRC_DIR%" --hidden-import modern_third_space.vest --hidden-import modern_third_space.vest.controller --hidden-import modern_third_space.vest.status --hidden-import modern_third_space.vest.discovery --hidden-import modern_third_space.presets --hidden-import modern_third_space.server --hidden-import modern_third_space.server.daemon --hidden-import modern_third_space.server.protocol --hidden-import modern_third_space.server.client_manager --hidden-import modern_third_space.server.lifecycle --hidden-import modern_third_space.server.cs2_manager --hidden-import modern_third_space.server.alyx_manager --hidden-import modern_third_space.server.superhot_manager --hidden-import modern_third_space.legacy_adapter vest-daemon-entry.py
+
+:: Include libusb DLL in the bundle (extracted to same dir as exe at runtime)
+python -m PyInstaller --onefile --name vest-daemon --console --clean --paths "%SRC_DIR%" --add-binary "%LIBUSB_PATH%\libusb-1.0.dll;." --hidden-import modern_third_space.vest --hidden-import modern_third_space.vest.controller --hidden-import modern_third_space.vest.status --hidden-import modern_third_space.vest.discovery --hidden-import modern_third_space.presets --hidden-import modern_third_space.server --hidden-import modern_third_space.server.daemon --hidden-import modern_third_space.server.protocol --hidden-import modern_third_space.server.client_manager --hidden-import modern_third_space.server.lifecycle --hidden-import modern_third_space.server.cs2_manager --hidden-import modern_third_space.server.alyx_manager --hidden-import modern_third_space.server.superhot_manager --hidden-import modern_third_space.legacy_adapter vest-daemon-entry.py
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Failed to build daemon!
     pause
