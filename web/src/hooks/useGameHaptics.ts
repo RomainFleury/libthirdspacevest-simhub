@@ -13,6 +13,7 @@ export function useGameHaptics(options?: GameHapticsOptions) {
   const triggerCell = useCallback(
     async (cell: number, speed: number = 5, overrideOptions?: GameHapticsOptions) => {
       const opts = overrideOptions || options;
+      console.log(`[useGameHaptics] triggerCell: cell=${cell}, speed=${speed}, opts=`, opts);
       await triggerEffect({ 
         label: `Game Cell ${cell}`, 
         cell, 
