@@ -59,17 +59,24 @@ export function DeviceSelector({ onDeviceChange, disabled }: Props) {
       setDevices(deviceList);
       setPreferredDevice(preference);
       
-      // Auto-select preferred device if it exists in the list
+      // Auto-select device: try preferred first, then fallback to first device
+      let deviceToSelect: VestDevice | null = null;
+      
       if (preference) {
         const matchingDevice = deviceList.find((d) => deviceMatches(d, preference));
         if (matchingDevice) {
-          setSelectedDevice(matchingDevice);
-          onDeviceChange?.(matchingDevice);
+          deviceToSelect = matchingDevice;
         }
-      } else if (deviceList.length > 0) {
-        // No preference, select first device
-        setSelectedDevice(deviceList[0]);
-        onDeviceChange?.(deviceList[0]);
+      }
+      
+      // Fallback to first device if no preference match
+      if (!deviceToSelect && deviceList.length > 0) {
+        deviceToSelect = deviceList[0];
+      }
+      
+      if (deviceToSelect) {
+        setSelectedDevice(deviceToSelect);
+        onDeviceChange?.(deviceToSelect);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load devices");
