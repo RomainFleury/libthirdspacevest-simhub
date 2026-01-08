@@ -5,7 +5,7 @@ This is a living checklist intended to be updated during implementation. It exis
 ### Status
 - **Current phase**: Phase A (MVP: hit recorded from redness ROI)
 - **Owner**: (fill in)
-- **Started**: (fill in date)
+- **Started**: 2026-01-08
 - **Target**: (fill in)
 
 ---
@@ -13,31 +13,31 @@ This is a living checklist intended to be updated during implementation. It exis
 ## Phase A milestones
 
 ### Daemon
-- [ ] Register integration spec
-- [ ] Implement manager start/stop/status
+- [x] Register integration spec
+- [x] Implement manager start/stop/status
 - [ ] ROI-only capture working on Windows
-- [ ] Redness scoring produces stable values
-- [ ] Cooldown/debounce prevents hit spam
-- [ ] Hit triggers random-cell haptic
-- [ ] Daemon commands wired
-- [ ] Broadcast hit events for UI logs
-- [ ] Tests updated/passing
+- [x] Redness scoring produces stable values
+- [x] Cooldown/debounce prevents hit spam
+- [x] Hit triggers random-cell haptic
+- [x] Daemon commands wired
+- [x] Broadcast hit events for UI logs
+- [x] Tests updated/passing
 
 ### Electron main
-- [ ] Profile storage + active profile
-- [ ] IPC: profile CRUD + import/export
-- [ ] IPC: screenshot capture (full frame for calibration)
-- [ ] IPC: list/delete/clear screenshots
-- [ ] Retention policy implemented
-- [ ] IPC: enable/disable watcher + status
+- [x] Profile storage + active profile
+- [x] IPC: profile CRUD + import/export
+- [x] IPC: screenshot capture (full frame for calibration)
+- [x] IPC: list/delete/clear screenshots
+- [x] Retention policy implemented
+- [x] IPC: enable/disable watcher + status
 
 ### UI
-- [ ] Generic Screen Health integration page
-- [ ] Screenshot capture + ROI drawing
-- [ ] Threshold/cooldown controls
-- [ ] Captured screenshots panel (gallery)
-- [ ] Enable/disable + status indicator
-- [ ] Event log display (hit events)
+- [x] Generic Screen Health integration page
+- [x] Screenshot capture + ROI drawing
+- [x] Threshold/cooldown controls
+- [x] Captured screenshots panel (gallery)
+- [x] Enable/disable + status indicator
+- [x] Event log display (hit events)
 
 ---
 

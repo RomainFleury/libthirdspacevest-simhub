@@ -13,9 +13,12 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import asyncio
 import json
+import pytest
 from unittest.mock import Mock, patch, AsyncMock
 from modern_third_space.server.daemon import VestDaemon
 from modern_third_space.server.protocol import Command, CommandType
+
+pytestmark = pytest.mark.asyncio
 
 
 async def test_player_commands():

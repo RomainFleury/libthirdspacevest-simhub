@@ -1047,6 +1047,63 @@ class DaemonBridge extends EventEmitter {
   }
 
   // -------------------------------------------------------------------------
+  // Generic Screen Health Watcher API
+  // -------------------------------------------------------------------------
+
+  /**
+   * Start the screen health watcher with a profile JSON.
+   * @param {Object} profile - Profile JSON object (schema_version 0)
+   */
+  async screenHealthStart(profile) {
+    try {
+      const response = await this.sendCommand("screen_health_start", { profile });
+      return {
+        success: response.success ?? false,
+        profile_name: response.profile_name ?? null,
+        error: response.message,
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Stop the screen health watcher.
+   */
+  async screenHealthStop() {
+    try {
+      const response = await this.sendCommand("screen_health_stop");
+      return {
+        success: response.success ?? false,
+        error: response.message,
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Get screen health watcher status.
+   */
+  async screenHealthStatus() {
+    try {
+      const response = await this.sendCommand("screen_health_status");
+      return {
+        running: response.running ?? false,
+        profile_name: response.profile_name ?? null,
+        events_received: response.events_received ?? 0,
+        last_event_ts: response.last_event_ts ?? null,
+        last_hit_ts: response.last_hit_ts ?? null,
+      };
+    } catch (error) {
+      return {
+        running: false,
+        error: error.message,
+      };
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Predefined Effects Library API
   // -------------------------------------------------------------------------
 

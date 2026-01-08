@@ -74,6 +74,7 @@ from .protocol import (
 from .cs2_manager import CS2Manager, generate_cs2_config
 from .alyx_manager import AlyxManager, get_mod_info as get_alyx_mod_info
 from .l4d2_manager import L4D2Manager
+from .screen_health_manager import ScreenHealthManager
 from .protocol import (
     event_alyx_started,
     event_alyx_stopped,
@@ -88,6 +89,12 @@ from .protocol import (
     response_l4d2_start,
     response_l4d2_stop,
     response_l4d2_status,
+    event_screen_health_started,
+    event_screen_health_stopped,
+    event_screen_health_hit,
+    response_screen_health_start,
+    response_screen_health_stop,
+    response_screen_health_status,
     # Predefined effects
     event_effect_started,
     event_effect_completed,
@@ -144,6 +151,12 @@ class VestDaemon:
         self._l4d2_manager = L4D2Manager(
             on_game_event=self._on_l4d2_game_event,
             on_trigger=self._on_l4d2_trigger,
+        )
+
+        # Generic Screen Health Watcher manager
+        self._screen_health_manager = ScreenHealthManager(
+            on_game_event=self._on_screen_health_game_event,
+            on_trigger=self._on_screen_health_trigger,
         )
         
         self._loop: Optional[asyncio.AbstractEventLoop] = None
@@ -394,6 +407,16 @@ class VestDaemon:
         
         if cmd_type == CommandType.L4D2_STATUS:
             return await self._cmd_l4d2_status(command)
+
+        # Generic Screen Health Watcher commands
+        if cmd_type == CommandType.SCREEN_HEALTH_START:
+            return await self._cmd_screen_health_start(command)
+
+        if cmd_type == CommandType.SCREEN_HEALTH_STOP:
+            return await self._cmd_screen_health_stop(command)
+
+        if cmd_type == CommandType.SCREEN_HEALTH_STATUS:
+            return await self._cmd_screen_health_status(command)
         
         # Predefined effects commands
         if cmd_type == CommandType.PLAY_EFFECT:
@@ -547,6 +570,7 @@ class VestDaemon:
         return response_set_main_device(
             success=True,
             device_id=command.device_id,
+            device=device_info,
             req_id=command.req_id,
         )
     
@@ -1329,6 +1353,102 @@ class VestDaemon:
         controller.trigger_effect(cell, speed)
         
         # Broadcast event (async)
+        if self._loop is not None:
+            event = event_effect_triggered(cell, speed, device_id=main_device_id)
+            asyncio.run_coroutine_threadsafe(
+                self._clients.broadcast(event),
+                self._loop,
+            )
+
+    # -------------------------------------------------------------------------
+    # Generic Screen Health Watcher commands
+    # -------------------------------------------------------------------------
+
+    async def _cmd_screen_health_start(self, command: Command) -> Response:
+        """Start the generic screen health watcher with a profile JSON."""
+        if not command.profile:
+            return response_screen_health_start(
+                success=False,
+                error="profile is required",
+                req_id=command.req_id,
+            )
+
+        success, error = self._screen_health_manager.start(command.profile)
+        if success:
+            profile_name = self._screen_health_manager.status().get("profile_name") or ""
+            await self._clients.broadcast(event_screen_health_started(profile_name))
+
+        status = self._screen_health_manager.status()
+        return response_screen_health_start(
+            success=success,
+            profile_name=status.get("profile_name"),
+            error=error,
+            req_id=command.req_id,
+        )
+
+    async def _cmd_screen_health_stop(self, command: Command) -> Response:
+        """Stop the generic screen health watcher."""
+        success = self._screen_health_manager.stop()
+        if success:
+            await self._clients.broadcast(event_screen_health_stopped())
+        return response_screen_health_stop(success=success, req_id=command.req_id)
+
+    async def _cmd_screen_health_status(self, command: Command) -> Response:
+        """Get screen health watcher status."""
+        s = self._screen_health_manager.status()
+        return response_screen_health_status(
+            running=bool(s.get("running")),
+            profile_name=s.get("profile_name"),
+            events_received=int(s.get("events_received") or 0),
+            last_event_ts=s.get("last_event_ts"),
+            last_hit_ts=s.get("last_hit_ts"),
+            req_id=command.req_id,
+        )
+
+    # -------------------------------------------------------------------------
+    # Generic Screen Health Watcher callbacks
+    # -------------------------------------------------------------------------
+
+    def _on_screen_health_game_event(self, event_type: str, params: dict):
+        """
+        Called when ScreenHealthManager emits a game event.
+
+        Called from the manager thread, so broadcast must be scheduled
+        on the asyncio loop.
+        """
+        if self._loop is None:
+            return
+
+        if event_type == "hit_recorded":
+            direction = params.get("direction")
+            score = float(params.get("score") or 0.0)
+            roi = params.get("roi")
+            event = event_screen_health_hit(direction=direction, score=score, roi=roi)
+        else:
+            event = event_error(f"Unknown screen_health event_type: {event_type}")
+
+        asyncio.run_coroutine_threadsafe(
+            self._clients.broadcast(event),
+            self._loop,
+        )
+
+    def _on_screen_health_trigger(self, cell: int, speed: int):
+        """
+        Called when ScreenHealthManager wants to trigger a haptic effect.
+
+        Triggers the effect on the main device.
+        """
+        main_device_id = self._registry.get_main_device_id()
+        if main_device_id is None:
+            return  # No device available
+
+        controller = self._registry.get_controller(main_device_id)
+        if controller is None or not controller.status().connected:
+            return  # Device not connected
+
+        controller.trigger_effect(cell, speed)
+
+        # Broadcast effect triggered event (async)
         if self._loop is not None:
             event = event_effect_triggered(cell, speed, device_id=main_device_id)
             asyncio.run_coroutine_threadsafe(

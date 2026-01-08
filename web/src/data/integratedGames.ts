@@ -6,6 +6,15 @@ import type { IntegratedGameConfig } from "../types/integratedGames";
  */
 export const integratedGames: IntegratedGameConfig[] = [
   {
+    id: "screen_health",
+    name: "Generic Screen Health",
+    description: "Screen-based hit detection via configurable ROIs",
+    icon: "🩸",
+    hasConfiguration: true,
+    hasSetupGuide: true,
+    tags: ["universal", "screen-capture", "beta"],
+  },
+  {
     id: "cs2",
     name: "Counter-Strike 2",
     description: "GSI-based haptic feedback for damage, kills, and events",
