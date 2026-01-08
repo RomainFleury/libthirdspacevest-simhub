@@ -88,3 +88,62 @@ def test_manager_cooldown_prevents_hit_spam(monkeypatch):
     hit_events = [e for e in events if e[0] == "hit_recorded"]
     assert len(hit_events) == 1, "Cooldown should prevent multiple hits within 200ms"
 
+
+def test_profile_allows_meta_and_rejects_invalid_direction(monkeypatch):
+    class FakeCapture:
+        def __init__(self, monitor_index: int):
+            self.monitor_index = monitor_index
+
+        def get_frame_size(self):
+            return 10, 10
+
+        def capture_bgra(self, left: int, top: int, width: int, height: int) -> bytes:
+            return bytes([0, 0, 0, 255] * (width * height))
+
+    monkeypatch.setattr(shm, "_MSSCaptureBackend", FakeCapture)
+
+    manager = shm.ScreenHealthManager(on_game_event=lambda *_: None, on_trigger=lambda *_: None)
+
+    ok, err = manager.start(
+        {
+            "schema_version": 0,
+            "name": "meta ok",
+            "meta": {"preset_id": "x", "game_name": "y"},
+            "capture": {"source": "monitor", "monitor_index": 1, "tick_ms": 50},
+            "detectors": [
+                {
+                    "type": "redness_rois",
+                    "cooldown_ms": 0,
+                    "threshold": {"min_score": 1.0},
+                    "rois": [{"name": "r1", "rect": {"x": 0, "y": 0, "w": 0.5, "h": 0.5}}],
+                }
+            ],
+        }
+    )
+    assert ok, err
+    manager.stop()
+
+    ok, err = manager.start(
+        {
+            "schema_version": 0,
+            "name": "bad direction",
+            "capture": {"source": "monitor", "monitor_index": 1, "tick_ms": 50},
+            "detectors": [
+                {
+                    "type": "redness_rois",
+                    "cooldown_ms": 0,
+                    "threshold": {"min_score": 1.0},
+                    "rois": [
+                        {
+                            "name": "r1",
+                            "direction": "diagonal_up_left",
+                            "rect": {"x": 0, "y": 0, "w": 0.5, "h": 0.5},
+                        }
+                    ],
+                }
+            ],
+        }
+    )
+    assert ok is False
+    assert err
+

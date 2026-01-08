@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { GameIntegrationPage } from "../../components/GameIntegrationPage";
 import { getIntegratedGame } from "../../data/integratedGames";
+import { SCREEN_HEALTH_PRESETS } from "../../data/screenHealthPresets";
 import type { EventDisplayInfo, GameEvent } from "../../types/integratedGames";
 import { useScreenHealthIntegration } from "../../hooks/useScreenHealthIntegration";
 
@@ -69,6 +70,7 @@ export function ScreenHealthIntegrationPage() {
   const [minScore, setMinScore] = useState<number>(0.35);
   const [cooldownMs, setCooldownMs] = useState<number>(200);
   const [rois, setRois] = useState<RoiDraft[]>([]);
+  const [selectedPresetId, setSelectedPresetId] = useState<string>(SCREEN_HEALTH_PRESETS[0]?.preset_id || "");
 
   useEffect(() => {
     if (!activeProfile?.profile) return;
@@ -98,6 +100,7 @@ export function ScreenHealthIntegrationPage() {
     return {
       schema_version: 0,
       name: profileName,
+      meta: activeProfile?.profile?.meta,
       capture: {
         source: "monitor",
         monitor_index: monitorIndex,
@@ -121,7 +124,7 @@ export function ScreenHealthIntegrationPage() {
         },
       ],
     };
-  }, [profileName, monitorIndex, tickMs, cooldownMs, minScore, rois]);
+  }, [profileName, monitorIndex, tickMs, cooldownMs, minScore, rois, activeProfile?.profile?.meta]);
 
   const [saving, setSaving] = useState(false);
   const handleSave = async () => {
@@ -145,6 +148,50 @@ export function ScreenHealthIntegrationPage() {
       profile: daemonProfile,
     } as any);
     await setActive(saved.id);
+  };
+
+  const findInstalledPresetProfileId = (presetId: string): string | null => {
+    for (const p of profiles) {
+      const pid = (p.profile as any)?.meta?.preset_id;
+      if (pid === presetId) return p.id;
+    }
+    return null;
+  };
+
+  const handleInstallPreset = async () => {
+    const preset = SCREEN_HEALTH_PRESETS.find((p) => p.preset_id === selectedPresetId);
+    if (!preset) return;
+
+    const existingId = findInstalledPresetProfileId(preset.preset_id);
+    if (existingId) {
+      await setActive(existingId);
+      await captureCalibrationScreenshot(Number((profiles.find((p) => p.id === existingId)?.profile as any)?.capture?.monitor_index || 1));
+      return;
+    }
+
+    const saved = await saveProfile({
+      name: preset.display_name,
+      profile: preset.profile,
+    } as any);
+    await setActive(saved.id);
+    await captureCalibrationScreenshot(Number((preset.profile as any)?.capture?.monitor_index || 1));
+  };
+
+  const handleResetToPresetDefaults = async () => {
+    if (!activeProfileId || !activeProfile?.profile) return;
+    const presetId = (activeProfile.profile as any)?.meta?.preset_id;
+    if (!presetId) return;
+    const preset = SCREEN_HEALTH_PRESETS.find((p) => p.preset_id === presetId);
+    if (!preset) return;
+
+    // Replace stored profile.profile with preset defaults, keep wrapper id/name.
+    await saveProfile({
+      id: activeProfileId,
+      name: activeProfile.name,
+      profile: preset.profile,
+      createdAt: activeProfile.createdAt,
+    } as any);
+    await captureCalibrationScreenshot(Number((preset.profile as any)?.capture?.monitor_index || 1));
   };
 
   const handleCapture = async () => {
@@ -203,6 +250,61 @@ export function ScreenHealthIntegrationPage() {
 
   const configurationPanel = (
     <div className="space-y-6">
+      {/* Preset profiles */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-white">Preset profiles</h3>
+        <div className="flex flex-wrap items-center gap-3">
+          <select
+            value={selectedPresetId}
+            onChange={(e) => setSelectedPresetId(e.target.value)}
+            className="rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
+          >
+            {SCREEN_HEALTH_PRESETS.map((p) => (
+              <option key={p.preset_id} value={p.preset_id}>
+                {p.display_name}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={handleInstallPreset}
+            className="rounded-lg bg-emerald-600/80 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-600"
+          >
+            Install preset
+          </button>
+          <button
+            onClick={handleResetToPresetDefaults}
+            disabled={!((activeProfile?.profile as any)?.meta?.preset_id)}
+            className="rounded-lg bg-slate-600/80 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-600 disabled:opacity-50"
+            title={
+              (activeProfile?.profile as any)?.meta?.preset_id
+                ? "Reset this profile to its preset defaults"
+                : "This profile is not from a preset"
+            }
+          >
+            Reset to preset defaults
+          </button>
+        </div>
+        {(() => {
+          const meta = (activeProfile?.profile as any)?.meta;
+          if (!meta) return null;
+          return (
+            <div className="rounded-xl bg-slate-900/40 p-3 ring-1 ring-white/5 text-sm">
+              <div className="text-slate-300">
+                <span className="font-medium text-white">Preset:</span>{" "}
+                <span className="font-mono">{meta.preset_id}</span>
+              </div>
+              {Array.isArray(meta.hints) && meta.hints.length > 0 && (
+                <ul className="mt-2 list-disc list-inside text-slate-400 space-y-1">
+                  {meta.hints.slice(0, 4).map((h: string, i: number) => (
+                    <li key={i}>{h}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          );
+        })()}
+      </div>
+
       {/* Profile controls */}
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-3">
@@ -407,7 +509,7 @@ export function ScreenHealthIntegrationPage() {
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-slate-400 block mb-1">Direction (optional)</label>
+                    <label className="text-xs text-slate-400 block mb-1">Direction (optional — defaults to random)</label>
                     <select
                       value={r.direction || ""}
                       onChange={(e) =>
