@@ -7,7 +7,10 @@
 - Preset install flow:
   - creates a new stored profile in userData
   - sets it active
-  - optionally navigates user into calibration (capture screenshot)
+  - auto-captures a calibration screenshot to start ROI verification immediately
+ - Preset lifecycle:
+  - stored preset profiles are editable (“edit in place” UX)
+  - add optional “Reset to preset defaults” action
 
 ---
 
@@ -27,4 +30,6 @@
 
 ## Profiles / schema
 - Keep schema v0 (Phase A) and standardize multi-ROI + direction usage.
+ - Store preset metadata in the stored-profile wrapper (not in daemon profile JSON), e.g.:
+  - `{ presetId, gameName, hints, lastVerifiedAt, recommendedResolution, notes }`
 

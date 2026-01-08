@@ -30,8 +30,7 @@ Phase D adds an optional detector that reads a health number from a digits ROI (
   - thresholding
   - scale factor
 - OCR engine selection (implementation choice):
-  - lightweight digit-only approach first (template matching / simple classifier), or
-  - Tesseract (more robust but heavier)
+  - **digits-only** approach first (Phase D scope)
 - smoothing + validation:
   - reject outliers
   - require N consistent reads
@@ -66,12 +65,14 @@ Phase D adds an optional detector that reads a health number from a digits ROI (
   - show “raw recognized text” and parsed integer
   - tuning controls for threshold/scale/invert
 - Add a “test capture” button that runs OCR once and displays result (avoid continuous OCR while configuring).
+ - Provide a “run per tick” mode (Phase D requirement) with strong throttling controls exposed in profile:
+  - `tick_ms` (capture cadence)
+  - `stable_reads` / outlier rejection
 
 ---
 
 ## Daemon changes
-- Implement OCR pipeline as an optional module:
-  - keep import optional when OCR isn’t configured (similar pattern to capture deps).
+- Implement OCR pipeline as a bundled dependency (Phase D requirement).
 - Add event broadcast for UI:
   - `screen_health_health_number` (or embed `health_value` in params).
 

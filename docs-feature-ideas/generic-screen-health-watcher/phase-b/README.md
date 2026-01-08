@@ -1,7 +1,7 @@
 ## Phase B — Preset profiles + directional hits UX (documentation)
 
 Phase B focuses on making the capture-based approach feel like “real game integrations” by:
-- shipping **preset profiles** (Option A)
+- shipping **game-specific preset profiles** (Option A)
 - improving the directional ROI workflow (without requiring directional haptics mapping yet)
 
 ---
@@ -36,11 +36,26 @@ Each preset:
 - has display metadata (name, game name, notes)
 - includes a `profile` field that matches the daemon profile JSON schema
 
+### Preset lifecycle: “edit in place templates” (practical implementation)
+We want presets to feel like **templates you can edit in place**. Since presets are bundled with the app, the practical behavior should be:
+- On first use, **install** the preset into user storage as a stored profile.
+- After that, edits are applied to that stored profile (so it behaves like “edit in place” for the user).
+- Provide an optional “Reset to preset defaults” action to re-apply the bundled preset.
+
 ### Install behavior
 - “Install preset”:
   - copies preset into Electron user storage (`screenHealthStorage`)
   - sets it as **active profile**
-  - optionally opens the calibration screenshot step to let user tweak ROIs
+  - automatically **captures a calibration screenshot** to let user immediately validate/tweak ROIs
+
+### Preset metadata (required)
+Add a metadata block to each preset (stored alongside the profile) to help users troubleshoot:
+- recommended resolution / aspect ratio
+- HUD scale / UI scaling assumptions
+- borderless/windowed note
+- known conflicts (color filters, accessibility modes)
+- “what to try if it doesn’t work” hints
+- last verified date + game version (if known)
 
 ### Why TS objects (vs raw JSON files)
 - Easy bundling with Vite/Electron (no file-path surprises).

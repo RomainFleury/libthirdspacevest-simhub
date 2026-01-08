@@ -3,7 +3,7 @@
 ---
 
 ## Daemon detector: `health_number`
-- [ ] Choose OCR approach for digits (lightweight digits-only vs Tesseract)
+- [ ] OCR approach: digits-only first (bundled)
 - [ ] Implement preprocessing pipeline (threshold/invert/scale)
 - [ ] Implement stability filtering (reject outliers, stable_reads)
 - [ ] Derive `hit_recorded` from decreases (min_drop + cooldown)
@@ -20,6 +20,7 @@
 ## UI
 - [ ] OCR calibration UI (show ROI crop + recognized value)
 - [ ] “Test capture once” button (avoid continuous OCR while tuning)
+- [ ] Ensure OCR can run per tick (performance + stability controls)
 - [ ] Explain performance tradeoffs + optional nature
 
 ---

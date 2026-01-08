@@ -22,11 +22,12 @@ Phase C adds an optional detector that tracks a **health bar fill** in an ROI an
 
 ### Inputs (profile)
 - `roi`: normalized rectangle around the bar
-- `orientation`: `"horizontal"` or `"vertical"`
-- `fill_direction`: `"left_to_right" | "right_to_left" | "top_to_bottom" | "bottom_to_top"`
+- Phase C scope: **horizontal only** (future can add vertical / other fill directions)
 - color/segmentation:
-  - either `fill_color` sampling config, or
-  - `threshold` for brightness/saturation-based segmentation
+  - **user samples colors** in UI (recommended UX):
+    - “health on” color (filled)
+    - “health off” color (empty/background)
+  - still allow a threshold-based fallback (brightness/saturation) for tough UIs
 - smoothing:
   - EMA `alpha` or rolling average window
 - hit derivation:
@@ -52,8 +53,12 @@ Add a second detector type:
   "type": "health_bar",
   "roi": { "x": 0.1, "y": 0.9, "w": 0.3, "h": 0.03 },
   "orientation": "horizontal",
-  "fill_direction": "left_to_right",
-  "threshold": { "mode": "brightness", "min": 0.4 },
+  "color_sampling": {
+    "filled_rgb": [220, 40, 40],
+    "empty_rgb": [40, 40, 40],
+    "tolerance": 0.15
+  },
+  "threshold": { "mode": "brightness", "min": 0.4 }, // optional fallback
   "smoothing": { "alpha": 0.3 },
   "hit_on_decrease": { "min_drop": 0.02, "cooldown_ms": 150 }
 }
