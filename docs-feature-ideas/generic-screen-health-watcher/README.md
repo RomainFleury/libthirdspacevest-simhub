@@ -8,4 +8,4 @@ This folder contains planning + implementation tracking docs for the “Generic 
 - `phase-b/`: directional expansions
 - `phase-c/`: health bar tracking
 - `phase-d/`: health number OCR
-- `phase-e/`: capture source expansion (optional)
+- `future-next-steps/`: deferred ideas (includes the former Phase E)

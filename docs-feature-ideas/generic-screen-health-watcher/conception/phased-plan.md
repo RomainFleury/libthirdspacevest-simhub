@@ -8,6 +8,7 @@
 - **One active profile at a time**.
 - Runtime capture captures **ROI rectangles only** (performance + privacy).
 - Calibration uses **user-triggered full-frame screenshot** to draw ROIs.
+- Ship “supported games” as **preset profiles** inside the Generic Screen Health UI (Option A).
 
 ---
 
@@ -68,13 +69,6 @@
 
 ---
 
-## Phase E (optional) — Capture source expansion
-
-### Outcomes
-- Expand capture options beyond monitor:
-  - window capture (if desired)
-  - multi-monitor handling improvements
-  - safer handling for borderless vs exclusive fullscreen
-
-### Notes
-- Not required for MVP; capture complexity can grow quickly.
+## Deferred (moved to future-next-steps)
+- Capture source expansion and related enhancements were moved to:
+  - `docs-feature-ideas/generic-screen-health-watcher/future-next-steps/phase-e/`

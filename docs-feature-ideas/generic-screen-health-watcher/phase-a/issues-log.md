@@ -58,3 +58,14 @@ This file is a running log of implementation issues, investigations, and decisio
 - **Observed**: Without declaring `mss` as a dependency, Windows daemon builds/users may fail at runtime unless they manually install it.
 - **Decision**: Add `mss>=9.0.1` to `modern-third-space/pyproject.toml` dependencies.
 - **Follow-ups**: Validate capture on Windows (borderless/windowed) and ensure daemon packaging includes `mss` correctly.
+
+### 2026-01-08 — Decision: ship “game presets” inside the Generic integration (Option A)
+- **Context**: Need users to see “supported games” that are implemented via screen capture, with default JSON configs.
+- **Observed**: Listing each capture-based game as its own integration page would create UI/page sprawl, even though they all share the same underlying integration.
+- **Decision**: Use **Option A**:
+  - Keep a single UI entry for **Generic Screen Health**.
+  - Ship **bundled preset profiles** (default JSON configs) for specific games/layouts.
+  - Provide an in-page “Preset profiles” selector and an **Install preset** action that copies the preset into user storage as an editable profile and sets it active.
+- **Follow-ups**:
+  - Decide preset source format (recommended: TS objects in `web/src/data/…` for easy bundling).
+  - Add a “first run” default preset install (optional) so users always have at least one profile.

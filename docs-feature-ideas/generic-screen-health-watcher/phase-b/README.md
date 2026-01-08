@@ -1,3 +1,98 @@
-## Phase B — Directional hits
+## Phase B — Preset profiles + directional hits UX (documentation)
 
-Placeholder for Phase B planning/implementation notes.
+Phase B focuses on making the capture-based approach feel like “real game integrations” by:
+- shipping **preset profiles** (Option A)
+- improving the directional ROI workflow (without requiring directional haptics mapping yet)
+
+---
+
+## Goals
+- Users can pick a **preset profile** for a specific game/layout and install it with one click.
+- A profile can encode **directional ROIs** using fixed keys:
+  - `front`, `back`, `left`, `right`, `front_left`, `front_right`, `back_left`, `back_right`
+- UI makes it easy to:
+  - add multiple ROIs
+  - assign directions
+  - validate “what the detector sees” (ROI crop previews)
+
+---
+
+## Out of scope (Phase B)
+- Health bar tracking (Phase C)
+- OCR health numbers (Phase D)
+- Window capture / fullscreen handling (deferred to `future-next-steps/`)
+- Directional haptics mapping (can remain random-cell in Phase B)
+
+---
+
+## Preset profiles (Option A) — how it should work
+
+### Where presets live
+Recommended:
+- `web/src/data/screenHealthPresets.ts` exporting an array of presets (TS objects).
+
+Each preset:
+- has an id (stable key)
+- has display metadata (name, game name, notes)
+- includes a `profile` field that matches the daemon profile JSON schema
+
+### Install behavior
+- “Install preset”:
+  - copies preset into Electron user storage (`screenHealthStorage`)
+  - sets it as **active profile**
+  - optionally opens the calibration screenshot step to let user tweak ROIs
+
+### Why TS objects (vs raw JSON files)
+- Easy bundling with Vite/Electron (no file-path surprises).
+- Easy to evolve schema with type assistance.
+
+---
+
+## Profile schema changes (Phase B)
+
+No required schema changes if Phase A schema already supports:
+- multiple ROIs
+- optional `direction` per ROI
+
+If Phase A shipped minimal ROI support, Phase B can standardize:
+- `detectors[0].rois[]` contains:
+  - `name: string`
+  - `direction?: DirectionKey`
+  - `rect: {x,y,w,h}` normalized
+
+---
+
+## UI/UX additions
+
+### Presets panel
+- Section in Generic Screen Health page:
+  - preset selector (dropdown/search)
+  - “Install preset” button
+  - preset notes: recommended resolution, HUD scale assumptions, etc.
+
+### Directional ROI assignment
+- In ROI list:
+  - direction dropdown per ROI
+  - quick “duplicate ROI” action (common for symmetric HUD)
+
+### Debugging support
+- Keep ROI crop capture and gallery
+- Add “Capture ROI crops on hit” (optional, off by default) to collect examples for tuning presets
+
+---
+
+## Daemon changes (Phase B)
+
+Minimal:
+- Include direction field in `hit_recorded` event (already supported in Phase A design).
+- Optionally attach `roi` name + score in event params.
+
+No changes required to haptics mapping if direction remains informational.
+
+---
+
+## Tests
+- Add tests for:
+  - profile validation of `direction` keys (reject unknown strings)
+  - multiple ROI selection behavior (only triggers once per ROI cooldown)
+- UI: lightweight smoke test manually (no automated web tests currently in repo).
