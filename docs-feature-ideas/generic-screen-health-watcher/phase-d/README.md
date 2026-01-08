@@ -31,6 +31,7 @@ Phase D adds an optional detector that reads a health number from a digits ROI (
   - scale factor
 - OCR engine selection (implementation choice):
   - **digits-only** approach first (Phase D scope)
+  - strict assumption: **fixed font / stable glyphs** (performance-first)
 - smoothing + validation:
   - reject outliers
   - require N consistent reads
@@ -65,9 +66,8 @@ Phase D adds an optional detector that reads a health number from a digits ROI (
   - show “raw recognized text” and parsed integer
   - tuning controls for threshold/scale/invert
 - Add a “test capture” button that runs OCR once and displays result (avoid continuous OCR while configuring).
- - Provide a “run per tick” mode (Phase D requirement) with strong throttling controls exposed in profile:
-  - `tick_ms` (capture cadence)
-  - `stable_reads` / outlier rejection
+- Phase D requirement: OCR must be capable of running **per tick**.
+  - Keep stability controls exposed in profile (`stable_reads`, outlier rejection, etc.)
 
 ---
 

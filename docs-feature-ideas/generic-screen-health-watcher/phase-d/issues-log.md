@@ -17,6 +17,7 @@
 - **Context**: Phase D planning constraints.
 - **Decision**:
   - OCR should start **digits-only**.
+  - OCR should assume **fixed font / stable glyphs** (strict) for speed and determinism.
   - OCR dependencies should be **bundled** in the Windows distribution.
   - The solution should be capable of running **per tick** (capture cadence), so profile needs stability controls.
 - **Follow-ups**:

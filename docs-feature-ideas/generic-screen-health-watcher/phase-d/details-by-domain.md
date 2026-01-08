@@ -6,16 +6,21 @@
 - Add `health_number` detector:
   - ROI capture
   - preprocessing
-  - OCR (digits-only)
+  - OCR (digits-only, strict fixed font)
   - stability filtering
   - hit derivation
 
 ---
 
 ## Dependencies
-- Decide whether OCR dependency is:
-  - bundled/required, or
-  - optional (recommended) and enabled only when detector is configured
+- OCR dependencies should be **bundled** in the Windows distribution.
+
+### Fast digits-only approach (per-tick)
+To support per-tick use, prefer a simple digits-only pipeline:
+- Preprocess ROI to a small binary image.
+- Segment into fixed digit cells (fixed width).
+- Recognize each digit via template matching (Hamming distance on bitmaps).
+This avoids heavyweight OCR engines and keeps per-tick costs predictable.
 
 ---
 

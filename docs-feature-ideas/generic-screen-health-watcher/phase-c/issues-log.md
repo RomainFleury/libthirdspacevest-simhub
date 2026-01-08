@@ -19,6 +19,8 @@
   - Start with **single-color filled bars**.
   - Phase C supports **horizontal bars only**.
   - Prefer **color sampling UX** (“health on/off” colors) with threshold fallback.
+- **Performance note**:
+  - Prefer the fastest implementation: per-pixel integer distance checks (L1 / abs-diff), avoid heavy image processing.
 - **Follow-ups**:
   - Decide where segmented/gradient bars land (likely Phase C.1 or later).
 

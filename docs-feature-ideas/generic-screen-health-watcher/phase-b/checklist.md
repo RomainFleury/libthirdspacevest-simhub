@@ -11,9 +11,9 @@ This checklist is meant to be checked off during implementation of Phase B.
   - [ ] copies preset into user storage as editable profile
   - [ ] sets installed profile as active
   - [ ] auto-captures a calibration screenshot after install
-  - [ ] creates/updates a metadata block shown in UI (hints, last verified, etc.)
+  - [ ] creates/updates a `meta` block **inside the profile JSON** (hints, last verified, etc.)
   - [ ] preserves preset id/name metadata for traceability (optional)
-- [ ] Implement “Reset to preset defaults” (optional but recommended)
+- [ ] Implement “Reset to preset defaults”
 - [ ] Add at least 1 real preset profile for validation (can be internal/test-only initially)
 
 ---

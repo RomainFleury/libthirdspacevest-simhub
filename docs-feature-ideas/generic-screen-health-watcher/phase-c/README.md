@@ -71,7 +71,7 @@ Add a second detector type:
   - or allow multiple detectors in one profile (recommended long-term).
 - Health bar calibration:
   - live display of `health_percent`
-  - “sample fill color” tool (optional)
+  - “sample filled/empty colors” tool (recommended)
 - Add a simple “health graph” (last N seconds) for tuning (optional).
 
 ---

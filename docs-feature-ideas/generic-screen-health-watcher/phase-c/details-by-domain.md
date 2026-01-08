@@ -9,6 +9,14 @@
   - compute `health_percent`
   - detect drops and emit `hit_recorded`
 
+### Performance-first segmentation (fastest path)
+Prefer per-pixel integer math (no floats, no sqrt) for per-tick operation:
+- Convert BGRA → RGB cheaply while iterating bytes.
+- If using sampled colors:
+  - compute L1 distance: `abs(r-rf)+abs(g-gf)+abs(b-bf)` and compare to a tolerance threshold
+  - (optional) also compare distance-to-empty and classify pixel as “filled” if it’s closer to filled than empty
+This keeps CPU cost low even for moderately sized ROIs.
+
 ---
 
 ## Protocol/events
@@ -21,8 +29,9 @@
 ## UI (React)
 - Add a configuration panel for:
   - ROI selection
-  - orientation/fill direction
-  - threshold/smoothing
+  - Phase C scope: horizontal only
+  - sampled filled/empty colors + tolerance
+  - threshold/smoothing (fallback/advanced)
 - Add a live readout for:
   - current health percent
   - last N seconds (optional)

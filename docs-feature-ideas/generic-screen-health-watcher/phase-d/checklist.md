@@ -21,7 +21,7 @@
 - [ ] OCR calibration UI (show ROI crop + recognized value)
 - [ ] “Test capture once” button (avoid continuous OCR while tuning)
 - [ ] Ensure OCR can run per tick (performance + stability controls)
-- [ ] Explain performance tradeoffs + optional nature
+- [ ] Explain strict assumptions (digits-only, fixed font) and why (per-tick performance)
 
 ---
 

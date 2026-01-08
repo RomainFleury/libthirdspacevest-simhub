@@ -8,9 +8,9 @@
   - creates a new stored profile in userData
   - sets it active
   - auto-captures a calibration screenshot to start ROI verification immediately
- - Preset lifecycle:
+- Preset lifecycle:
   - stored preset profiles are editable (“edit in place” UX)
-  - add optional “Reset to preset defaults” action
+  - add “Reset to preset defaults” action
 
 ---
 
@@ -30,6 +30,6 @@
 
 ## Profiles / schema
 - Keep schema v0 (Phase A) and standardize multi-ROI + direction usage.
- - Store preset metadata in the stored-profile wrapper (not in daemon profile JSON), e.g.:
-  - `{ presetId, gameName, hints, lastVerifiedAt, recommendedResolution, notes }`
+- Store preset metadata in the **profile JSON itself** under `meta` (daemon ignores it), so export/import is self-describing.
+  - Example: `{ meta: { preset_id, game_name, hints, last_verified_at, recommended_resolution, notes } }`
 

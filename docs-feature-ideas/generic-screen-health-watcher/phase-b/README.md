@@ -42,6 +42,11 @@ We want presets to feel like **templates you can edit in place**. Since presets 
 - After that, edits are applied to that stored profile (so it behaves like “edit in place” for the user).
 - Provide an optional “Reset to preset defaults” action to re-apply the bundled preset.
 
+### Preset metadata location: inside exported JSON
+Preset metadata must be embedded **inside the profile JSON** (so export/import stays self-describing), e.g.:
+- `profile.meta` (ignored by daemon)
+- contains: `preset_id`, `game_name`, `last_verified_at`, `hints`, `recommended_resolution`, etc.
+
 ### Install behavior
 - “Install preset”:
   - copies preset into Electron user storage (`screenHealthStorage`)
@@ -49,7 +54,7 @@ We want presets to feel like **templates you can edit in place**. Since presets 
   - automatically **captures a calibration screenshot** to let user immediately validate/tweak ROIs
 
 ### Preset metadata (required)
-Add a metadata block to each preset (stored alongside the profile) to help users troubleshoot:
+Add a metadata block (`meta`) to each preset **inside the exported JSON** to help users troubleshoot:
 - recommended resolution / aspect ratio
 - HUD scale / UI scaling assumptions
 - borderless/windowed note
