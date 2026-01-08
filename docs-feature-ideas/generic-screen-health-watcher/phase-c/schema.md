@@ -86,7 +86,7 @@ If no empty column is found (all filled):
 
 Clamp to [0,1].
 
-### Step D: smoothing (optional but recommended)
+### Step D: smoothing (deferred)
 If `smoothing.alpha` is present:
 - `health_percent = alpha * health_percent_raw + (1-alpha) * prev_health_percent`
 Else:

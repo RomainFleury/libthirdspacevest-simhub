@@ -72,12 +72,12 @@ Add a metadata block (`meta`) to each preset **inside the exported JSON** to hel
 
 No required schema changes if Phase A schema already supports:
 - multiple ROIs
-- optional `direction` per ROI
+- `direction` can be omitted (treated as **random** for Phase A/B mapping) or set to a fixed direction key
 
 If Phase A shipped minimal ROI support, Phase B can standardize:
 - `detectors[0].rois[]` contains:
   - `name: string`
-  - `direction?: DirectionKey`
+  - `direction?: DirectionKey` (if omitted, behavior is “random”)
   - `rect: {x,y,w,h}` normalized
 
 ---
@@ -97,7 +97,7 @@ If Phase A shipped minimal ROI support, Phase B can standardize:
 
 ### Debugging support
 - Keep ROI crop capture and gallery
-- Add “Capture ROI crops on hit” (optional, off by default) to collect examples for tuning presets
+- (Removed) “Capture ROI crops on hit” — not part of Phase B plan
 
 ---
 

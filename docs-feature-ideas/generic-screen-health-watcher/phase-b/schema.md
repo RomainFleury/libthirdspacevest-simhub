@@ -113,6 +113,10 @@ Optional meta fields:
 }
 ```
 
+Direction note:
+- `rois[].direction` is optional.
+- If omitted, the integration should treat the hit as **random/no-direction** for mapping purposes.
+
 ---
 
 ## 4) Reset-to-preset defaults

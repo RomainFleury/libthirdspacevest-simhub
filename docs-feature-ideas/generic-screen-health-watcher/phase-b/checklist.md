@@ -12,7 +12,7 @@ This checklist is meant to be checked off during implementation of Phase B.
   - [ ] sets installed profile as active
   - [ ] auto-captures a calibration screenshot after install
   - [ ] creates/updates a `meta` block **inside the profile JSON** (hints, last verified, etc.)
-  - [ ] preserves preset id/name metadata for traceability (optional)
+  - [ ] preserves preset traceability via `profile.meta.preset_id` (required)
 - [ ] Implement “Reset to preset defaults”
 - [ ] Add at least 1 real preset profile for validation (can be internal/test-only initially)
 
@@ -27,7 +27,6 @@ This checklist is meant to be checked off during implementation of Phase B.
 ---
 
 ## Debugging / developer ergonomics
-- [ ] (Optional) “Capture ROI crops on hit” toggle (default off)
 - [ ] Improve ROI crop previews / labeling for direction
 
 ---

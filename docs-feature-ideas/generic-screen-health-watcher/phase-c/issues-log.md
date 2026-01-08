@@ -23,6 +23,7 @@
   - Prefer the fastest implementation: per-pixel integer distance checks (L1 / abs-diff), avoid heavy image processing.
 - **Follow-ups**:
   - Decide where segmented/gradient bars land (likely Phase C.1 or later).
+  - Add smoothing only if raw percent is too noisy (deferred).
 
 ### 2026-01-08 — Decision: bar percent uses contiguous fill boundary
 - **Context**: Phase C health percent definition.

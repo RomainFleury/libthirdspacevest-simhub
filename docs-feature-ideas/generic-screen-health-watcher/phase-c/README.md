@@ -28,8 +28,7 @@ Phase C adds an optional detector that tracks a **health bar fill** in an ROI an
     - “health on” color (filled)
     - “health off” color (empty/background)
   - still allow a threshold-based fallback (brightness/saturation) for tough UIs
-- smoothing:
-  - EMA `alpha` or rolling average window
+- smoothing: deferred (Phase C computes raw percent; smoothing can be added later if needed)
 - hit derivation:
   - `min_drop` (e.g. 0.02)
   - `cooldown_ms`
