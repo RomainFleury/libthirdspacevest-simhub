@@ -56,9 +56,9 @@ Add a second detector type:
   "color_sampling": {
     "filled_rgb": [220, 40, 40],
     "empty_rgb": [40, 40, 40],
-    "tolerance": 0.15
+    "tolerance_l1": 120
   },
-  "threshold": { "mode": "brightness", "min": 0.4 }, // optional fallback
+  "threshold_fallback": { "mode": "brightness", "min": 0.4 }, // optional fallback
   "smoothing": { "alpha": 0.3 },
   "hit_on_decrease": { "min_drop": 0.02, "cooldown_ms": 150 }
 }

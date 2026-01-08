@@ -22,5 +22,5 @@
   - “Reset to preset defaults” should be provided.
   - Preset metadata should be embedded **inside the exported profile JSON** (e.g. `profile.meta`) so imports stay self-describing.
 - **Notes**:
-  - Practical implementation: “edit in place” means presets are installed into user storage on first use, then edited there; optionally support “Reset to preset defaults”.
+  - Practical implementation: “edit in place” means presets are installed into user storage on first use, then edited there; support “Reset to preset defaults”.
 

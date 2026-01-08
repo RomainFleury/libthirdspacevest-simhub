@@ -40,7 +40,7 @@ Each preset:
 We want presets to feel like **templates you can edit in place**. Since presets are bundled with the app, the practical behavior should be:
 - On first use, **install** the preset into user storage as a stored profile.
 - After that, edits are applied to that stored profile (so it behaves like “edit in place” for the user).
-- Provide an optional “Reset to preset defaults” action to re-apply the bundled preset.
+- Provide a “Reset to preset defaults” action to re-apply the bundled preset.
 
 ### Preset metadata location: inside exported JSON
 Preset metadata must be embedded **inside the profile JSON** (so export/import stays self-describing), e.g.:

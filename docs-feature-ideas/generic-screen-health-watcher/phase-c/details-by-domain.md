@@ -13,7 +13,7 @@
 Prefer per-pixel integer math (no floats, no sqrt) for per-tick operation:
 - Convert BGRA → RGB cheaply while iterating bytes.
 - If using sampled colors:
-  - compute L1 distance: `abs(r-rf)+abs(g-gf)+abs(b-bf)` and compare to a tolerance threshold
+  - compute L1 distance: `abs(r-rf)+abs(g-gf)+abs(b-bf)` and compare to `tolerance_l1` (int)
   - (optional) also compare distance-to-empty and classify pixel as “filled” if it’s closer to filled than empty
 This keeps CPU cost low even for moderately sized ROIs.
 
@@ -30,7 +30,7 @@ This keeps CPU cost low even for moderately sized ROIs.
 - Add a configuration panel for:
   - ROI selection
   - Phase C scope: horizontal only
-  - sampled filled/empty colors + tolerance
+  - sampled filled/empty colors + `tolerance_l1`
   - threshold/smoothing (fallback/advanced)
 - Add a live readout for:
   - current health percent
