@@ -6,6 +6,9 @@ This checklist is intentionally concrete so we can track implementation progress
 
 ## Daemon / backend
 - [ ] **Integration registry**: register “Generic Screen Health” integration (spec entry)
+- [ ] **Add/Update tests checkpoint (registry)**:
+  - [ ] add integration snapshot entry (registry snapshot test)
+  - [ ] run: `cd modern-third-space && python3 -m pytest tests/test_game_integrations.py -v`
 - [ ] **Manager**: implement a `screen_health_manager` (name TBD) with:
   - [ ] start(profile)
   - [ ] stop()
@@ -19,6 +22,11 @@ This checklist is intentionally concrete so we can track implementation progress
   - [ ] smoothing (optional)
   - [ ] cooldown/debounce
   - [ ] emit standardized `hit` event
+- [ ] **Add/Update tests checkpoint (detector logic)**:
+  - [ ] unit tests: normalized ROI → pixel rect conversion (bounds/clamping/rounding)
+  - [ ] unit tests: redness scoring on synthetic frames (red-dominant vs not)
+  - [ ] unit tests: cooldown/debounce prevents hit spam
+  - [ ] run: `cd modern-third-space && python3 -m pytest -q`
 - [ ] **Haptics**: on hit, trigger **random cell** effect
 - [ ] **Daemon protocol**: add commands
   - [ ] `screen_health.start(profile_json)`
@@ -27,9 +35,8 @@ This checklist is intentionally concrete so we can track implementation progress
 - [ ] **Broadcast events to UI** (optional but recommended for debugging)
   - [ ] `screen_health.hit`
   - [ ] `screen_health.status_changed` (if useful)
-- [ ] **Tests**:
-  - [ ] add integration snapshot entry (registry snapshot test)
-  - [ ] unit tests for ROI normalization and cooldown behavior (if practical)
+- [ ] **Add/Update tests checkpoint (protocol & wiring)**:
+  - [ ] run: `cd modern-third-space && python3 -m pytest -q`
 
 ---
 
@@ -76,6 +83,13 @@ This checklist is intentionally concrete so we can track implementation progress
   - [ ] direction keys: fixed vocabulary
   - [ ] normalized ROI format
 - [ ] Provide at least one **example default profile** JSON for testing
+
+---
+
+## Phase A completion gate (tests)
+- [ ] **Run full relevant tests (minimum)**:
+  - [ ] `cd modern-third-space && python3 -m pytest tests/test_game_integrations.py -v`
+  - [ ] `cd modern-third-space && python3 -m pytest -q`
 
 ---
 
