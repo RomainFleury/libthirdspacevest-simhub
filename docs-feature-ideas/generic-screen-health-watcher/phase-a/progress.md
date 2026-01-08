@@ -43,6 +43,6 @@ This is a living checklist intended to be updated during implementation. It exis
 
 ## Notes / links
 - Design docs:
-  - `docs-feature-ideas/feature-generic-screen-health-watcher-phased-plan.md`
-  - `docs-feature-ideas/feature-generic-screen-health-watcher-phase-a-checklist.md`
-  - `docs-feature-ideas/feature-generic-screen-health-watcher-phase-a-details-by-domain.md`
+  - `docs-feature-ideas/generic-screen-health-watcher/conception/phased-plan.md`
+  - `docs-feature-ideas/generic-screen-health-watcher/phase-a/checklist.md`
+  - `docs-feature-ideas/generic-screen-health-watcher/phase-a/details-by-domain.md`
