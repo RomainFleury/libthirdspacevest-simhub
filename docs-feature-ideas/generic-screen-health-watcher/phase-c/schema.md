@@ -47,6 +47,9 @@ Example:
 
 Phase C defines health percent for horizontal bars as follows:
 
+### Assumption (Phase C)
+The ROI tightly contains the **entire health bar**, and the filled portion is a **single contiguous region** starting at the **left edge** of the ROI.
+
 ### Step A: classify pixels (per-tick, per ROI)
 Given a pixel RGB = (r,g,b):
 - Compute L1 distance to filled: `df = |r-rf| + |g-gf| + |b-bf|`
@@ -67,10 +70,19 @@ Let ROI width = W, height = H.
 Canonical constants:
 - `column_threshold = 0.5` (at least half the column matches “filled”)
 
-### Step C: compute bar fill percentage
-Compute:
-- `filled_columns = count(x where column_filled[x] == true)`
-- `health_percent_raw = filled_columns / W`
+### Step C: compute bar fill percentage (contiguous-width model)
+Compute the **boundary** between filled and empty by scanning from **left → right**:
+
+- Find the smallest `x_boundary` such that:
+  - `column_filled[x_boundary] == false`
+  - and `column_filled[x] == true` for most `x < x_boundary` (i.e. the left side is filled)
+
+Canonical rule:
+- `x_boundary = first x where column_filled[x] == false`
+- `health_percent_raw = x_boundary / W`
+
+If no empty column is found (all filled):
+- `health_percent_raw = 1.0`
 
 Clamp to [0,1].
 
@@ -79,6 +91,11 @@ If `smoothing.alpha` is present:
 - `health_percent = alpha * health_percent_raw + (1-alpha) * prev_health_percent`
 Else:
 - `health_percent = health_percent_raw`
+
+### Fallback note (non-canonical)
+If some games violate the “contiguous filled region” assumption (e.g. segmented bars with gaps), a fallback is:
+- `health_percent_raw = filled_columns / W`
+but Phase C’s canonical definition is the boundary scan above.
 
 ---
 

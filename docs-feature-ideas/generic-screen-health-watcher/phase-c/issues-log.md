@@ -24,3 +24,8 @@
 - **Follow-ups**:
   - Decide where segmented/gradient bars land (likely Phase C.1 or later).
 
+### 2026-01-08 — Decision: bar percent uses contiguous fill boundary
+- **Context**: Phase C health percent definition.
+- **Decision**: Assume ROI contains the full bar and compute `health_percent` as the **contiguous filled width from the left edge** (boundary scan), rather than global filled pixel ratio.
+- **Rationale**: Faster and often more stable for typical horizontal health bars.
+
