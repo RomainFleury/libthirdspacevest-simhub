@@ -1,14 +1,14 @@
 import type { ScreenHealthPreset } from "../../../../data/screenHealthPresets";
+import { useScreenHealthConfig } from "../state/context";
 
 export function PresetProfilesSection(props: {
   presets: ScreenHealthPreset[];
-  selectedPresetId: string;
-  setSelectedPresetId: (id: string) => void;
   onInstall: () => void;
   onResetToDefaults: () => void;
   activeProfileMeta?: any;
 }) {
-  const { presets, selectedPresetId, setSelectedPresetId, onInstall, onResetToDefaults, activeProfileMeta } = props;
+  const { presets, onInstall, onResetToDefaults, activeProfileMeta } = props;
+  const { state, dispatch } = useScreenHealthConfig();
   const presetId = activeProfileMeta?.preset_id;
   const hints: string[] = Array.isArray(activeProfileMeta?.hints) ? activeProfileMeta.hints : [];
 
@@ -17,8 +17,8 @@ export function PresetProfilesSection(props: {
       <h3 className="text-sm font-semibold text-white">Preset profiles</h3>
       <div className="flex flex-wrap items-center gap-3">
         <select
-          value={selectedPresetId}
-          onChange={(e) => setSelectedPresetId(e.target.value)}
+          value={state.selectedPresetId}
+          onChange={(e) => dispatch({ type: "setSelectedPresetId", value: e.target.value })}
           className="rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
         >
           {presets.map((p) => (

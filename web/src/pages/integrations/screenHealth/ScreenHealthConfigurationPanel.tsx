@@ -13,14 +13,7 @@ import { DetectorSelectionSection } from "./sections/DetectorSelectionSection";
 import { CalibrationCanvasSection } from "./sections/CalibrationCanvasSection";
 import { RoiListSection } from "./sections/RoiListSection";
 import { ScreenshotsSection } from "./sections/ScreenshotsSection";
-
-type RoiDraft = {
-  name: string;
-  direction?: string | null;
-  rect: { x: number; y: number; w: number; h: number };
-};
-
-type DetectorType = "redness_rois" | "health_bar" | "health_number";
+import { ScreenHealthConfigProvider, useScreenHealthConfig } from "./state/context";
 
 type Props = {
   profiles: ScreenHealthStoredProfile[];
@@ -48,6 +41,15 @@ type Props = {
 };
 
 export function ScreenHealthConfigurationPanel(props: Props) {
+  const defaultPresetId = SCREEN_HEALTH_PRESETS[0]?.preset_id || "";
+  return (
+    <ScreenHealthConfigProvider defaultPresetId={defaultPresetId}>
+      <ScreenHealthConfigurationPanelInner {...props} />
+    </ScreenHealthConfigProvider>
+  );
+}
+
+function ScreenHealthConfigurationPanelInner(props: Props) {
   const {
     profiles,
     activeProfileId,
@@ -70,221 +72,83 @@ export function ScreenHealthConfigurationPanel(props: Props) {
     captureRoiDebugImages,
   } = props;
 
-  // Draft editor state (derived from activeProfile)
-  const [profileName, setProfileName] = useState<string>("Default");
-  const [monitorIndex, setMonitorIndex] = useState<number>(1);
-  const [tickMs, setTickMs] = useState<number>(50);
-  const [detectorType, setDetectorType] = useState<DetectorType>("redness_rois");
-
-  // Redness detector state
-  const [minScore, setMinScore] = useState<number>(0.35);
-  const [cooldownMs, setCooldownMs] = useState<number>(200);
-  const [rois, setRois] = useState<RoiDraft[]>([]);
-
-  // Health bar detector state
-  const [healthBarRoi, setHealthBarRoi] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
-  const [healthBarMode, setHealthBarMode] = useState<"color_sampling" | "threshold_fallback">("color_sampling");
-  const [filledRgb, setFilledRgb] = useState<[number, number, number]>([220, 40, 40]);
-  const [emptyRgb, setEmptyRgb] = useState<[number, number, number]>([40, 40, 40]);
-  const [toleranceL1, setToleranceL1] = useState<number>(120);
-  const [hbFallbackMode, setHbFallbackMode] = useState<"brightness" | "saturation">("brightness");
-  const [hbFallbackMin, setHbFallbackMin] = useState<number>(0.5);
-  const [hitMinDrop, setHitMinDrop] = useState<number>(0.02);
-  const [hitCooldownMs, setHitCooldownMs] = useState<number>(150);
-  const [colorPickMode, setColorPickMode] = useState<null | "filled" | "empty">(null);
-
-  // Health number OCR detector state
-  const [healthNumberRoi, setHealthNumberRoi] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
-  const [healthNumberDigits, setHealthNumberDigits] = useState<number>(3);
-  const [hnInvert, setHnInvert] = useState<boolean>(false);
-  const [hnThreshold, setHnThreshold] = useState<number>(0.6);
-  const [hnScale, setHnScale] = useState<number>(2);
-  const [hnReadMin, setHnReadMin] = useState<number>(0);
-  const [hnReadMax, setHnReadMax] = useState<number>(300);
-  const [hnStableReads, setHnStableReads] = useState<number>(2);
-  const [hnHitMinDrop, setHnHitMinDrop] = useState<number>(1);
-  const [hnHitCooldownMs, setHnHitCooldownMs] = useState<number>(150);
-  const [hnHammingMax, setHnHammingMax] = useState<number>(120);
-  const [hnTemplateSize, setHnTemplateSize] = useState<{ w: number; h: number }>({ w: 16, h: 24 });
-  const [hnTemplates, setHnTemplates] = useState<Record<string, string>>({});
-  const [hnLearnValue, setHnLearnValue] = useState<string>("");
-  const [hnCalibrationError, setHnCalibrationError] = useState<string | null>(null);
-  const [hnTestResult, setHnTestResult] = useState<{ value: number | null; digits?: string; reason?: string } | null>(null);
-
-  const [selectedPresetId, setSelectedPresetId] = useState<string>(SCREEN_HEALTH_PRESETS[0]?.preset_id || "");
+  const { state, dispatch } = useScreenHealthConfig();
 
   useEffect(() => {
     if (!activeProfile?.profile) return;
-    const p: any = activeProfile.profile;
-    setProfileName(activeProfile.name || p.name || "Unnamed Profile");
-    setMonitorIndex(Number(p.capture?.monitor_index || 1));
-    setTickMs(Number(p.capture?.tick_ms || 50));
-
-    const detectors: any[] = Array.isArray(p.detectors) ? p.detectors : [];
-    const hb = detectors.find((d: any) => d.type === "health_bar");
-    const hn = detectors.find((d: any) => d.type === "health_number");
-    const red = detectors.find((d: any) => d.type === "redness_rois");
-
-    if (hn) {
-      setDetectorType("health_number");
-      setHealthNumberRoi({
-        x: Number(hn.roi?.x ?? 0),
-        y: Number(hn.roi?.y ?? 0),
-        w: Number(hn.roi?.w ?? 0.12),
-        h: Number(hn.roi?.h ?? 0.06),
-      });
-      setHealthNumberDigits(Number(hn.digits ?? 3));
-      setHnInvert(Boolean(hn.preprocess?.invert ?? false));
-      setHnThreshold(Number(hn.preprocess?.threshold ?? 0.6));
-      setHnScale(Number(hn.preprocess?.scale ?? 2));
-      setHnReadMin(Number(hn.readout?.min ?? 0));
-      setHnReadMax(Number(hn.readout?.max ?? 300));
-      setHnStableReads(Number(hn.readout?.stable_reads ?? 2));
-      setHnHitMinDrop(Number(hn.hit_on_decrease?.min_drop ?? 1));
-      setHnHitCooldownMs(Number(hn.hit_on_decrease?.cooldown_ms ?? 150));
-      setHnHammingMax(Number(hn.templates?.hamming_max ?? 120));
-      setHnTemplateSize({
-        w: Number(hn.templates?.width ?? 16),
-        h: Number(hn.templates?.height ?? 24),
-      });
-      const digitsMap = hn.templates?.digits;
-      if (digitsMap && typeof digitsMap === "object") {
-        const next: Record<string, string> = {};
-        for (const k of Object.keys(digitsMap)) {
-          const v = (digitsMap as any)[k];
-          if (typeof v === "string") next[String(k)] = v;
-        }
-        setHnTemplates(next);
-      } else {
-        setHnTemplates({});
-      }
-      setColorPickMode(null);
-      setHnCalibrationError(null);
-      setHnTestResult(null);
-    } else if (hb) {
-      setDetectorType("health_bar");
-      setHealthBarRoi({
-        x: Number(hb.roi?.x ?? 0),
-        y: Number(hb.roi?.y ?? 0),
-        w: Number(hb.roi?.w ?? 0.3),
-        h: Number(hb.roi?.h ?? 0.03),
-      });
-      const cs = hb.color_sampling;
-      const fb = hb.threshold_fallback;
-      if (cs) setHealthBarMode("color_sampling");
-      else if (fb) setHealthBarMode("threshold_fallback");
-      if (Array.isArray(cs?.filled_rgb) && cs.filled_rgb.length === 3) {
-        setFilledRgb([
-          clampInt(Number(cs.filled_rgb[0]), 0, 255),
-          clampInt(Number(cs.filled_rgb[1]), 0, 255),
-          clampInt(Number(cs.filled_rgb[2]), 0, 255),
-        ]);
-      }
-      if (Array.isArray(cs?.empty_rgb) && cs.empty_rgb.length === 3) {
-        setEmptyRgb([
-          clampInt(Number(cs.empty_rgb[0]), 0, 255),
-          clampInt(Number(cs.empty_rgb[1]), 0, 255),
-          clampInt(Number(cs.empty_rgb[2]), 0, 255),
-        ]);
-      }
-      setToleranceL1(clampInt(Number(cs?.tolerance_l1 ?? 120), 0, 765));
-      if (fb) {
-        setHbFallbackMode((fb.mode as "brightness" | "saturation") || "brightness");
-        setHbFallbackMin(Number(fb.min ?? 0.5));
-      }
-      setHitMinDrop(Number(hb.hit_on_decrease?.min_drop ?? 0.02));
-      setHitCooldownMs(Number(hb.hit_on_decrease?.cooldown_ms ?? 150));
-      setColorPickMode(null);
-    } else {
-      setDetectorType("redness_rois");
-      setMinScore(Number(red?.threshold?.min_score ?? 0.35));
-      setCooldownMs(Number(red?.cooldown_ms ?? 200));
-      const srcRois: any[] = Array.isArray(red?.rois) ? red.rois : [];
-      setRois(
-        srcRois.map((r, idx) => ({
-          name: String(r.name || `roi_${idx}`),
-          direction: r.direction || "",
-          rect: {
-            x: Number(r.rect?.x ?? 0),
-            y: Number(r.rect?.y ?? 0),
-            w: Number(r.rect?.w ?? 0.1),
-            h: Number(r.rect?.h ?? 0.1),
-          },
-        }))
-      );
-    }
+    dispatch({ type: "initFromActiveProfile", value: activeProfile.profile, wrapperName: activeProfile.name });
   }, [activeProfile]);
 
   const daemonProfile = useMemo(() => {
-    if (detectorType === "health_bar") {
-      const roi = healthBarRoi ?? { x: 0.1, y: 0.9, w: 0.3, h: 0.03 };
+    if (state.detectorType === "health_bar") {
+      const roi = state.healthBar.roi ?? { x: 0.1, y: 0.9, w: 0.3, h: 0.03 };
       return {
         schema_version: 0,
-        name: profileName,
+        name: state.profileName,
         meta: (activeProfile?.profile as any)?.meta,
-        capture: { source: "monitor", monitor_index: monitorIndex, tick_ms: tickMs },
+        capture: { source: "monitor", monitor_index: state.monitorIndex, tick_ms: state.tickMs },
         detectors: [
           {
             type: "health_bar",
             name: "health_bar",
             roi: { x: clamp01(roi.x), y: clamp01(roi.y), w: clamp01(roi.w), h: clamp01(roi.h) },
             orientation: "horizontal",
-            ...(healthBarMode === "color_sampling"
+            ...(state.healthBar.mode === "color_sampling"
               ? {
                   color_sampling: {
-                    filled_rgb: filledRgb.map((v) => clampInt(v, 0, 255)),
-                    empty_rgb: emptyRgb.map((v) => clampInt(v, 0, 255)),
-                    tolerance_l1: clampInt(toleranceL1, 0, 765),
+                    filled_rgb: state.healthBar.filledRgb.map((v) => clampInt(v, 0, 255)),
+                    empty_rgb: state.healthBar.emptyRgb.map((v) => clampInt(v, 0, 255)),
+                    tolerance_l1: clampInt(state.healthBar.toleranceL1, 0, 765),
                   },
                 }
               : {
                   threshold_fallback: {
-                    mode: hbFallbackMode,
-                    min: Math.max(0, Math.min(1, hbFallbackMin)),
+                    mode: state.healthBar.fallbackMode,
+                    min: Math.max(0, Math.min(1, state.healthBar.fallbackMin)),
                   },
                 }),
             hit_on_decrease: {
-              min_drop: Math.max(0, Math.min(1, hitMinDrop)),
-              cooldown_ms: Math.max(0, Math.floor(hitCooldownMs)),
+              min_drop: Math.max(0, Math.min(1, state.healthBar.hitMinDrop)),
+              cooldown_ms: Math.max(0, Math.floor(state.healthBar.hitCooldownMs)),
             },
           },
         ],
       };
     }
 
-    if (detectorType === "health_number") {
-      const roi = healthNumberRoi ?? { x: 0.05, y: 0.9, w: 0.12, h: 0.06 };
+    if (state.detectorType === "health_number") {
+      const roi = state.healthNumber.roi ?? { x: 0.05, y: 0.9, w: 0.12, h: 0.06 };
       return {
         schema_version: 0,
-        name: profileName,
+        name: state.profileName,
         meta: (activeProfile?.profile as any)?.meta,
-        capture: { source: "monitor", monitor_index: monitorIndex, tick_ms: tickMs },
+        capture: { source: "monitor", monitor_index: state.monitorIndex, tick_ms: state.tickMs },
         detectors: [
           {
             type: "health_number",
             name: "health_number",
             roi: { x: clamp01(roi.x), y: clamp01(roi.y), w: clamp01(roi.w), h: clamp01(roi.h) },
-            digits: Math.max(1, Math.floor(healthNumberDigits)),
+            digits: Math.max(1, Math.floor(state.healthNumber.digits)),
             preprocess: {
-              invert: Boolean(hnInvert),
-              threshold: Math.max(0, Math.min(1, hnThreshold)),
-              scale: Math.max(1, Math.floor(hnScale)),
+              invert: Boolean(state.healthNumber.invert),
+              threshold: Math.max(0, Math.min(1, state.healthNumber.threshold)),
+              scale: Math.max(1, Math.floor(state.healthNumber.scale)),
             },
             readout: {
-              min: Math.floor(hnReadMin),
-              max: Math.floor(hnReadMax),
-              stable_reads: Math.max(1, Math.floor(hnStableReads)),
+              min: Math.floor(state.healthNumber.readMin),
+              max: Math.floor(state.healthNumber.readMax),
+              stable_reads: Math.max(1, Math.floor(state.healthNumber.stableReads)),
             },
             templates: {
               template_set_id: "learned_v1",
-              hamming_max: Math.max(0, Math.floor(hnHammingMax)),
-              width: hnTemplateSize.w,
-              height: hnTemplateSize.h,
-              digits: hnTemplates,
+              hamming_max: Math.max(0, Math.floor(state.healthNumber.hammingMax)),
+              width: state.healthNumber.templateSize.w,
+              height: state.healthNumber.templateSize.h,
+              digits: state.healthNumber.templates,
             },
             hit_on_decrease: {
-              min_drop: Math.max(1, Math.floor(hnHitMinDrop)),
-              cooldown_ms: Math.max(0, Math.floor(hnHitCooldownMs)),
+              min_drop: Math.max(1, Math.floor(state.healthNumber.hitMinDrop)),
+              cooldown_ms: Math.max(0, Math.floor(state.healthNumber.hitCooldownMs)),
             },
           },
         ],
@@ -293,15 +157,15 @@ export function ScreenHealthConfigurationPanel(props: Props) {
 
     return {
       schema_version: 0,
-      name: profileName,
+      name: state.profileName,
       meta: (activeProfile?.profile as any)?.meta,
-      capture: { source: "monitor", monitor_index: monitorIndex, tick_ms: tickMs },
+      capture: { source: "monitor", monitor_index: state.monitorIndex, tick_ms: state.tickMs },
       detectors: [
         {
           type: "redness_rois",
-          cooldown_ms: cooldownMs,
-          threshold: { min_score: minScore },
-          rois: rois.map((r) => ({
+          cooldown_ms: state.redness.cooldownMs,
+          threshold: { min_score: state.redness.minScore },
+          rois: state.redness.rois.map((r) => ({
             name: r.name,
             direction: r.direction || undefined,
             rect: {
@@ -314,47 +178,14 @@ export function ScreenHealthConfigurationPanel(props: Props) {
         },
       ],
     };
-  }, [
-    detectorType,
-    profileName,
-    monitorIndex,
-    tickMs,
-    // redness
-    cooldownMs,
-    minScore,
-    rois,
-    // health bar
-    healthBarRoi,
-    healthBarMode,
-    filledRgb,
-    emptyRgb,
-    toleranceL1,
-    hbFallbackMode,
-    hbFallbackMin,
-    hitMinDrop,
-    hitCooldownMs,
-    // health number
-    healthNumberRoi,
-    healthNumberDigits,
-    hnInvert,
-    hnThreshold,
-    hnScale,
-    hnReadMin,
-    hnReadMax,
-    hnStableReads,
-    hnHitMinDrop,
-    hnHitCooldownMs,
-    hnHammingMax,
-    hnTemplateSize,
-    hnTemplates,
-    activeProfile?.profile,
-  ]);
+  }, [state, activeProfile?.profile]);
 
   // If template size changes, existing learned bitstrings are invalid.
   useEffect(() => {
-    setHnTemplates({});
-    setHnTestResult(null);
-  }, [hnTemplateSize.w, hnTemplateSize.h]);
+    dispatch({ type: "setHealthNumberTemplates", value: {} });
+    dispatch({ type: "setHealthNumberTestResult", value: null });
+    dispatch({ type: "setHealthNumberCalibrationError", value: null });
+  }, [state.healthNumber.templateSize.w, state.healthNumber.templateSize.h]);
 
   const [saving, setSaving] = useState(false);
   const handleSave = async () => {
@@ -363,7 +194,7 @@ export function ScreenHealthConfigurationPanel(props: Props) {
     try {
       await saveProfile({
         id: activeProfileId,
-        name: profileName,
+        name: state.profileName,
         profile: daemonProfile,
         createdAt: activeProfile?.createdAt,
       } as any);
@@ -389,7 +220,7 @@ export function ScreenHealthConfigurationPanel(props: Props) {
   };
 
   const handleInstallPreset = async () => {
-    const preset = SCREEN_HEALTH_PRESETS.find((p) => p.preset_id === selectedPresetId);
+    const preset = SCREEN_HEALTH_PRESETS.find((p) => p.preset_id === state.selectedPresetId);
     if (!preset) return;
 
     const existingId = findInstalledPresetProfileId(preset.preset_id);
@@ -423,7 +254,7 @@ export function ScreenHealthConfigurationPanel(props: Props) {
   };
 
   const handleCapture = async () => {
-    await captureCalibrationScreenshot(monitorIndex);
+    await captureCalibrationScreenshot(state.monitorIndex);
   };
 
   // Calibration screenshot editor
@@ -450,7 +281,7 @@ export function ScreenHealthConfigurationPanel(props: Props) {
   }, [lastCapturedImage?.dataUrl]);
 
   const pickColorAtMouse = (e: React.MouseEvent) => {
-    if (!colorPickMode || !imgContainerRef.current) return false;
+    if (!state.colorPickMode || !imgContainerRef.current) return false;
     const canvas = offscreenCanvasRef.current;
     if (!canvas || !imageLoadedRef.current) return false;
     const ctx = canvas.getContext("2d");
@@ -463,9 +294,9 @@ export function ScreenHealthConfigurationPanel(props: Props) {
     const py = clampInt(Math.floor(ny * canvas.height), 0, canvas.height - 1);
     const data = ctx.getImageData(px, py, 1, 1).data; // RGBA
     const rgb: [number, number, number] = [data[0], data[1], data[2]];
-    if (colorPickMode === "filled") setFilledRgb(rgb);
-    else setEmptyRgb(rgb);
-    setColorPickMode(null);
+    if (state.colorPickMode === "filled") dispatch({ type: "setHealthBarFilledRgb", value: rgb });
+    else dispatch({ type: "setHealthBarEmptyRgb", value: rgb });
+    dispatch({ type: "setColorPickMode", value: null });
     return true;
   };
 
@@ -499,58 +330,60 @@ export function ScreenHealthConfigurationPanel(props: Props) {
     if (w < 5 || h < 5) return;
 
     const newRect = { x: clamp01(x1 / rect.width), y: clamp01(y1 / rect.height), w: clamp01(w / rect.width), h: clamp01(h / rect.height) };
-    if (detectorType === "health_bar") setHealthBarRoi(newRect);
-    else if (detectorType === "health_number") setHealthNumberRoi(newRect);
-    else setRois((prev) => [...prev, { name: `roi_${rois.length + 1}`, direction: "", rect: newRect }]);
+    if (state.detectorType === "health_bar") dispatch({ type: "setHealthBarRoi", value: newRect });
+    else if (state.detectorType === "health_number") dispatch({ type: "setHealthNumberRoi", value: newRect });
+    else
+      dispatch({
+        type: "setRednessRois",
+        value: [...state.redness.rois, { name: `roi_${state.redness.rois.length + 1}`, direction: "", rect: newRect }],
+      });
   };
 
   const handleLearnTemplates = () => {
-    setHnCalibrationError(null);
-    setHnTestResult(null);
-    if (!healthNumberRoi) throw new Error("No health number ROI set");
+    dispatch({ type: "setHealthNumberCalibrationError", value: null });
+    dispatch({ type: "setHealthNumberTestResult", value: null });
+    if (!state.healthNumber.roi) throw new Error("No health number ROI set");
     const canvas = offscreenCanvasRef.current;
     if (!canvas || !imageLoadedRef.current) throw new Error("No screenshot loaded");
-    const digitsCount = Math.max(1, Math.floor(healthNumberDigits));
+    const digitsCount = Math.max(1, Math.floor(state.healthNumber.digits));
     const next = learnDigitTemplatesFromCanvas({
       canvas,
-      roi: healthNumberRoi,
+      roi: state.healthNumber.roi,
       digitsCount,
-      displayedValue: hnLearnValue,
-      threshold: hnThreshold,
-      invert: hnInvert,
-      scale: hnScale,
-      templateSize: hnTemplateSize,
-      prevTemplates: hnTemplates,
+      displayedValue: state.healthNumber.learnValue,
+      threshold: state.healthNumber.threshold,
+      invert: state.healthNumber.invert,
+      scale: state.healthNumber.scale,
+      templateSize: state.healthNumber.templateSize,
+      prevTemplates: state.healthNumber.templates,
     });
-    setHnTemplates(next);
+    dispatch({ type: "setHealthNumberTemplates", value: next });
   };
 
   const handleTestOcrOnce = () => {
-    setHnCalibrationError(null);
-    if (!healthNumberRoi) throw new Error("No health number ROI set");
+    dispatch({ type: "setHealthNumberCalibrationError", value: null });
+    if (!state.healthNumber.roi) throw new Error("No health number ROI set");
     const canvas = offscreenCanvasRef.current;
     if (!canvas || !imageLoadedRef.current) throw new Error("No screenshot loaded");
-    const digitsCount = Math.max(1, Math.floor(healthNumberDigits));
+    const digitsCount = Math.max(1, Math.floor(state.healthNumber.digits));
     const result = tryReadDigitValueFromCanvas({
       canvas,
-      roi: healthNumberRoi,
+      roi: state.healthNumber.roi,
       digitsCount,
-      threshold: hnThreshold,
-      invert: hnInvert,
-      scale: hnScale,
-      templateSize: hnTemplateSize,
-      templates: hnTemplates,
-      hammingMax: hnHammingMax,
+      threshold: state.healthNumber.threshold,
+      invert: state.healthNumber.invert,
+      scale: state.healthNumber.scale,
+      templateSize: state.healthNumber.templateSize,
+      templates: state.healthNumber.templates,
+      hammingMax: state.healthNumber.hammingMax,
     });
-    setHnTestResult(result);
+    dispatch({ type: "setHealthNumberTestResult", value: result });
   };
 
   return (
     <div className="space-y-6">
       <PresetProfilesSection
         presets={SCREEN_HEALTH_PRESETS}
-        selectedPresetId={selectedPresetId}
-        setSelectedPresetId={setSelectedPresetId}
         onInstall={handleInstallPreset}
         onResetToDefaults={handleResetToPresetDefaults}
         activeProfileMeta={(activeProfile?.profile as any)?.meta}
@@ -564,135 +397,81 @@ export function ScreenHealthConfigurationPanel(props: Props) {
         onExport={() => activeProfileId && exportProfile(activeProfileId)}
         onImport={importProfile}
         onDelete={() => activeProfileId && deleteProfile(activeProfileId)}
-        profileName={profileName}
-        setProfileName={setProfileName}
+        profileName={state.profileName}
+        setProfileName={(v) => dispatch({ type: "setProfileName", value: v })}
         onSave={handleSave}
         saving={saving}
       />
 
-      <CaptureSettingsSection
-        monitorIndex={monitorIndex}
-        setMonitorIndex={setMonitorIndex}
-        tickMs={tickMs}
-        setTickMs={setTickMs}
-        onCapture={handleCapture}
-      />
+      <CaptureSettingsSection onCapture={handleCapture} />
 
-      <DetectorSelectionSection detectorType={detectorType} setDetectorType={setDetectorType} />
+      <DetectorSelectionSection />
 
       <CalibrationCanvasSection
         lastCapturedImage={lastCapturedImage}
-        detectorType={detectorType}
-        colorPickMode={colorPickMode}
         imgContainerRef={imgContainerRef}
         offscreenCanvasRef={offscreenCanvasRef}
         drawing={drawing}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        rois={rois}
-        healthBarRoi={healthBarRoi}
-        healthNumberRoi={healthNumberRoi}
       />
 
       {/* Detector settings */}
-      {detectorType === "redness_rois" ? (
+      {state.detectorType === "redness_rois" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <label className="text-sm text-slate-400 block mb-1">Min redness score (0-1)</label>
-            <input type="number" step={0.01} min={0} max={1} value={minScore} onChange={(e) => setMinScore(parseFloat(e.target.value) || 0)} className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10" />
+            <input
+              type="number"
+              step={0.01}
+              min={0}
+              max={1}
+              value={state.redness.minScore}
+              onChange={(e) => dispatch({ type: "setRednessMinScore", value: parseFloat(e.target.value) || 0 })}
+              className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
+            />
           </div>
           <div>
             <label className="text-sm text-slate-400 block mb-1">Cooldown (ms)</label>
-            <input type="number" min={0} value={cooldownMs} onChange={(e) => setCooldownMs(parseInt(e.target.value, 10) || 0)} className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10" />
+            <input
+              type="number"
+              min={0}
+              value={state.redness.cooldownMs}
+              onChange={(e) => dispatch({ type: "setRednessCooldownMs", value: parseInt(e.target.value, 10) || 0 })}
+              className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
+            />
           </div>
         </div>
-      ) : detectorType === "health_bar" ? (
-        <HealthBarSettings
-          mode={healthBarMode}
-          setMode={setHealthBarMode}
-          filledRgb={filledRgb}
-          setFilledRgb={setFilledRgb}
-          emptyRgb={emptyRgb}
-          setEmptyRgb={setEmptyRgb}
-          toleranceL1={toleranceL1}
-          setToleranceL1={setToleranceL1}
-          hitMinDrop={hitMinDrop}
-          setHitMinDrop={setHitMinDrop}
-          hitCooldownMs={hitCooldownMs}
-          setHitCooldownMs={setHitCooldownMs}
-          colorPickMode={colorPickMode}
-          setColorPickMode={setColorPickMode}
-          fallbackMode={hbFallbackMode}
-          setFallbackMode={setHbFallbackMode}
-          fallbackMin={hbFallbackMin}
-          setFallbackMin={setHbFallbackMin}
-        />
+      ) : state.detectorType === "health_bar" ? (
+        <HealthBarSettings />
       ) : (
         <HealthNumberSettings
-          digits={healthNumberDigits}
-          setDigits={setHealthNumberDigits}
-          threshold={hnThreshold}
-          setThreshold={setHnThreshold}
-          scale={hnScale}
-          setScale={setHnScale}
-          invert={hnInvert}
-          setInvert={setHnInvert}
-          readMin={hnReadMin}
-          setReadMin={setHnReadMin}
-          readMax={hnReadMax}
-          setReadMax={setHnReadMax}
-          stableReads={hnStableReads}
-          setStableReads={setHnStableReads}
-          hammingMax={hnHammingMax}
-          setHammingMax={setHnHammingMax}
-          templateW={hnTemplateSize.w}
-          setTemplateW={(v) => setHnTemplateSize((p) => ({ ...p, w: v }))}
-          templateH={hnTemplateSize.h}
-          setTemplateH={(v) => setHnTemplateSize((p) => ({ ...p, h: v }))}
-          hitMinDrop={hnHitMinDrop}
-          setHitMinDrop={setHnHitMinDrop}
-          hitCooldownMs={hnHitCooldownMs}
-          setHitCooldownMs={setHnHitCooldownMs}
-          learnValue={hnLearnValue}
-          setLearnValue={setHnLearnValue}
           onLearn={() => {
             try {
               handleLearnTemplates();
             } catch (e) {
-              setHnCalibrationError(e instanceof Error ? e.message : "Failed to learn templates");
+              dispatch({ type: "setHealthNumberCalibrationError", value: e instanceof Error ? e.message : "Failed to learn templates" });
             }
           }}
           onTest={() => {
             try {
               handleTestOcrOnce();
             } catch (e) {
-              setHnCalibrationError(e instanceof Error ? e.message : "Failed to test OCR");
+              dispatch({ type: "setHealthNumberCalibrationError", value: e instanceof Error ? e.message : "Failed to test OCR" });
             }
           }}
           onClearTemplates={() => {
-            setHnTemplates({});
-            setHnTestResult(null);
-            setHnCalibrationError(null);
+            dispatch({ type: "setHealthNumberTemplates", value: {} });
+            dispatch({ type: "setHealthNumberTestResult", value: null });
+            dispatch({ type: "setHealthNumberCalibrationError", value: null });
           }}
-          learnedDigits={Object.keys(hnTemplates).sort().join(", ")}
-          error={hnCalibrationError}
-          testResult={hnTestResult}
+          learnedDigits={Object.keys(state.healthNumber.templates).sort().join(", ")}
         />
       )}
 
       {/* ROIs */}
-      <RoiListSection
-        detectorType={detectorType}
-        monitorIndex={monitorIndex}
-        captureRoiDebugImages={captureRoiDebugImages}
-        rois={rois}
-        setRois={setRois}
-        healthBarRoi={healthBarRoi}
-        setHealthBarRoi={setHealthBarRoi}
-        healthNumberRoi={healthNumberRoi}
-        setHealthNumberRoi={setHealthNumberRoi}
-      />
+      <RoiListSection captureRoiDebugImages={captureRoiDebugImages} />
 
       {/* Screenshot retention + gallery */}
       <ScreenshotsSection

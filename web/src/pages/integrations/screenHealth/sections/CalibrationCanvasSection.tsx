@@ -1,33 +1,22 @@
 import type { RefObject } from "react";
+import { useScreenHealthConfig } from "../state/context";
 
 export function CalibrationCanvasSection(props: {
   lastCapturedImage: { dataUrl: string } | null;
-  detectorType: "redness_rois" | "health_bar" | "health_number";
-  colorPickMode: null | "filled" | "empty";
   imgContainerRef: RefObject<HTMLDivElement>;
   offscreenCanvasRef: RefObject<HTMLCanvasElement>;
   drawing: { startX: number; startY: number; curX: number; curY: number } | null;
   onMouseDown: (e: any) => void;
   onMouseMove: (e: any) => void;
   onMouseUp: () => void;
-  rois: Array<{ name: string; rect: { x: number; y: number; w: number; h: number } }>;
-  healthBarRoi: { x: number; y: number; w: number; h: number } | null;
-  healthNumberRoi: { x: number; y: number; w: number; h: number } | null;
 }) {
-  const {
-    lastCapturedImage,
-    detectorType,
-    colorPickMode,
-    imgContainerRef,
-    offscreenCanvasRef,
-    drawing,
-    onMouseDown,
-    onMouseMove,
-    onMouseUp,
-    rois,
-    healthBarRoi,
-    healthNumberRoi,
-  } = props;
+  const { state } = useScreenHealthConfig();
+  const { lastCapturedImage, imgContainerRef, offscreenCanvasRef, drawing, onMouseDown, onMouseMove, onMouseUp } = props;
+  const detectorType = state.detectorType;
+  const colorPickMode = state.colorPickMode;
+  const rois = state.redness.rois;
+  const healthBarRoi = state.healthBar.roi;
+  const healthNumberRoi = state.healthNumber.roi;
 
   if (!lastCapturedImage) return null;
 
