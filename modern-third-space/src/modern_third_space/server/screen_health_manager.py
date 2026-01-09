@@ -116,6 +116,66 @@ def redness_score_from_bgra(raw_bgra: bytes, width: int, height: int) -> float:
     return max(0.0, min(1.0, total / float(count)))
 
 
+def health_bar_percent_from_bgra(
+    raw_bgra: bytes,
+    width: int,
+    height: int,
+    *,
+    filled_rgb: Tuple[int, int, int],
+    empty_rgb: Tuple[int, int, int],
+    tolerance_l1: int,
+    column_threshold: float = 0.5,
+) -> float:
+    """
+    Compute a horizontal health bar fill percent in [0,1] from BGRA bytes.
+
+    Canonical Phase C algorithm:
+    - Classify each pixel as filled if:
+        df = L1(pixel_rgb, filled_rgb)
+        de = L1(pixel_rgb, empty_rgb)
+        df <= tolerance_l1 AND df <= de
+    - For each column x: filled_ratio[x] = filled_pixels_in_column / H
+    - Column is filled if filled_ratio[x] >= column_threshold
+    - Scan left -> right to find first empty column; percent = x_boundary / W
+    """
+    if width <= 0 or height <= 0:
+        raise ValueError("width and height must be > 0")
+    expected = width * height * 4
+    if len(raw_bgra) < expected:
+        raise ValueError("raw_bgra is smaller than expected for BGRA frame")
+    if tolerance_l1 < 0 or tolerance_l1 > 765:
+        raise ValueError("tolerance_l1 must be in [0, 765]")
+    if not (0.0 <= column_threshold <= 1.0):
+        raise ValueError("column_threshold must be in [0, 1]")
+
+    fr, fg, fb = filled_rgb
+    er, eg, eb = empty_rgb
+
+    filled_counts_by_col = [0] * width
+    # raw_bgra is row-major: for pixel (x,y) index = (y*width + x)*4
+    i = 0
+    for _y in range(height):
+        for x in range(width):
+            b = raw_bgra[i]
+            g = raw_bgra[i + 1]
+            r = raw_bgra[i + 2]
+            i += 4
+
+            df = abs(r - fr) + abs(g - fg) + abs(b - fb)
+            if df > tolerance_l1:
+                continue
+            de = abs(r - er) + abs(g - eg) + abs(b - eb)
+            if df <= de:
+                filled_counts_by_col[x] += 1
+
+    # Find first column that is not filled.
+    col_min = int(column_threshold * height)
+    for x in range(width):
+        if filled_counts_by_col[x] < col_min:
+            return max(0.0, min(1.0, x / float(width)))
+    return 1.0
+
+
 @dataclass(frozen=True)
 class RednessROI:
     name: str
@@ -130,6 +190,90 @@ class RednessDetectorConfig:
 
 
 @dataclass(frozen=True)
+class RGB:
+    r: int
+    g: int
+    b: int
+
+    def validate(self) -> None:
+        for name, v in (("r", self.r), ("g", self.g), ("b", self.b)):
+            if not isinstance(v, int):
+                raise ValueError(f"rgb.{name} must be an int")
+            if not (0 <= v <= 255):
+                raise ValueError(f"rgb.{name} must be in [0,255]")
+
+    def as_tuple(self) -> Tuple[int, int, int]:
+        return (self.r, self.g, self.b)
+
+
+@dataclass(frozen=True)
+class HealthBarColorSampling:
+    filled: RGB
+    empty: RGB
+    tolerance_l1: int
+
+    def validate(self) -> None:
+        self.filled.validate()
+        self.empty.validate()
+        if not isinstance(self.tolerance_l1, int):
+            raise ValueError("color_sampling.tolerance_l1 must be an int")
+        if not (0 <= self.tolerance_l1 <= 765):
+            raise ValueError("color_sampling.tolerance_l1 must be in [0,765]")
+
+
+@dataclass(frozen=True)
+class HealthBarThresholdFallback:
+    mode: str  # "brightness" | "saturation"
+    min_value: float
+
+    def validate(self) -> None:
+        if self.mode not in ("brightness", "saturation"):
+            raise ValueError("threshold_fallback.mode must be 'brightness' or 'saturation'")
+        if not isinstance(self.min_value, (int, float)):
+            raise ValueError("threshold_fallback.min must be a number")
+        if not (0.0 <= float(self.min_value) <= 1.0):
+            raise ValueError("threshold_fallback.min must be in [0,1]")
+
+
+@dataclass(frozen=True)
+class HealthBarHitOnDecrease:
+    min_drop: float
+    cooldown_ms: int
+
+    def validate(self) -> None:
+        if not isinstance(self.min_drop, (int, float)):
+            raise ValueError("hit_on_decrease.min_drop must be a number")
+        if not (0.0 <= float(self.min_drop) <= 1.0):
+            raise ValueError("hit_on_decrease.min_drop must be in [0,1]")
+        if not isinstance(self.cooldown_ms, int):
+            raise ValueError("hit_on_decrease.cooldown_ms must be an int")
+        if self.cooldown_ms < 0:
+            raise ValueError("hit_on_decrease.cooldown_ms must be >= 0")
+
+
+@dataclass(frozen=True)
+class HealthBarDetector:
+    rect: NormalizedRect
+    orientation: str  # Phase C: "horizontal"
+    color_sampling: Optional[HealthBarColorSampling]
+    hit_on_decrease: HealthBarHitOnDecrease
+    threshold_fallback: Optional[HealthBarThresholdFallback] = None
+    name: str = "health_bar"
+
+    def validate(self) -> None:
+        self.rect.validate()
+        if self.orientation != "horizontal":
+            raise ValueError("health_bar.orientation must be 'horizontal' (Phase C)")
+        if self.color_sampling is not None:
+            self.color_sampling.validate()
+        if self.threshold_fallback is not None:
+            self.threshold_fallback.validate()
+        self.hit_on_decrease.validate()
+        if not isinstance(self.name, str) or not self.name:
+            raise ValueError("health_bar.name must be a non-empty string")
+
+
+@dataclass(frozen=True)
 class ScreenCaptureConfig:
     monitor_index: int = 1  # 1-based to match common UX in Electron
     tick_ms: int = 50
@@ -140,8 +284,9 @@ class ScreenHealthProfile:
     schema_version: int
     name: str
     capture: ScreenCaptureConfig
-    rois: List[RednessROI]
-    detector: RednessDetectorConfig
+    redness_rois: List[RednessROI]
+    redness_detector: Optional[RednessDetectorConfig]
+    health_bars: List[HealthBarDetector]
 
 
 class ScreenHealthManager:
@@ -174,6 +319,11 @@ class ScreenHealthManager:
 
         # Cooldown state
         self._last_hit_by_roi: Dict[str, float] = {}
+
+        # Health bar state
+        self._prev_health_percent_by_detector: Dict[str, float] = {}
+        self._last_health_emit_by_detector: Dict[str, float] = {}
+        self._last_health_percent_emitted: Dict[str, float] = {}
 
     @property
     def is_running(self) -> bool:
@@ -250,38 +400,130 @@ class ScreenHealthManager:
                 time.sleep(0.5)
                 continue
 
-            for roi in profile.rois:
+            # Redness ROIs (Phase A)
+            if profile.redness_detector is not None:
+                for roi in profile.redness_rois:
+                    if self._stop_evt.is_set():
+                        break
+
+                    left, top, w, h = normalized_rect_to_pixels(roi.rect, frame_w, frame_h)
+
+                    try:
+                        raw_bgra = capture.capture_bgra(left=left, top=top, width=w, height=h)
+                    except Exception:
+                        continue
+
+                    score = redness_score_from_bgra(raw_bgra, w, h)
+                    if score < profile.redness_detector.min_score:
+                        continue
+
+                    now = time.time()
+                    key = f"redness:{roi.name}"
+                    last = self._last_hit_by_roi.get(key, 0.0)
+                    if (now - last) * 1000.0 < profile.redness_detector.cooldown_ms:
+                        continue
+
+                    self._last_hit_by_roi[key] = now
+                    self.last_hit_ts = now
+
+                    self._emit_game_event(
+                        "hit_recorded",
+                        {
+                            "roi": roi.name,
+                            "direction": roi.direction.value if roi.direction else None,
+                            "score": score,
+                            "source": "redness_rois",
+                        },
+                    )
+                    self._trigger_hit(intensity=score)
+
+            # Health bar (Phase C)
+            for hb in profile.health_bars:
                 if self._stop_evt.is_set():
                     break
 
-                left, top, w, h = normalized_rect_to_pixels(roi.rect, frame_w, frame_h)
-
+                left, top, w, h = normalized_rect_to_pixels(hb.rect, frame_w, frame_h)
                 try:
                     raw_bgra = capture.capture_bgra(left=left, top=top, width=w, height=h)
                 except Exception:
                     continue
 
-                score = redness_score_from_bgra(raw_bgra, w, h)
-                if score < profile.detector.min_score:
+                percent_raw: Optional[float] = None
+                if hb.color_sampling is not None:
+                    percent_raw = health_bar_percent_from_bgra(
+                        raw_bgra,
+                        w,
+                        h,
+                        filled_rgb=hb.color_sampling.filled.as_tuple(),
+                        empty_rgb=hb.color_sampling.empty.as_tuple(),
+                        tolerance_l1=hb.color_sampling.tolerance_l1,
+                    )
+                elif hb.threshold_fallback is not None:
+                    percent_raw = self._health_bar_percent_threshold_fallback(
+                        raw_bgra, w, h, hb.threshold_fallback
+                    )
+
+                if percent_raw is None:
                     continue
 
+                # Clamp for safety
+                percent = max(0.0, min(1.0, float(percent_raw)))
+
+                # Emit health_percent (throttled)
                 now = time.time()
-                last = self._last_hit_by_roi.get(roi.name, 0.0)
-                if (now - last) * 1000.0 < profile.detector.cooldown_ms:
+                last_emit = self._last_health_emit_by_detector.get(hb.name, 0.0)
+                last_val = self._last_health_percent_emitted.get(hb.name)
+                should_emit = False
+                if last_val is None:
+                    should_emit = True
+                elif abs(percent - last_val) >= 0.005:
+                    should_emit = True
+                elif (now - last_emit) * 1000.0 >= 500.0:
+                    should_emit = True
+
+                if should_emit:
+                    self._last_health_emit_by_detector[hb.name] = now
+                    self._last_health_percent_emitted[hb.name] = percent
+                    self._emit_game_event(
+                        "health_percent",
+                        {
+                            "detector": hb.name,
+                            "percent": percent,
+                        },
+                    )
+
+                # Hit on decrease
+                prev = self._prev_health_percent_by_detector.get(hb.name)
+                self._prev_health_percent_by_detector[hb.name] = percent
+                if prev is None:
                     continue
 
-                self._last_hit_by_roi[roi.name] = now
+                drop = float(prev) - float(percent)
+                if drop < hb.hit_on_decrease.min_drop:
+                    continue
+
+                key = f"health_bar:{hb.name}"
+                last_hit = self._last_hit_by_roi.get(key, 0.0)
+                if (now - last_hit) * 1000.0 < hb.hit_on_decrease.cooldown_ms:
+                    continue
+
+                self._last_hit_by_roi[key] = now
                 self.last_hit_ts = now
 
                 self._emit_game_event(
                     "hit_recorded",
                     {
-                        "roi": roi.name,
-                        "direction": roi.direction.value if roi.direction else None,
-                        "score": score,
+                        "roi": hb.name,
+                        "direction": None,
+                        "score": max(0.0, min(1.0, drop)),
+                        "source": "health_bar",
+                        "percent": percent,
+                        "prev_percent": float(prev),
+                        "drop": drop,
                     },
                 )
-                self._trigger_hit(intensity=score)
+                # Map intensity to drop, but keep within [0,1]
+                self._trigger_hit(intensity=max(0.0, min(1.0, drop)))
 
             elapsed = time.time() - loop_start
             sleep_for = tick_s - elapsed
@@ -312,51 +554,178 @@ class ScreenHealthManager:
         if not isinstance(detectors, list) or not detectors:
             raise ValueError("profile.detectors must be a non-empty list")
 
-        # Phase A expects a single redness_rois detector; accept the first matching.
-        det = next((d for d in detectors if (d.get("type") == "redness_rois")), None)
-        if det is None:
-            raise ValueError("Phase A requires a detector of type 'redness_rois'")
+        redness_detector: Optional[RednessDetectorConfig] = None
+        redness_rois: List[RednessROI] = []
+        health_bars: List[HealthBarDetector] = []
 
-        threshold = det.get("threshold") or {}
-        detector = RednessDetectorConfig(
-            min_score=float(threshold.get("min_score", 0.35)),
-            cooldown_ms=int(det.get("cooldown_ms", 200)),
-        )
-        if detector.cooldown_ms < 0:
-            raise ValueError("detector.cooldown_ms must be >= 0")
-        if not (0.0 <= detector.min_score <= 1.0):
-            raise ValueError("threshold.min_score must be in [0,1]")
+        # Parse detectors (schema_version 0 extensions)
+        for d in detectors:
+            if not isinstance(d, dict):
+                continue
+            d_type = d.get("type")
+            if d_type == "redness_rois":
+                threshold = d.get("threshold") or {}
+                detector = RednessDetectorConfig(
+                    min_score=float(threshold.get("min_score", 0.35)),
+                    cooldown_ms=int(d.get("cooldown_ms", 200)),
+                )
+                if detector.cooldown_ms < 0:
+                    raise ValueError("detector.cooldown_ms must be >= 0")
+                if not (0.0 <= detector.min_score <= 1.0):
+                    raise ValueError("threshold.min_score must be in [0,1]")
 
-        rois_data = det.get("rois") or det.get("zones") or []
-        if not isinstance(rois_data, list) or not rois_data:
-            raise ValueError("redness_rois detector must include a non-empty 'rois' list")
+                rois_data = d.get("rois") or d.get("zones") or []
+                if not isinstance(rois_data, list) or not rois_data:
+                    raise ValueError("redness_rois detector must include a non-empty 'rois' list")
 
-        rois: List[RednessROI] = []
-        for idx, r in enumerate(rois_data):
-            r_name = str(r.get("name") or f"roi_{idx}")
-            rect_data = r.get("rect") or r.get("roi")
-            if not isinstance(rect_data, dict):
-                raise ValueError(f"roi '{r_name}': missing rect")
-            rect = NormalizedRect(
-                x=float(rect_data.get("x", 0)),
-                y=float(rect_data.get("y", 0)),
-                w=float(rect_data.get("w", 0)),
-                h=float(rect_data.get("h", 0)),
-            )
-            rect.validate()
+                rois: List[RednessROI] = []
+                for idx, r in enumerate(rois_data):
+                    r_name = str(r.get("name") or f"roi_{idx}")
+                    rect_data = r.get("rect") or r.get("roi")
+                    if not isinstance(rect_data, dict):
+                        raise ValueError(f"roi '{r_name}': missing rect")
+                    rect = NormalizedRect(
+                        x=float(rect_data.get("x", 0)),
+                        y=float(rect_data.get("y", 0)),
+                        w=float(rect_data.get("w", 0)),
+                        h=float(rect_data.get("h", 0)),
+                    )
+                    rect.validate()
 
-            direction_raw = r.get("direction")
-            direction = DirectionKey(direction_raw) if direction_raw else None
+                    direction_raw = r.get("direction")
+                    direction = DirectionKey(direction_raw) if direction_raw else None
 
-            rois.append(RednessROI(name=r_name, rect=rect, direction=direction))
+                    rois.append(RednessROI(name=r_name, rect=rect, direction=direction))
+
+                redness_detector = detector
+                redness_rois = rois
+                continue
+
+            if d_type == "health_bar":
+                name_raw = d.get("name") or "health_bar"
+                name = str(name_raw)
+
+                roi = d.get("roi")
+                if not isinstance(roi, dict):
+                    raise ValueError("health_bar.roi is required")
+                rect = NormalizedRect(
+                    x=float(roi.get("x", 0)),
+                    y=float(roi.get("y", 0)),
+                    w=float(roi.get("w", 0)),
+                    h=float(roi.get("h", 0)),
+                )
+                rect.validate()
+
+                orientation = str(d.get("orientation") or "horizontal")
+                if orientation != "horizontal":
+                    raise ValueError("health_bar.orientation must be 'horizontal' (Phase C)")
+
+                color_sampling_data = d.get("color_sampling")
+                color_sampling: Optional[HealthBarColorSampling] = None
+                if isinstance(color_sampling_data, dict):
+                    filled_arr = color_sampling_data.get("filled_rgb")
+                    empty_arr = color_sampling_data.get("empty_rgb")
+                    if (
+                        isinstance(filled_arr, list)
+                        and len(filled_arr) == 3
+                        and isinstance(empty_arr, list)
+                        and len(empty_arr) == 3
+                    ):
+                        filled = RGB(int(filled_arr[0]), int(filled_arr[1]), int(filled_arr[2]))
+                        empty = RGB(int(empty_arr[0]), int(empty_arr[1]), int(empty_arr[2]))
+                        color_sampling = HealthBarColorSampling(
+                            filled=filled,
+                            empty=empty,
+                            tolerance_l1=int(color_sampling_data.get("tolerance_l1", 120)),
+                        )
+                        color_sampling.validate()
+
+                threshold_fallback_data = d.get("threshold_fallback")
+                threshold_fallback: Optional[HealthBarThresholdFallback] = None
+                if isinstance(threshold_fallback_data, dict):
+                    threshold_fallback = HealthBarThresholdFallback(
+                        mode=str(threshold_fallback_data.get("mode") or "brightness"),
+                        min_value=float(threshold_fallback_data.get("min", 0.5)),
+                    )
+                    threshold_fallback.validate()
+
+                hit_on_decrease_data = d.get("hit_on_decrease")
+                if not isinstance(hit_on_decrease_data, dict):
+                    raise ValueError("health_bar.hit_on_decrease is required")
+                hit_on_decrease = HealthBarHitOnDecrease(
+                    min_drop=float(hit_on_decrease_data.get("min_drop", 0.02)),
+                    cooldown_ms=int(hit_on_decrease_data.get("cooldown_ms", 150)),
+                )
+                hit_on_decrease.validate()
+
+                hb = HealthBarDetector(
+                    name=name,
+                    rect=rect,
+                    orientation=orientation,
+                    color_sampling=color_sampling,
+                    threshold_fallback=threshold_fallback,
+                    hit_on_decrease=hit_on_decrease,
+                )
+                hb.validate()
+                health_bars.append(hb)
+                continue
+
+        if redness_detector is None and not health_bars:
+            raise ValueError("profile.detectors must include at least one supported detector")
 
         return ScreenHealthProfile(
             schema_version=schema_version,
             name=name,
             capture=capture,
-            rois=rois,
-            detector=detector,
+            redness_rois=redness_rois,
+            redness_detector=redness_detector,
+            health_bars=health_bars,
         )
+
+    def _health_bar_percent_threshold_fallback(
+        self, raw_bgra: bytes, width: int, height: int, fallback: HealthBarThresholdFallback
+    ) -> float:
+        """
+        Fallback % when color sampling isn't available.
+
+        This is intentionally simple and Phase C only guarantees support (not canonical).
+        - brightness: treat pixel filled if max(r,g,b)/255 >= min_value
+        - saturation: treat pixel filled if (max-min)/max >= min_value, with max>0
+        """
+        expected = width * height * 4
+        if len(raw_bgra) < expected:
+            raise ValueError("raw_bgra is smaller than expected for BGRA frame")
+
+        filled_counts_by_col = [0] * width
+        i = 0
+        min_v = float(fallback.min_value)
+        for _y in range(height):
+            for x in range(width):
+                b = raw_bgra[i]
+                g = raw_bgra[i + 1]
+                r = raw_bgra[i + 2]
+                i += 4
+
+                mx = r if r >= g else g
+                mx = mx if mx >= b else b
+                mn = r if r <= g else g
+                mn = mn if mn <= b else b
+
+                if fallback.mode == "brightness":
+                    if (mx / 255.0) >= min_v:
+                        filled_counts_by_col[x] += 1
+                else:  # saturation
+                    if mx <= 0:
+                        continue
+                    sat = (mx - mn) / float(mx)
+                    if sat >= min_v:
+                        filled_counts_by_col[x] += 1
+
+        col_min = int(0.5 * height)
+        for x in range(width):
+            if filled_counts_by_col[x] < col_min:
+                return max(0.0, min(1.0, x / float(width)))
+        return 1.0
 
 
 class _MSSCaptureBackend:

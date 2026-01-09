@@ -42,6 +42,33 @@ def test_redness_score_from_bgra_expected_value():
     assert score == pytest.approx(0.5, abs=1e-6)
 
 
+def test_health_bar_percent_from_bgra_half_filled():
+    # 10x2 ROI: left half filled (red), right half empty (dark)
+    w, h = 10, 2
+    filled = (220, 40, 40)
+    empty = (40, 40, 40)
+
+    def px(rgb):
+        r, g, b = rgb
+        return [b, g, r, 255]  # BGRA
+
+    raw = bytearray()
+    for _y in range(h):
+        for x in range(w):
+            raw.extend(px(filled if x < 5 else empty))
+
+    percent = shm.health_bar_percent_from_bgra(
+        bytes(raw),
+        w,
+        h,
+        filled_rgb=filled,
+        empty_rgb=empty,
+        tolerance_l1=0,
+        column_threshold=0.5,
+    )
+    assert percent == pytest.approx(0.5, abs=1e-6)
+
+
 def test_manager_cooldown_prevents_hit_spam(monkeypatch):
     class FakeCapture:
         def __init__(self, monitor_index: int):
@@ -146,4 +173,70 @@ def test_profile_allows_meta_and_rejects_invalid_direction(monkeypatch):
     )
     assert ok is False
     assert err
+
+
+def test_manager_health_bar_hit_on_decrease(monkeypatch):
+    class FakeCapture:
+        def __init__(self, monitor_index: int):
+            self.monitor_index = monitor_index
+            self._calls = 0
+
+        def get_frame_size(self):
+            return 10, 10
+
+        def capture_bgra(self, left: int, top: int, width: int, height: int) -> bytes:
+            # First few ticks: fully filled; then drop to 70% filled.
+            self._calls += 1
+            filled_cols = width if self._calls <= 3 else int(width * 0.7)
+
+            filled = (220, 40, 40)
+            empty = (40, 40, 40)
+
+            def px(rgb):
+                r, g, b = rgb
+                return [b, g, r, 255]
+
+            raw = bytearray()
+            for _y in range(height):
+                for x in range(width):
+                    raw.extend(px(filled if x < filled_cols else empty))
+            return bytes(raw)
+
+    monkeypatch.setattr(shm, "_MSSCaptureBackend", FakeCapture)
+
+    events = []
+
+    def on_game_event(event_type: str, params: dict):
+        events.append((event_type, params))
+
+    manager = shm.ScreenHealthManager(on_game_event=on_game_event, on_trigger=lambda *_: None)
+    profile = {
+        "schema_version": 0,
+        "name": "hb test",
+        "capture": {"source": "monitor", "monitor_index": 1, "tick_ms": 10},
+        "detectors": [
+            {
+                "type": "health_bar",
+                "name": "hb1",
+                "roi": {"x": 0.0, "y": 0.0, "w": 0.5, "h": 0.5},
+                "orientation": "horizontal",
+                "color_sampling": {
+                    "filled_rgb": [220, 40, 40],
+                    "empty_rgb": [40, 40, 40],
+                    "tolerance_l1": 0,
+                },
+                "hit_on_decrease": {"min_drop": 0.1, "cooldown_ms": 0},
+            }
+        ],
+    }
+
+    ok, err = manager.start(profile)
+    assert ok, err
+    try:
+        time.sleep(0.07)  # ~7 ticks
+    finally:
+        manager.stop()
+
+    hit_events = [e for e in events if e[0] == "hit_recorded" and e[1].get("source") == "health_bar"]
+    assert len(hit_events) >= 1
 

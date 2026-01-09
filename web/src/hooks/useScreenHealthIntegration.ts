@@ -29,11 +29,13 @@ import {
 
 export type ScreenHealthGameEvent = {
   id: string;
-  type: "hit_recorded";
+  type: "hit_recorded" | "health_percent";
   ts: number;
   roi?: string | null;
   direction?: string | null;
   score?: number;
+  detector?: string | null;
+  health_percent?: number;
 };
 
 const MAX_EVENTS = 50;
@@ -128,6 +130,20 @@ export function useScreenHealthIntegration() {
           events_received: (prev.events_received ?? 0) + 1,
           last_event_ts: event.ts,
           last_hit_ts: event.ts,
+        }));
+      } else if (event.event === "screen_health_health") {
+        const newEvent: ScreenHealthGameEvent = {
+          id: `sh-${++eventIdCounter.current}`,
+          type: "health_percent",
+          ts: event.ts * 1000,
+          detector: (event.detector as string | undefined) ?? null,
+          health_percent: typeof event.health_percent === "number" ? event.health_percent : undefined,
+        };
+        setEvents((prev) => [newEvent, ...prev].slice(0, MAX_EVENTS));
+        setStatus((prev) => ({
+          ...prev,
+          events_received: (prev.events_received ?? 0) + 1,
+          last_event_ts: event.ts,
         }));
       }
     });

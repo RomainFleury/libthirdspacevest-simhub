@@ -120,6 +120,7 @@ class EventType(Enum):
     SCREEN_HEALTH_STARTED = "screen_health_started"
     SCREEN_HEALTH_STOPPED = "screen_health_stopped"
     SCREEN_HEALTH_HIT = "screen_health_hit"
+    SCREEN_HEALTH_HEALTH = "screen_health_health"
     # Predefined effects
     EFFECT_STARTED = "effect_started"
     EFFECT_COMPLETED = "effect_completed"
@@ -243,6 +244,8 @@ class Event:
     profile_name: Optional[str] = None
     score: Optional[float] = None
     direction: Optional[str] = None
+    health_percent: Optional[float] = None
+    detector: Optional[str] = None
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary, excluding None values."""
@@ -859,6 +862,15 @@ def event_screen_health_hit(
         params={"roi": roi} if roi else None,
         direction=direction,
         score=score,
+    )
+
+
+def event_screen_health_health(health_percent: float, detector: Optional[str] = None) -> Event:
+    return Event(
+        event=EventType.SCREEN_HEALTH_HEALTH.value,
+        event_type="health_percent",
+        health_percent=float(health_percent),
+        detector=detector,
     )
 
 

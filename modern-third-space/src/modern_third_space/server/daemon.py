@@ -92,6 +92,7 @@ from .protocol import (
     event_screen_health_started,
     event_screen_health_stopped,
     event_screen_health_hit,
+    event_screen_health_health,
     response_screen_health_start,
     response_screen_health_stop,
     response_screen_health_status,
@@ -1424,6 +1425,10 @@ class VestDaemon:
             score = float(params.get("score") or 0.0)
             roi = params.get("roi")
             event = event_screen_health_hit(direction=direction, score=score, roi=roi)
+        elif event_type == "health_percent":
+            detector = params.get("detector")
+            percent = float(params.get("percent") or 0.0)
+            event = event_screen_health_health(health_percent=percent, detector=detector)
         else:
             event = event_error(f"Unknown screen_health event_type: {event_type}")
 

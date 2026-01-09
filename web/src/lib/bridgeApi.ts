@@ -39,6 +39,8 @@ export type DaemonEvent = {
   direction?: string | null;
   score?: number;
   profile_name?: string | null;
+  health_percent?: number;
+  detector?: string | null;
 };
 
 export type DaemonStatus = {

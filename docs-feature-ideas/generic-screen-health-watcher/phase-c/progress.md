@@ -9,10 +9,10 @@
 ---
 
 ## Milestones
-- [ ] Daemon health bar detector implemented
-- [ ] Profile schema updated and documented
-- [ ] UI configuration for health bar implemented
-- [ ] Unit tests added/updated and passing
+- [x] Daemon health bar detector implemented
+- [x] Profile schema updated and documented
+- [x] UI configuration for health bar implemented
+- [x] Unit tests added/updated and passing
 - [ ] Manual in-game verification recorded
 
 ---
