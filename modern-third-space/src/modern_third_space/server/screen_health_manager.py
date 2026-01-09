@@ -521,6 +521,9 @@ class ScreenHealthManager:
         except Exception as e:
             return False, str(e)
 
+        # Reset all runtime state so a previous run/profile doesn't affect this run.
+        self._reset_runtime_state()
+
         self._stop_evt.clear()
         self._thread = threading.Thread(target=self._run_loop, name="screen_health", daemon=True)
         self._thread.start()
@@ -534,6 +537,8 @@ class ScreenHealthManager:
         if self._thread:
             self._thread.join(timeout=2.0)
         self._running = False
+        # Clear per-run state after stop to avoid stale values on next start().
+        self._reset_runtime_state()
         return True
 
     def status(self) -> Dict[str, Any]:
@@ -554,6 +559,26 @@ class ScreenHealthManager:
         self.last_event_ts = time.time()
         if self._on_game_event:
             self._on_game_event(event_type, params)
+
+    def _reset_runtime_state(self) -> None:
+        # Stats
+        self.events_received = 0
+        self.last_event_ts = None
+        self.last_hit_ts = None
+
+        # Cooldowns
+        self._last_hit_by_roi.clear()
+
+        # Health bar state
+        self._prev_health_percent_by_detector.clear()
+        self._last_health_emit_by_detector.clear()
+        self._last_health_percent_emitted.clear()
+
+        # Health number OCR state
+        self._health_number_candidate_value.clear()
+        self._health_number_candidate_count.clear()
+        self._prev_health_value_by_detector.clear()
+        self._last_health_value_emitted.clear()
 
     def _trigger_hit(self, intensity: float) -> None:
         """Trigger a Phase A random-cell haptic."""

@@ -2,8 +2,17 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { SCREEN_HEALTH_PRESETS } from "../../../data/screenHealthPresets";
 import type { ScreenHealthStoredProfile } from "../../../lib/bridgeApi";
 import { DIRECTION_KEYS } from "./constants";
-import { learnDigitTemplatesFromCanvas } from "./templateLearning";
-import { clamp01, clampInt, parseRgbTriplet } from "./utils";
+import { learnDigitTemplatesFromCanvas, tryReadDigitValueFromCanvas } from "./templateLearning";
+import { clamp01, clampInt } from "./utils";
+import { HealthBarSettings } from "./sections/HealthBarSettings";
+import { HealthNumberSettings } from "./sections/HealthNumberSettings";
+import { PresetProfilesSection } from "./sections/PresetProfilesSection";
+import { ProfileControlsSection } from "./sections/ProfileControlsSection";
+import { CaptureSettingsSection } from "./sections/CaptureSettingsSection";
+import { DetectorSelectionSection } from "./sections/DetectorSelectionSection";
+import { CalibrationCanvasSection } from "./sections/CalibrationCanvasSection";
+import { RoiListSection } from "./sections/RoiListSection";
+import { ScreenshotsSection } from "./sections/ScreenshotsSection";
 
 type RoiDraft = {
   name: string;
@@ -74,9 +83,12 @@ export function ScreenHealthConfigurationPanel(props: Props) {
 
   // Health bar detector state
   const [healthBarRoi, setHealthBarRoi] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [healthBarMode, setHealthBarMode] = useState<"color_sampling" | "threshold_fallback">("color_sampling");
   const [filledRgb, setFilledRgb] = useState<[number, number, number]>([220, 40, 40]);
   const [emptyRgb, setEmptyRgb] = useState<[number, number, number]>([40, 40, 40]);
   const [toleranceL1, setToleranceL1] = useState<number>(120);
+  const [hbFallbackMode, setHbFallbackMode] = useState<"brightness" | "saturation">("brightness");
+  const [hbFallbackMin, setHbFallbackMin] = useState<number>(0.5);
   const [hitMinDrop, setHitMinDrop] = useState<number>(0.02);
   const [hitCooldownMs, setHitCooldownMs] = useState<number>(150);
   const [colorPickMode, setColorPickMode] = useState<null | "filled" | "empty">(null);
@@ -93,9 +105,11 @@ export function ScreenHealthConfigurationPanel(props: Props) {
   const [hnHitMinDrop, setHnHitMinDrop] = useState<number>(1);
   const [hnHitCooldownMs, setHnHitCooldownMs] = useState<number>(150);
   const [hnHammingMax, setHnHammingMax] = useState<number>(120);
-  const [hnTemplateSize] = useState<{ w: number; h: number }>({ w: 16, h: 24 });
+  const [hnTemplateSize, setHnTemplateSize] = useState<{ w: number; h: number }>({ w: 16, h: 24 });
   const [hnTemplates, setHnTemplates] = useState<Record<string, string>>({});
   const [hnLearnValue, setHnLearnValue] = useState<string>("");
+  const [hnCalibrationError, setHnCalibrationError] = useState<string | null>(null);
+  const [hnTestResult, setHnTestResult] = useState<{ value: number | null; digits?: string; reason?: string } | null>(null);
 
   const [selectedPresetId, setSelectedPresetId] = useState<string>(SCREEN_HEALTH_PRESETS[0]?.preset_id || "");
 
@@ -129,6 +143,10 @@ export function ScreenHealthConfigurationPanel(props: Props) {
       setHnHitMinDrop(Number(hn.hit_on_decrease?.min_drop ?? 1));
       setHnHitCooldownMs(Number(hn.hit_on_decrease?.cooldown_ms ?? 150));
       setHnHammingMax(Number(hn.templates?.hamming_max ?? 120));
+      setHnTemplateSize({
+        w: Number(hn.templates?.width ?? 16),
+        h: Number(hn.templates?.height ?? 24),
+      });
       const digitsMap = hn.templates?.digits;
       if (digitsMap && typeof digitsMap === "object") {
         const next: Record<string, string> = {};
@@ -141,6 +159,8 @@ export function ScreenHealthConfigurationPanel(props: Props) {
         setHnTemplates({});
       }
       setColorPickMode(null);
+      setHnCalibrationError(null);
+      setHnTestResult(null);
     } else if (hb) {
       setDetectorType("health_bar");
       setHealthBarRoi({
@@ -150,6 +170,9 @@ export function ScreenHealthConfigurationPanel(props: Props) {
         h: Number(hb.roi?.h ?? 0.03),
       });
       const cs = hb.color_sampling;
+      const fb = hb.threshold_fallback;
+      if (cs) setHealthBarMode("color_sampling");
+      else if (fb) setHealthBarMode("threshold_fallback");
       if (Array.isArray(cs?.filled_rgb) && cs.filled_rgb.length === 3) {
         setFilledRgb([
           clampInt(Number(cs.filled_rgb[0]), 0, 255),
@@ -165,6 +188,10 @@ export function ScreenHealthConfigurationPanel(props: Props) {
         ]);
       }
       setToleranceL1(clampInt(Number(cs?.tolerance_l1 ?? 120), 0, 765));
+      if (fb) {
+        setHbFallbackMode((fb.mode as "brightness" | "saturation") || "brightness");
+        setHbFallbackMin(Number(fb.min ?? 0.5));
+      }
       setHitMinDrop(Number(hb.hit_on_decrease?.min_drop ?? 0.02));
       setHitCooldownMs(Number(hb.hit_on_decrease?.cooldown_ms ?? 150));
       setColorPickMode(null);
@@ -202,11 +229,20 @@ export function ScreenHealthConfigurationPanel(props: Props) {
             name: "health_bar",
             roi: { x: clamp01(roi.x), y: clamp01(roi.y), w: clamp01(roi.w), h: clamp01(roi.h) },
             orientation: "horizontal",
-            color_sampling: {
-              filled_rgb: filledRgb.map((v) => clampInt(v, 0, 255)),
-              empty_rgb: emptyRgb.map((v) => clampInt(v, 0, 255)),
-              tolerance_l1: clampInt(toleranceL1, 0, 765),
-            },
+            ...(healthBarMode === "color_sampling"
+              ? {
+                  color_sampling: {
+                    filled_rgb: filledRgb.map((v) => clampInt(v, 0, 255)),
+                    empty_rgb: emptyRgb.map((v) => clampInt(v, 0, 255)),
+                    tolerance_l1: clampInt(toleranceL1, 0, 765),
+                  },
+                }
+              : {
+                  threshold_fallback: {
+                    mode: hbFallbackMode,
+                    min: Math.max(0, Math.min(1, hbFallbackMin)),
+                  },
+                }),
             hit_on_decrease: {
               min_drop: Math.max(0, Math.min(1, hitMinDrop)),
               cooldown_ms: Math.max(0, Math.floor(hitCooldownMs)),
@@ -289,9 +325,12 @@ export function ScreenHealthConfigurationPanel(props: Props) {
     rois,
     // health bar
     healthBarRoi,
+    healthBarMode,
     filledRgb,
     emptyRgb,
     toleranceL1,
+    hbFallbackMode,
+    hbFallbackMin,
     hitMinDrop,
     hitCooldownMs,
     // health number
@@ -310,6 +349,12 @@ export function ScreenHealthConfigurationPanel(props: Props) {
     hnTemplates,
     activeProfile?.profile,
   ]);
+
+  // If template size changes, existing learned bitstrings are invalid.
+  useEffect(() => {
+    setHnTemplates({});
+    setHnTestResult(null);
+  }, [hnTemplateSize.w, hnTemplateSize.h]);
 
   const [saving, setSaving] = useState(false);
   const handleSave = async () => {
@@ -460,6 +505,8 @@ export function ScreenHealthConfigurationPanel(props: Props) {
   };
 
   const handleLearnTemplates = () => {
+    setHnCalibrationError(null);
+    setHnTestResult(null);
     if (!healthNumberRoi) throw new Error("No health number ROI set");
     const canvas = offscreenCanvasRef.current;
     if (!canvas || !imageLoadedRef.current) throw new Error("No screenshot loaded");
@@ -478,178 +525,75 @@ export function ScreenHealthConfigurationPanel(props: Props) {
     setHnTemplates(next);
   };
 
+  const handleTestOcrOnce = () => {
+    setHnCalibrationError(null);
+    if (!healthNumberRoi) throw new Error("No health number ROI set");
+    const canvas = offscreenCanvasRef.current;
+    if (!canvas || !imageLoadedRef.current) throw new Error("No screenshot loaded");
+    const digitsCount = Math.max(1, Math.floor(healthNumberDigits));
+    const result = tryReadDigitValueFromCanvas({
+      canvas,
+      roi: healthNumberRoi,
+      digitsCount,
+      threshold: hnThreshold,
+      invert: hnInvert,
+      scale: hnScale,
+      templateSize: hnTemplateSize,
+      templates: hnTemplates,
+      hammingMax: hnHammingMax,
+    });
+    setHnTestResult(result);
+  };
+
   return (
     <div className="space-y-6">
-      {/* Preset profiles */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-white">Preset profiles</h3>
-        <div className="flex flex-wrap items-center gap-3">
-          <select
-            value={selectedPresetId}
-            onChange={(e) => setSelectedPresetId(e.target.value)}
-            className="rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
-          >
-            {SCREEN_HEALTH_PRESETS.map((p) => (
-              <option key={p.preset_id} value={p.preset_id}>
-                {p.display_name}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={handleInstallPreset}
-            className="rounded-lg bg-emerald-600/80 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-600"
-          >
-            Install preset
-          </button>
-          <button
-            onClick={handleResetToPresetDefaults}
-            disabled={!((activeProfile?.profile as any)?.meta?.preset_id)}
-            className="rounded-lg bg-slate-600/80 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-600 disabled:opacity-50"
-            title={(activeProfile?.profile as any)?.meta?.preset_id ? "Reset this profile to its preset defaults" : "This profile is not from a preset"}
-          >
-            Reset to preset defaults
-          </button>
-        </div>
-      </div>
+      <PresetProfilesSection
+        presets={SCREEN_HEALTH_PRESETS}
+        selectedPresetId={selectedPresetId}
+        setSelectedPresetId={setSelectedPresetId}
+        onInstall={handleInstallPreset}
+        onResetToDefaults={handleResetToPresetDefaults}
+        activeProfileMeta={(activeProfile?.profile as any)?.meta}
+      />
 
-      {/* Profile controls */}
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <label className="text-sm text-slate-400">Active profile</label>
-          <select
-            value={activeProfileId || ""}
-            onChange={(e) => setActive(e.target.value)}
-            className="rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
-          >
-            {profiles.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-          <button onClick={handleNewProfile} className="rounded-lg bg-slate-600/80 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-600">
-            New
-          </button>
-          <button
-            onClick={() => activeProfileId && exportProfile(activeProfileId)}
-            disabled={!activeProfileId}
-            className="rounded-lg bg-slate-600/80 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-600 disabled:opacity-50"
-          >
-            Export
-          </button>
-          <button onClick={importProfile} className="rounded-lg bg-slate-600/80 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-600">
-            Import
-          </button>
-          <button
-            onClick={() => activeProfileId && deleteProfile(activeProfileId)}
-            disabled={!activeProfileId || profiles.length <= 1}
-            className="rounded-lg bg-rose-600/80 px-3 py-2 text-sm font-medium text-white transition hover:bg-rose-600 disabled:opacity-50"
-            title={profiles.length <= 1 ? "Keep at least one profile" : "Delete profile"}
-          >
-            Delete
-          </button>
-        </div>
+      <ProfileControlsSection
+        profiles={profiles}
+        activeProfileId={activeProfileId}
+        setActive={(id) => setActive(id)}
+        onNew={handleNewProfile}
+        onExport={() => activeProfileId && exportProfile(activeProfileId)}
+        onImport={importProfile}
+        onDelete={() => activeProfileId && deleteProfile(activeProfileId)}
+        profileName={profileName}
+        setProfileName={setProfileName}
+        onSave={handleSave}
+        saving={saving}
+      />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <label className="text-sm text-slate-400 block mb-1">Profile name</label>
-            <input value={profileName} onChange={(e) => setProfileName(e.target.value)} className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10" />
-          </div>
-          <div className="flex items-end gap-2">
-            <button
-              onClick={handleSave}
-              disabled={!activeProfileId || saving}
-              className="rounded-lg bg-emerald-600/80 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-600 disabled:opacity-50"
-            >
-              {saving ? "Saving..." : "Save profile"}
-            </button>
-          </div>
-        </div>
-      </div>
+      <CaptureSettingsSection
+        monitorIndex={monitorIndex}
+        setMonitorIndex={setMonitorIndex}
+        tickMs={tickMs}
+        setTickMs={setTickMs}
+        onCapture={handleCapture}
+      />
 
-      {/* Capture settings */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div>
-          <label className="text-sm text-slate-400 block mb-1">Monitor index</label>
-          <input type="number" min={1} value={monitorIndex} onChange={(e) => setMonitorIndex(parseInt(e.target.value, 10) || 1)} className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10" />
-        </div>
-        <div>
-          <label className="text-sm text-slate-400 block mb-1">Tick (ms)</label>
-          <input type="number" min={10} value={tickMs} onChange={(e) => setTickMs(parseInt(e.target.value, 10) || 50)} className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10" />
-        </div>
-        <div className="flex items-end gap-2">
-          <button onClick={handleCapture} className="rounded-lg bg-blue-600/80 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-600">
-            Capture screenshot
-          </button>
-        </div>
-      </div>
+      <DetectorSelectionSection detectorType={detectorType} setDetectorType={setDetectorType} />
 
-      {/* Detector selection */}
-      <div className="space-y-2">
-        <h3 className="text-sm font-semibold text-white">Detector</h3>
-        <div className="flex flex-wrap gap-3 items-center">
-          <label className="text-sm text-slate-400">Type</label>
-          <select value={detectorType} onChange={(e) => setDetectorType(e.target.value as DetectorType)} className="rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10">
-            <option value="redness_rois">Red vignette (ROIs)</option>
-            <option value="health_bar">Health bar (horizontal)</option>
-            <option value="health_number">Health number (digits-only OCR)</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Screenshot + ROI editor */}
-      {lastCapturedImage && (
-        <div className="space-y-3">
-          <div className="text-sm text-slate-400">
-            {detectorType === "health_bar"
-              ? "Drag on the image to set the Health Bar ROI. (Saved config will be sent to the daemon when you click Start.)"
-              : detectorType === "health_number"
-                ? "Drag on the image to set the Health Number ROI. (Saved config will be sent to the daemon when you click Start.)"
-                : "Drag on the image to add ROIs. (Saved ROIs will be sent to the daemon when you click Start.)"}
-          </div>
-          <div
-            ref={imgContainerRef}
-            className="relative w-full overflow-hidden rounded-xl ring-1 ring-white/10 bg-slate-900/30"
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            style={{ cursor: colorPickMode ? "copy" : "crosshair" }}
-          >
-            <img src={lastCapturedImage.dataUrl} className="block w-full select-none" draggable={false} />
-            <canvas ref={offscreenCanvasRef} className="hidden" />
-
-            {detectorType === "redness_rois" &&
-              rois.map((r, idx) => (
-                <div
-                  key={`${r.name}-${idx}`}
-                  className="absolute border-2 border-emerald-400/80 bg-emerald-400/10"
-                  style={{ left: `${r.rect.x * 100}%`, top: `${r.rect.y * 100}%`, width: `${r.rect.w * 100}%`, height: `${r.rect.h * 100}%` }}
-                  title={r.name}
-                />
-              ))}
-
-            {detectorType === "health_bar" && healthBarRoi && (
-              <div className="absolute border-2 border-emerald-400/80 bg-emerald-400/10" style={{ left: `${healthBarRoi.x * 100}%`, top: `${healthBarRoi.y * 100}%`, width: `${healthBarRoi.w * 100}%`, height: `${healthBarRoi.h * 100}%` }} title="health_bar" />
-            )}
-
-            {detectorType === "health_number" && healthNumberRoi && (
-              <div className="absolute border-2 border-emerald-400/80 bg-emerald-400/10" style={{ left: `${healthNumberRoi.x * 100}%`, top: `${healthNumberRoi.y * 100}%`, width: `${healthNumberRoi.w * 100}%`, height: `${healthNumberRoi.h * 100}%` }} title="health_number" />
-            )}
-
-            {drawing && (
-              <div
-                className="absolute border-2 border-blue-400/80 bg-blue-400/10"
-                style={{
-                  left: `${(Math.min(drawing.startX, drawing.curX) / (imgContainerRef.current?.getBoundingClientRect().width || 1)) * 100}%`,
-                  top: `${(Math.min(drawing.startY, drawing.curY) / (imgContainerRef.current?.getBoundingClientRect().height || 1)) * 100}%`,
-                  width: `${(Math.abs(drawing.curX - drawing.startX) / (imgContainerRef.current?.getBoundingClientRect().width || 1)) * 100}%`,
-                  height: `${(Math.abs(drawing.curY - drawing.startY) / (imgContainerRef.current?.getBoundingClientRect().height || 1)) * 100}%`,
-                }}
-              />
-            )}
-          </div>
-        </div>
-      )}
+      <CalibrationCanvasSection
+        lastCapturedImage={lastCapturedImage}
+        detectorType={detectorType}
+        colorPickMode={colorPickMode}
+        imgContainerRef={imgContainerRef}
+        offscreenCanvasRef={offscreenCanvasRef}
+        drawing={drawing}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        rois={rois}
+        healthBarRoi={healthBarRoi}
+        healthNumberRoi={healthNumberRoi}
+      />
 
       {/* Detector settings */}
       {detectorType === "redness_rois" ? (
@@ -664,288 +608,103 @@ export function ScreenHealthConfigurationPanel(props: Props) {
           </div>
         </div>
       ) : detectorType === "health_bar" ? (
-        <div className="space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label className="text-sm text-slate-400 block mb-1">Filled RGB</label>
-              <div className="flex items-center gap-2">
-                <input value={filledRgb.join(",")} onChange={(e) => { const parsed = parseRgbTriplet(e.target.value); if (parsed) setFilledRgb(parsed); }} className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10" />
-                <div className="h-9 w-9 rounded-lg ring-1 ring-white/10" style={{ backgroundColor: `rgb(${filledRgb[0]},${filledRgb[1]},${filledRgb[2]})` }} />
-                <button onClick={() => setColorPickMode(colorPickMode === "filled" ? null : "filled")} className="rounded-lg bg-slate-600/80 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-600">
-                  {colorPickMode === "filled" ? "Picking…" : "Pick"}
-                </button>
-              </div>
-            </div>
-            <div>
-              <label className="text-sm text-slate-400 block mb-1">Empty RGB</label>
-              <div className="flex items-center gap-2">
-                <input value={emptyRgb.join(",")} onChange={(e) => { const parsed = parseRgbTriplet(e.target.value); if (parsed) setEmptyRgb(parsed); }} className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10" />
-                <div className="h-9 w-9 rounded-lg ring-1 ring-white/10" style={{ backgroundColor: `rgb(${emptyRgb[0]},${emptyRgb[1]},${emptyRgb[2]})` }} />
-                <button onClick={() => setColorPickMode(colorPickMode === "empty" ? null : "empty")} className="rounded-lg bg-slate-600/80 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-600">
-                  {colorPickMode === "empty" ? "Picking…" : "Pick"}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
-              <label className="text-sm text-slate-400 block mb-1">Tolerance L1 (0..765)</label>
-              <input type="number" min={0} max={765} value={toleranceL1} onChange={(e) => setToleranceL1(parseInt(e.target.value, 10) || 0)} className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10" />
-            </div>
-            <div>
-              <label className="text-sm text-slate-400 block mb-1">Hit min drop (0..1)</label>
-              <input type="number" step={0.01} min={0} max={1} value={hitMinDrop} onChange={(e) => setHitMinDrop(parseFloat(e.target.value) || 0)} className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10" />
-            </div>
-            <div>
-              <label className="text-sm text-slate-400 block mb-1">Hit cooldown (ms)</label>
-              <input type="number" min={0} value={hitCooldownMs} onChange={(e) => setHitCooldownMs(parseInt(e.target.value, 10) || 0)} className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10" />
-            </div>
-          </div>
-        </div>
+        <HealthBarSettings
+          mode={healthBarMode}
+          setMode={setHealthBarMode}
+          filledRgb={filledRgb}
+          setFilledRgb={setFilledRgb}
+          emptyRgb={emptyRgb}
+          setEmptyRgb={setEmptyRgb}
+          toleranceL1={toleranceL1}
+          setToleranceL1={setToleranceL1}
+          hitMinDrop={hitMinDrop}
+          setHitMinDrop={setHitMinDrop}
+          hitCooldownMs={hitCooldownMs}
+          setHitCooldownMs={setHitCooldownMs}
+          colorPickMode={colorPickMode}
+          setColorPickMode={setColorPickMode}
+          fallbackMode={hbFallbackMode}
+          setFallbackMode={setHbFallbackMode}
+          fallbackMin={hbFallbackMin}
+          setFallbackMin={setHbFallbackMin}
+        />
       ) : (
-        <div className="space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
-              <label className="text-sm text-slate-400 block mb-1">Digits</label>
-              <input type="number" min={1} value={healthNumberDigits} onChange={(e) => setHealthNumberDigits(parseInt(e.target.value, 10) || 1)} className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10" />
-            </div>
-            <div>
-              <label className="text-sm text-slate-400 block mb-1">Threshold (0..1)</label>
-              <input type="number" step={0.01} min={0} max={1} value={hnThreshold} onChange={(e) => setHnThreshold(parseFloat(e.target.value) || 0)} className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10" />
-            </div>
-            <div>
-              <label className="text-sm text-slate-400 block mb-1">Scale (int)</label>
-              <input type="number" min={1} value={hnScale} onChange={(e) => setHnScale(parseInt(e.target.value, 10) || 1)} className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10" />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <label className="text-sm text-slate-400">Invert</label>
-            <input type="checkbox" checked={hnInvert} onChange={(e) => setHnInvert(e.target.checked)} className="h-4 w-4" />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
-              <label className="text-sm text-slate-400 block mb-1">Readout min</label>
-              <input type="number" value={hnReadMin} onChange={(e) => setHnReadMin(parseInt(e.target.value, 10) || 0)} className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10" />
-            </div>
-            <div>
-              <label className="text-sm text-slate-400 block mb-1">Readout max</label>
-              <input type="number" value={hnReadMax} onChange={(e) => setHnReadMax(parseInt(e.target.value, 10) || 0)} className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10" />
-            </div>
-            <div>
-              <label className="text-sm text-slate-400 block mb-1">Stable reads</label>
-              <input type="number" min={1} value={hnStableReads} onChange={(e) => setHnStableReads(parseInt(e.target.value, 10) || 1)} className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
-              <label className="text-sm text-slate-400 block mb-1">Hamming max</label>
-              <input type="number" min={0} value={hnHammingMax} onChange={(e) => setHnHammingMax(parseInt(e.target.value, 10) || 0)} className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10" />
-            </div>
-            <div>
-              <label className="text-sm text-slate-400 block mb-1">Hit min drop (HP)</label>
-              <input type="number" min={1} value={hnHitMinDrop} onChange={(e) => setHnHitMinDrop(parseInt(e.target.value, 10) || 1)} className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10" />
-            </div>
-            <div>
-              <label className="text-sm text-slate-400 block mb-1">Hit cooldown (ms)</label>
-              <input type="number" min={0} value={hnHitCooldownMs} onChange={(e) => setHnHitCooldownMs(parseInt(e.target.value, 10) || 0)} className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10" />
-            </div>
-          </div>
-
-          <div className="rounded-xl bg-slate-900/40 p-3 ring-1 ring-white/5 space-y-2">
-            <div className="text-sm text-white font-medium">Template learning</div>
-            <div className="text-xs text-slate-400">Draw the digits ROI, then type the number currently shown and click “Learn”.</div>
-            <div className="flex flex-wrap items-center gap-2">
-              <input
-                value={hnLearnValue}
-                onChange={(e) => setHnLearnValue(e.target.value)}
-                placeholder={`e.g. ${"7".repeat(Math.max(1, Math.floor(healthNumberDigits)))}`}
-                className="rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
-              />
-              <button
-                onClick={() => {
-                  try {
-                    handleLearnTemplates();
-                  } catch (e) {
-                    // eslint-disable-next-line no-console
-                    console.error(e);
-                  }
-                }}
-                className="rounded-lg bg-emerald-600/80 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-600"
-              >
-                Learn from screenshot
-              </button>
-              <button onClick={() => setHnTemplates({})} className="rounded-lg bg-slate-600/80 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-600">
-                Clear templates
-              </button>
-            </div>
-            <div className="text-xs text-slate-500">
-              Learned digits: <span className="font-mono text-slate-300">{Object.keys(hnTemplates).sort().join(", ") || "(none)"}</span>
-            </div>
-          </div>
-        </div>
+        <HealthNumberSettings
+          digits={healthNumberDigits}
+          setDigits={setHealthNumberDigits}
+          threshold={hnThreshold}
+          setThreshold={setHnThreshold}
+          scale={hnScale}
+          setScale={setHnScale}
+          invert={hnInvert}
+          setInvert={setHnInvert}
+          readMin={hnReadMin}
+          setReadMin={setHnReadMin}
+          readMax={hnReadMax}
+          setReadMax={setHnReadMax}
+          stableReads={hnStableReads}
+          setStableReads={setHnStableReads}
+          hammingMax={hnHammingMax}
+          setHammingMax={setHnHammingMax}
+          templateW={hnTemplateSize.w}
+          setTemplateW={(v) => setHnTemplateSize((p) => ({ ...p, w: v }))}
+          templateH={hnTemplateSize.h}
+          setTemplateH={(v) => setHnTemplateSize((p) => ({ ...p, h: v }))}
+          hitMinDrop={hnHitMinDrop}
+          setHitMinDrop={setHnHitMinDrop}
+          hitCooldownMs={hnHitCooldownMs}
+          setHitCooldownMs={setHnHitCooldownMs}
+          learnValue={hnLearnValue}
+          setLearnValue={setHnLearnValue}
+          onLearn={() => {
+            try {
+              handleLearnTemplates();
+            } catch (e) {
+              setHnCalibrationError(e instanceof Error ? e.message : "Failed to learn templates");
+            }
+          }}
+          onTest={() => {
+            try {
+              handleTestOcrOnce();
+            } catch (e) {
+              setHnCalibrationError(e instanceof Error ? e.message : "Failed to test OCR");
+            }
+          }}
+          onClearTemplates={() => {
+            setHnTemplates({});
+            setHnTestResult(null);
+            setHnCalibrationError(null);
+          }}
+          learnedDigits={Object.keys(hnTemplates).sort().join(", ")}
+          error={hnCalibrationError}
+          testResult={hnTestResult}
+        />
       )}
 
       {/* ROIs */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-white">
-            {detectorType === "health_bar" ? "Health bar ROI" : detectorType === "health_number" ? "Health number ROI" : "ROIs"}
-          </h3>
-          <button
-            onClick={() => {
-              if (detectorType === "health_bar") {
-                if (!healthBarRoi) return;
-                captureRoiDebugImages(monitorIndex, [{ name: "health_bar", rect: { ...healthBarRoi } }] as any);
-                return;
-              }
-              if (detectorType === "health_number") {
-                if (!healthNumberRoi) return;
-                captureRoiDebugImages(monitorIndex, [{ name: "health_number", rect: { ...healthNumberRoi } }] as any);
-                return;
-              }
-              if (rois.length) captureRoiDebugImages(monitorIndex, rois);
-            }}
-            disabled={detectorType === "health_bar" ? !healthBarRoi : detectorType === "health_number" ? !healthNumberRoi : !rois.length}
-            className="rounded-lg bg-slate-600/80 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-600 disabled:opacity-50"
-            title="Capture current ROI crops for debugging"
-          >
-            Capture ROI {detectorType === "health_bar" || detectorType === "health_number" ? "crop" : "crops"}
-          </button>
-        </div>
-
-        {detectorType === "health_bar" ? (
-          !healthBarRoi ? (
-            <div className="text-sm text-slate-500">No health bar ROI yet. Capture a screenshot and draw one.</div>
-          ) : (
-            <div className="rounded-lg bg-slate-700/20 p-3 ring-1 ring-white/5">
-              <div className="flex items-center justify-between gap-2">
-                <div className="text-xs text-slate-500 font-mono">
-                  x={healthBarRoi.x.toFixed(3)} y={healthBarRoi.y.toFixed(3)} w={healthBarRoi.w.toFixed(3)} h={healthBarRoi.h.toFixed(3)}
-                </div>
-                <button onClick={() => setHealthBarRoi(null)} className="rounded-lg bg-rose-600/70 px-3 py-2 text-sm font-medium text-white transition hover:bg-rose-600">
-                  Clear
-                </button>
-              </div>
-            </div>
-          )
-        ) : detectorType === "health_number" ? (
-          !healthNumberRoi ? (
-            <div className="text-sm text-slate-500">No health number ROI yet. Capture a screenshot and draw one.</div>
-          ) : (
-            <div className="rounded-lg bg-slate-700/20 p-3 ring-1 ring-white/5">
-              <div className="flex items-center justify-between gap-2">
-                <div className="text-xs text-slate-500 font-mono">
-                  x={healthNumberRoi.x.toFixed(3)} y={healthNumberRoi.y.toFixed(3)} w={healthNumberRoi.w.toFixed(3)} h={healthNumberRoi.h.toFixed(3)}
-                </div>
-                <button onClick={() => setHealthNumberRoi(null)} className="rounded-lg bg-rose-600/70 px-3 py-2 text-sm font-medium text-white transition hover:bg-rose-600">
-                  Clear
-                </button>
-              </div>
-            </div>
-          )
-        ) : rois.length === 0 ? (
-          <div className="text-sm text-slate-500">No ROIs yet. Capture a screenshot and draw one.</div>
-        ) : (
-          <div className="space-y-2">
-            {rois.map((r, idx) => (
-              <div key={`${r.name}-${idx}`} className="rounded-lg bg-slate-700/20 p-3 ring-1 ring-white/5">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-2 items-end">
-                  <div>
-                    <label className="text-xs text-slate-400 block mb-1">Name</label>
-                    <input value={r.name} onChange={(e) => setRois((prev) => prev.map((x, i) => (i === idx ? { ...x, name: e.target.value } : x)))} className="w-full rounded-lg bg-slate-800/50 px-3 py-2 text-sm text-white ring-1 ring-white/10" />
-                  </div>
-                  <div>
-                    <label className="text-xs text-slate-400 block mb-1">Direction (optional — defaults to random)</label>
-                    <select value={r.direction || ""} onChange={(e) => setRois((prev) => prev.map((x, i) => (i === idx ? { ...x, direction: e.target.value } : x)))} className="w-full rounded-lg bg-slate-800/50 px-3 py-2 text-sm text-white ring-1 ring-white/10">
-                      {DIRECTION_KEYS.map((k) => (
-                        <option key={k} value={k}>
-                          {k || "(none)"}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="md:col-span-2 flex items-center justify-between gap-2">
-                    <div className="text-xs text-slate-500 font-mono">
-                      x={r.rect.x.toFixed(3)} y={r.rect.y.toFixed(3)} w={r.rect.w.toFixed(3)} h={r.rect.h.toFixed(3)}
-                    </div>
-                    <button onClick={() => setRois((prev) => prev.filter((_, i) => i !== idx))} className="rounded-lg bg-rose-600/70 px-3 py-2 text-sm font-medium text-white transition hover:bg-rose-600">
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <RoiListSection
+        detectorType={detectorType}
+        monitorIndex={monitorIndex}
+        captureRoiDebugImages={captureRoiDebugImages}
+        rois={rois}
+        setRois={setRois}
+        healthBarRoi={healthBarRoi}
+        setHealthBarRoi={setHealthBarRoi}
+        healthNumberRoi={healthNumberRoi}
+        setHealthNumberRoi={setHealthNumberRoi}
+      />
 
       {/* Screenshot retention + gallery */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-white">Captured screenshots</h3>
-        <div className="flex flex-wrap items-center gap-3">
-          <button onClick={chooseScreenshotsDir} className="rounded-lg bg-slate-600/80 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-600">
-            Choose folder
-          </button>
-          <button onClick={() => clearScreenshots()} className="rounded-lg bg-rose-600/80 px-3 py-2 text-sm font-medium text-white transition hover:bg-rose-600">
-            Clear all
-          </button>
-          {settings && <div className="text-xs text-slate-500">retention: {settings.retentionMaxCount} files / {settings.retentionMaxAgeDays} days</div>}
-        </div>
-
-        <div className="rounded-xl bg-slate-900/50 p-3">
-          {screenshots.length === 0 ? (
-            <div className="text-sm text-slate-500 text-center py-4">No screenshots yet.</div>
-          ) : (
-            <ul className="space-y-2">
-              {screenshots.map((s) => (
-                <li key={s.filename} className="flex items-center gap-3 rounded-lg bg-slate-800/40 px-3 py-2">
-                  <div className="min-w-0">
-                    <div className="text-sm text-white truncate">{s.filename}</div>
-                    <div className="text-xs text-slate-500 truncate">{s.path}</div>
-                  </div>
-                  <div className="ml-auto flex gap-2">
-                    <button onClick={() => loadScreenshotPreview(s.filename)} className="rounded-lg bg-slate-600/80 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-slate-600">
-                      Preview
-                    </button>
-                    <button onClick={() => deleteScreenshot(s.filename)} className="rounded-lg bg-rose-600/80 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-rose-600">
-                      Delete
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {screenshotPreview && (
-          <div className="rounded-xl bg-slate-900/50 p-3 ring-1 ring-white/10">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-sm text-white">{screenshotPreview.filename}</div>
-              <button onClick={() => loadScreenshotPreview(screenshotPreview.filename)} className="text-xs text-slate-400 hover:text-white" title="Refresh preview">
-                refresh
-              </button>
-            </div>
-            <img src={screenshotPreview.dataUrl} className="w-full rounded-lg ring-1 ring-white/10" />
-          </div>
-        )}
-
-        {settings && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-slate-400 block mb-1">Retention max count</label>
-              <input type="number" min={1} value={settings.retentionMaxCount} onChange={(e) => updateSettings({ retentionMaxCount: parseInt(e.target.value, 10) || 1 })} className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10" />
-            </div>
-            <div>
-              <label className="text-xs text-slate-400 block mb-1">Retention max age (days)</label>
-              <input type="number" min={1} value={settings.retentionMaxAgeDays} onChange={(e) => updateSettings({ retentionMaxAgeDays: parseInt(e.target.value, 10) || 1 })} className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10" />
-            </div>
-          </div>
-        )}
-      </div>
+      <ScreenshotsSection
+        settings={settings}
+        updateSettings={updateSettings}
+        chooseScreenshotsDir={chooseScreenshotsDir}
+        screenshots={screenshots}
+        screenshotPreview={screenshotPreview}
+        loadScreenshotPreview={loadScreenshotPreview}
+        deleteScreenshot={deleteScreenshot}
+        clearScreenshots={clearScreenshots}
+      />
     </div>
   );
 }
