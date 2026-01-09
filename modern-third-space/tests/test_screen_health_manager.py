@@ -260,3 +260,144 @@ def test_binarize_bgra_to_bitmap_basic():
     assert bits[:2] == [0, 1]
 
 
+def test_binarize_bgra_to_bitmap_invert():
+    # 2x1 pixels: [black, white] with threshold 0.5, invert=True => [1,0]
+    raw = bytes(
+        [
+            0,
+            0,
+            0,
+            255,  # black
+            255,
+            255,
+            255,
+            255,  # white
+        ]
+    )
+    bits, w, h = shm.binarize_bgra_to_bitmap(raw, 2, 1, threshold=0.5, invert=True, scale=1)
+    assert (w, h) == (2, 1)
+    assert bits[:2] == [1, 0]
+
+
+def test_binarize_bgra_to_bitmap_scale_replicates_pixels():
+    # 1x1 pixel: white, scale=2 => 2x2 all ones (threshold 0.5)
+    raw = bytes([255, 255, 255, 255])
+    bits, w, h = shm.binarize_bgra_to_bitmap(raw, 1, 1, threshold=0.5, invert=False, scale=2)
+    assert (w, h) == (2, 2)
+    assert bits == [1, 1, 1, 1]
+
+
+def _tmpl_digit_0(w: int, h: int) -> list[int]:
+    # Border rectangle
+    out: list[int] = [0] * (w * h)
+    for y in range(h):
+        for x in range(w):
+            if x == 0 or x == (w - 1) or y == 0 or y == (h - 1):
+                out[y * w + x] = 1
+    return out
+
+
+def _tmpl_digit_1(w: int, h: int) -> list[int]:
+    # Center vertical line
+    out: list[int] = [0] * (w * h)
+    cx = w // 2
+    for y in range(h):
+        out[y * w + cx] = 1
+    return out
+
+
+def _tmpl_digit_5(w: int, h: int) -> list[int]:
+    # Simple "5": top, middle, bottom bars + left-top + right-bottom stems
+    out: list[int] = [0] * (w * h)
+    for x in range(w):
+        out[0 * w + x] = 1
+        out[(h // 2) * w + x] = 1
+        out[(h - 1) * w + x] = 1
+    for y in range(1, h // 2):
+        out[y * w + 0] = 1
+    for y in range((h // 2) + 1, h - 1):
+        out[y * w + (w - 1)] = 1
+    return out
+
+
+def _render_digits_bits(digits: str, templates: dict[str, list[int]], w: int, h: int) -> list[int]:
+    # Compose digit slices horizontally, row by row (row-major for the whole ROI)
+    out: list[int] = []
+    for y in range(h):
+        for ch in digits:
+            t = templates[ch]
+            out.extend(t[y * w : (y + 1) * w])
+    return out
+
+
+def _make_hn_detector(*, digits: int, templates: dict[str, list[int]], w: int, h: int, hamming_max: int, min_v: int = 0, max_v: int = 999) -> shm.HealthNumberDetector:
+    return shm.HealthNumberDetector(
+        rect=shm.NormalizedRect(x=0.0, y=0.0, w=1.0, h=1.0),
+        digits=digits,
+        preprocess=shm.HealthNumberPreprocess(invert=False, threshold=0.5, scale=1),
+        readout=shm.HealthNumberReadout(min_value=min_v, max_value=max_v, stable_reads=1),
+        hit_on_decrease=shm.HealthNumberHitOnDecrease(min_drop=1, cooldown_ms=0),
+        templates=shm.HealthNumberTemplates(
+            template_set_id="unit_test",
+            hamming_max=hamming_max,
+            width=w,
+            height=h,
+            digits=templates,
+        ),
+        name="hn_test",
+    )
+
+
+def test_health_number_try_read_single_digit_exact_match():
+    w, h = 5, 7
+    templates = {"0": _tmpl_digit_0(w, h), "1": _tmpl_digit_1(w, h)}
+    hn = _make_hn_detector(digits=1, templates=templates, w=w, h=h, hamming_max=0)
+
+    bits = templates["1"]
+    manager = shm.ScreenHealthManager(on_game_event=lambda *_: None, on_trigger=lambda *_: None)
+    assert manager._health_number_try_read(bits, bw=w, bh=h, hn=hn) == 1
+
+
+def test_health_number_try_read_multi_digit_exact_match():
+    w, h = 5, 7
+    templates = {"0": _tmpl_digit_0(w, h), "1": _tmpl_digit_1(w, h), "5": _tmpl_digit_5(w, h)}
+    hn = _make_hn_detector(digits=3, templates=templates, w=w, h=h, hamming_max=0)
+
+    bits = _render_digits_bits("105", templates, w, h)
+    manager = shm.ScreenHealthManager(on_game_event=lambda *_: None, on_trigger=lambda *_: None)
+    assert manager._health_number_try_read(bits, bw=3 * w, bh=h, hn=hn) == 105
+
+
+def test_health_number_try_read_allows_small_noise_with_hamming_max():
+    w, h = 5, 7
+    templates = {"1": _tmpl_digit_1(w, h)}
+    # Allow exactly 1 bit difference
+    hn = _make_hn_detector(digits=1, templates=templates, w=w, h=h, hamming_max=1)
+
+    noisy = list(templates["1"])
+    noisy[0] = 0 if noisy[0] else 1  # flip one bit
+    manager = shm.ScreenHealthManager(on_game_event=lambda *_: None, on_trigger=lambda *_: None)
+    assert manager._health_number_try_read(noisy, bw=w, bh=h, hn=hn) == 1
+
+
+def test_health_number_try_read_rejects_when_hamming_exceeds_max():
+    w, h = 5, 7
+    templates = {"1": _tmpl_digit_1(w, h)}
+    hn = _make_hn_detector(digits=1, templates=templates, w=w, h=h, hamming_max=0)
+
+    noisy = list(templates["1"])
+    noisy[0] = 0 if noisy[0] else 1  # flip one bit => distance 1 > 0
+    manager = shm.ScreenHealthManager(on_game_event=lambda *_: None, on_trigger=lambda *_: None)
+    assert manager._health_number_try_read(noisy, bw=w, bh=h, hn=hn) is None
+
+
+def test_health_number_try_read_rejects_value_outside_range():
+    w, h = 5, 7
+    templates = {"5": _tmpl_digit_5(w, h)}
+    hn = _make_hn_detector(digits=3, templates=templates, w=w, h=h, hamming_max=0, min_v=0, max_v=200)
+
+    bits = _render_digits_bits("555", templates, w, h)
+    manager = shm.ScreenHealthManager(on_game_event=lambda *_: None, on_trigger=lambda *_: None)
+    assert manager._health_number_try_read(bits, bw=3 * w, bh=h, hn=hn) is None
+
+
