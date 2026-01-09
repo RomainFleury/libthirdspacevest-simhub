@@ -240,3 +240,23 @@ def test_manager_health_bar_hit_on_decrease(monkeypatch):
     hit_events = [e for e in events if e[0] == "hit_recorded" and e[1].get("source") == "health_bar"]
     assert len(hit_events) >= 1
 
+
+def test_binarize_bgra_to_bitmap_basic():
+    # 2x1 pixels: [black, white] with threshold 0.5 => [0,1]
+    raw = bytes(
+        [
+            0,
+            0,
+            0,
+            255,  # black
+            255,
+            255,
+            255,
+            255,  # white
+        ]
+    )
+    bits, w, h = shm.binarize_bgra_to_bitmap(raw, 2, 1, threshold=0.5, invert=False, scale=1)
+    assert (w, h) == (2, 1)
+    assert bits[:2] == [0, 1]
+
+

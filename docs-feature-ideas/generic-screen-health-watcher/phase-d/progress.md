@@ -9,11 +9,11 @@
 ---
 
 ## Milestones
-- [ ] OCR approach chosen and documented
-- [ ] Daemon OCR detector implemented
-- [ ] Profile schema updated
-- [ ] UI OCR calibration implemented
-- [ ] Unit tests added/updated and passing
+- [x] OCR approach chosen and documented
+- [x] Daemon OCR detector implemented
+- [x] Profile schema updated
+- [x] UI OCR calibration implemented
+- [x] Unit tests added/updated and passing
 - [ ] Manual verification recorded
 
 ---

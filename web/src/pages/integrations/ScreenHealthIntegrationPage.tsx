@@ -10,6 +10,7 @@ const game = getIntegratedGame("screen_health")!;
 const EVENT_DISPLAY_MAP: Record<string, EventDisplayInfo> = {
   hit_recorded: { label: "Hit", icon: "💥", color: "text-red-400" },
   health_percent: { label: "Health %", icon: "❤️", color: "text-emerald-400" },
+  health_value: { label: "Health", icon: "Health", color: "text-emerald-400" },
 };
 
 const DIRECTION_KEYS = [
@@ -30,7 +31,7 @@ type RoiDraft = {
   rect: { x: number; y: number; w: number; h: number };
 };
 
-type DetectorType = "redness_rois" | "health_bar";
+type DetectorType = "redness_rois" | "health_bar" | "health_number";
 
 function clamp01(v: number) {
   return Math.max(0, Math.min(1, v));
@@ -100,6 +101,22 @@ export function ScreenHealthIntegrationPage() {
   const [hitCooldownMs, setHitCooldownMs] = useState<number>(150);
   const [colorPickMode, setColorPickMode] = useState<null | "filled" | "empty">(null);
 
+  // Health number OCR detector state (Phase D)
+  const [healthNumberRoi, setHealthNumberRoi] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [healthNumberDigits, setHealthNumberDigits] = useState<number>(3);
+  const [hnInvert, setHnInvert] = useState<boolean>(false);
+  const [hnThreshold, setHnThreshold] = useState<number>(0.6);
+  const [hnScale, setHnScale] = useState<number>(2);
+  const [hnReadMin, setHnReadMin] = useState<number>(0);
+  const [hnReadMax, setHnReadMax] = useState<number>(300);
+  const [hnStableReads, setHnStableReads] = useState<number>(2);
+  const [hnHitMinDrop, setHnHitMinDrop] = useState<number>(1);
+  const [hnHitCooldownMs, setHnHitCooldownMs] = useState<number>(150);
+  const [hnHammingMax, setHnHammingMax] = useState<number>(120);
+  const [hnTemplateSize, setHnTemplateSize] = useState<{ w: number; h: number }>({ w: 16, h: 24 });
+  const [hnTemplates, setHnTemplates] = useState<Record<string, string>>({});
+  const [hnLearnValue, setHnLearnValue] = useState<string>("");
+
   const [selectedPresetId, setSelectedPresetId] = useState<string>(SCREEN_HEALTH_PRESETS[0]?.preset_id || "");
 
   useEffect(() => {
@@ -110,9 +127,43 @@ export function ScreenHealthIntegrationPage() {
     setTickMs(Number(p.capture?.tick_ms || 50));
     const detectors: any[] = Array.isArray(p.detectors) ? p.detectors : [];
     const hb = detectors.find((d: any) => d.type === "health_bar");
+    const hn = detectors.find((d: any) => d.type === "health_number");
     const red = detectors.find((d: any) => d.type === "redness_rois");
 
-    if (hb) {
+    if (hn) {
+      setDetectorType("health_number");
+      setHealthNumberRoi({
+        x: Number(hn.roi?.x ?? 0),
+        y: Number(hn.roi?.y ?? 0),
+        w: Number(hn.roi?.w ?? 0.12),
+        h: Number(hn.roi?.h ?? 0.06),
+      });
+      setHealthNumberDigits(Number(hn.digits ?? 3));
+      setHnInvert(Boolean(hn.preprocess?.invert ?? false));
+      setHnThreshold(Number(hn.preprocess?.threshold ?? 0.6));
+      setHnScale(Number(hn.preprocess?.scale ?? 2));
+      setHnReadMin(Number(hn.readout?.min ?? 0));
+      setHnReadMax(Number(hn.readout?.max ?? 300));
+      setHnStableReads(Number(hn.readout?.stable_reads ?? 2));
+      setHnHitMinDrop(Number(hn.hit_on_decrease?.min_drop ?? 1));
+      setHnHitCooldownMs(Number(hn.hit_on_decrease?.cooldown_ms ?? 150));
+      setHnHammingMax(Number(hn.templates?.hamming_max ?? 120));
+      const tw = Number(hn.templates?.width ?? 16);
+      const th = Number(hn.templates?.height ?? 24);
+      setHnTemplateSize({ w: tw, h: th });
+      const digitsMap = hn.templates?.digits;
+      if (digitsMap && typeof digitsMap === "object") {
+        const next: Record<string, string> = {};
+        for (const k of Object.keys(digitsMap)) {
+          const v = (digitsMap as any)[k];
+          if (typeof v === "string") next[String(k)] = v;
+        }
+        setHnTemplates(next);
+      } else {
+        setHnTemplates({});
+      }
+      setColorPickMode(null);
+    } else if (hb) {
       setDetectorType("health_bar");
       setHealthBarRoi({
         x: Number(hb.roi?.x ?? 0),
@@ -196,6 +247,54 @@ export function ScreenHealthIntegrationPage() {
       };
     }
 
+    if (detectorType === "health_number") {
+      const roi = healthNumberRoi ?? { x: 0.05, y: 0.9, w: 0.12, h: 0.06 };
+      return {
+        schema_version: 0,
+        name: profileName,
+        meta: activeProfile?.profile?.meta,
+        capture: {
+          source: "monitor",
+          monitor_index: monitorIndex,
+          tick_ms: tickMs,
+        },
+        detectors: [
+          {
+            type: "health_number",
+            name: "health_number",
+            roi: {
+              x: clamp01(roi.x),
+              y: clamp01(roi.y),
+              w: clamp01(roi.w),
+              h: clamp01(roi.h),
+            },
+            digits: Math.max(1, Math.floor(healthNumberDigits)),
+            preprocess: {
+              invert: Boolean(hnInvert),
+              threshold: Math.max(0, Math.min(1, hnThreshold)),
+              scale: Math.max(1, Math.floor(hnScale)),
+            },
+            readout: {
+              min: Math.floor(hnReadMin),
+              max: Math.floor(hnReadMax),
+              stable_reads: Math.max(1, Math.floor(hnStableReads)),
+            },
+            templates: {
+              template_set_id: "learned_v1",
+              hamming_max: Math.max(0, Math.floor(hnHammingMax)),
+              width: hnTemplateSize.w,
+              height: hnTemplateSize.h,
+              digits: hnTemplates,
+            },
+            hit_on_decrease: {
+              min_drop: Math.max(1, Math.floor(hnHitMinDrop)),
+              cooldown_ms: Math.max(0, Math.floor(hnHitCooldownMs)),
+            },
+          },
+        ],
+      };
+    }
+
     return {
       schema_version: 0,
       name: profileName,
@@ -238,6 +337,19 @@ export function ScreenHealthIntegrationPage() {
     toleranceL1,
     hitMinDrop,
     hitCooldownMs,
+    healthNumberRoi,
+    healthNumberDigits,
+    hnInvert,
+    hnThreshold,
+    hnScale,
+    hnReadMin,
+    hnReadMax,
+    hnStableReads,
+    hnHitMinDrop,
+    hnHitCooldownMs,
+    hnHammingMax,
+    hnTemplateSize,
+    hnTemplates,
   ]);
 
   const [saving, setSaving] = useState(false);
@@ -360,6 +472,95 @@ export function ScreenHealthIntegrationPage() {
     return true;
   };
 
+  const learnHealthNumberTemplatesFromScreenshot = () => {
+    if (!healthNumberRoi) {
+      throw new Error("No health number ROI set");
+    }
+    const canvas = offscreenCanvasRef.current;
+    if (!canvas || !imageLoadedRef.current) {
+      throw new Error("No screenshot loaded");
+    }
+
+    const digitsCount = Math.max(1, Math.floor(healthNumberDigits));
+    const raw = (hnLearnValue || "").replace(/[^\d]/g, "");
+    if (!raw) throw new Error("Enter the current health value (digits only)");
+    if (raw.length !== digitsCount) {
+      throw new Error(`Expected exactly ${digitsCount} digits (got ${raw.length})`);
+    }
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas context not available");
+
+    const x0 = clampInt(Math.floor(healthNumberRoi.x * canvas.width), 0, canvas.width - 1);
+    const y0 = clampInt(Math.floor(healthNumberRoi.y * canvas.height), 0, canvas.height - 1);
+    const x1 = clampInt(Math.floor((healthNumberRoi.x + healthNumberRoi.w) * canvas.width), x0 + 1, canvas.width);
+    const y1 = clampInt(Math.floor((healthNumberRoi.y + healthNumberRoi.h) * canvas.height), y0 + 1, canvas.height);
+    const roiW = x1 - x0;
+    const roiH = y1 - y0;
+
+    const imageData = ctx.getImageData(x0, y0, roiW, roiH).data; // RGBA
+    const scale = Math.max(1, Math.floor(hnScale));
+    const bw = roiW * scale;
+    const bh = roiH * scale;
+    const bits = new Uint8Array(bw * bh);
+    const thr = Math.round(Math.max(0, Math.min(1, hnThreshold)) * 255);
+
+    // Binarize then replicate (matches daemon semantics)
+    for (let yy = 0; yy < roiH; yy++) {
+      for (let xx = 0; xx < roiW; xx++) {
+        const idx = (yy * roiW + xx) * 4;
+        const r = imageData[idx + 0];
+        const g = imageData[idx + 1];
+        const b = imageData[idx + 2];
+        const gray = Math.floor((r * 299 + g * 587 + b * 114) / 1000);
+        let bit = gray >= thr ? 1 : 0;
+        if (hnInvert) bit = bit ? 0 : 1;
+
+        const oy0 = yy * scale;
+        const ox0 = xx * scale;
+        for (let sy = 0; sy < scale; sy++) {
+          const row = (oy0 + sy) * bw;
+          for (let sx = 0; sx < scale; sx++) {
+            bits[row + (ox0 + sx)] = bit;
+          }
+        }
+      }
+    }
+
+    const tw = hnTemplateSize.w;
+    const th = hnTemplateSize.h;
+
+    function resizeNearest(src: Uint8Array, srcW: number, srcH: number, dstW: number, dstH: number) {
+      const out = new Uint8Array(dstW * dstH);
+      for (let y = 0; y < dstH; y++) {
+        const sy = Math.floor((y * srcH) / dstH);
+        for (let x = 0; x < dstW; x++) {
+          const sx = Math.floor((x * srcW) / dstW);
+          out[y * dstW + x] = src[sy * srcW + sx] ? 1 : 0;
+        }
+      }
+      return out;
+    }
+
+    const nextTemplates: Record<string, string> = { ...hnTemplates };
+    for (let i = 0; i < digitsCount; i++) {
+      const ch = raw[i];
+      const sx0 = Math.round((i * bw) / digitsCount);
+      const sx1 = Math.round(((i + 1) * bw) / digitsCount);
+      const sw = Math.max(1, sx1 - sx0);
+      const slice = new Uint8Array(sw * bh);
+      for (let y = 0; y < bh; y++) {
+        slice.set(bits.subarray(y * bw + sx0, y * bw + sx0 + sw), y * sw);
+      }
+      const norm = resizeNearest(slice, sw, bh, tw, th);
+      let bitStr = "";
+      for (let k = 0; k < norm.length; k++) bitStr += norm[k] ? "1" : "0";
+      nextTemplates[ch] = bitStr;
+    }
+
+    setHnTemplates(nextTemplates);
+  };
+
   const handleMouseDown = (e: React.MouseEvent) => {
     if (pickColorAtMouse(e)) return;
     if (!imgContainerRef.current) return;
@@ -397,6 +598,8 @@ export function ScreenHealthIntegrationPage() {
     };
     if (detectorType === "health_bar") {
       setHealthBarRoi(newRect);
+    } else if (detectorType === "health_number") {
+      setHealthNumberRoi(newRect);
     } else {
       const roi: RoiDraft = {
         name: `roi_${rois.length + 1}`,
@@ -573,10 +776,16 @@ export function ScreenHealthIntegrationPage() {
           >
             <option value="redness_rois">Red vignette (ROIs)</option>
             <option value="health_bar">Health bar (horizontal)</option>
+            <option value="health_number">Health number (digits-only OCR)</option>
           </select>
           {detectorType === "health_bar" && (
             <div className="text-xs text-slate-500">
               Draw a single ROI that tightly contains the full bar, then sample filled/empty colors.
+            </div>
+          )}
+          {detectorType === "health_number" && (
+            <div className="text-xs text-slate-500">
+              Strict mode: digits-only, fixed digit count, fixed layout. You must “learn” templates from a screenshot.
             </div>
           )}
         </div>
@@ -630,6 +839,19 @@ export function ScreenHealthIntegrationPage() {
               />
             )}
 
+            {detectorType === "health_number" && healthNumberRoi && (
+              <div
+                className="absolute border-2 border-emerald-400/80 bg-emerald-400/10"
+                style={{
+                  left: `${healthNumberRoi.x * 100}%`,
+                  top: `${healthNumberRoi.y * 100}%`,
+                  width: `${healthNumberRoi.w * 100}%`,
+                  height: `${healthNumberRoi.h * 100}%`,
+                }}
+                title="health_number"
+              />
+            )}
+
             {/* Drawing ROI */}
             {drawing && (
               <div
@@ -672,7 +894,7 @@ export function ScreenHealthIntegrationPage() {
             />
           </div>
         </div>
-      ) : (
+      ) : detectorType === "health_bar" ? (
         <div className="space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
@@ -767,12 +989,171 @@ export function ScreenHealthIntegrationPage() {
             {colorPickMode ? "Color pick mode: click a pixel on the screenshot." : "Type RGB as “r,g,b” or sample from the screenshot."}
           </div>
         </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label className="text-sm text-slate-400 block mb-1">Digits</label>
+              <input
+                type="number"
+                min={1}
+                value={healthNumberDigits}
+                onChange={(e) => setHealthNumberDigits(parseInt(e.target.value, 10) || 1)}
+                className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-slate-400 block mb-1">Threshold (0..1)</label>
+              <input
+                type="number"
+                step={0.01}
+                min={0}
+                max={1}
+                value={hnThreshold}
+                onChange={(e) => setHnThreshold(parseFloat(e.target.value) || 0)}
+                className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-slate-400 block mb-1">Scale (int)</label>
+              <input
+                type="number"
+                min={1}
+                value={hnScale}
+                onChange={(e) => setHnScale(parseInt(e.target.value, 10) || 1)}
+                className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <label className="text-sm text-slate-400">Invert</label>
+            <input
+              type="checkbox"
+              checked={hnInvert}
+              onChange={(e) => setHnInvert(e.target.checked)}
+              className="h-4 w-4"
+            />
+            <div className="text-xs text-slate-500">Use invert if digits become “negative” after thresholding.</div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label className="text-sm text-slate-400 block mb-1">Readout min</label>
+              <input
+                type="number"
+                value={hnReadMin}
+                onChange={(e) => setHnReadMin(parseInt(e.target.value, 10) || 0)}
+                className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-slate-400 block mb-1">Readout max</label>
+              <input
+                type="number"
+                value={hnReadMax}
+                onChange={(e) => setHnReadMax(parseInt(e.target.value, 10) || 0)}
+                className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-slate-400 block mb-1">Stable reads</label>
+              <input
+                type="number"
+                min={1}
+                value={hnStableReads}
+                onChange={(e) => setHnStableReads(parseInt(e.target.value, 10) || 1)}
+                className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label className="text-sm text-slate-400 block mb-1">Hamming max</label>
+              <input
+                type="number"
+                min={0}
+                value={hnHammingMax}
+                onChange={(e) => setHnHammingMax(parseInt(e.target.value, 10) || 0)}
+                className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-slate-400 block mb-1">Hit min drop (HP)</label>
+              <input
+                type="number"
+                min={1}
+                value={hnHitMinDrop}
+                onChange={(e) => setHnHitMinDrop(parseInt(e.target.value, 10) || 1)}
+                className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-slate-400 block mb-1">Hit cooldown (ms)</label>
+              <input
+                type="number"
+                min={0}
+                value={hnHitCooldownMs}
+                onChange={(e) => setHnHitCooldownMs(parseInt(e.target.value, 10) || 0)}
+                className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
+              />
+            </div>
+          </div>
+
+          <div className="rounded-xl bg-slate-900/40 p-3 ring-1 ring-white/5 space-y-2">
+            <div className="text-sm text-white font-medium">Template learning</div>
+            <div className="text-xs text-slate-400">
+              Draw the digits ROI, then type the number currently shown and click “Learn”.
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                value={hnLearnValue}
+                onChange={(e) => setHnLearnValue(e.target.value)}
+                placeholder={`e.g. ${"7".repeat(Math.max(1, Math.floor(healthNumberDigits)))}`}
+                className="rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
+              />
+              <button
+                onClick={() => {
+                  try {
+                    learnHealthNumberTemplatesFromScreenshot();
+                  } catch (e) {
+                    // TODO: surface this to UI; for now it is visible in devtools
+                    // eslint-disable-next-line no-console
+                    console.error(e);
+                  }
+                }}
+                className="rounded-lg bg-emerald-600/80 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-600"
+              >
+                Learn from screenshot
+              </button>
+              <button
+                onClick={() => setHnTemplates({})}
+                className="rounded-lg bg-slate-600/80 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-600"
+              >
+                Clear templates
+              </button>
+            </div>
+            <div className="text-xs text-slate-500">
+              Learned digits:{" "}
+              <span className="font-mono text-slate-300">
+                {Object.keys(hnTemplates).sort().join(", ") || "(none)"}
+              </span>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ROIs list */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-white">{detectorType === "health_bar" ? "Health bar ROI" : "ROIs"}</h3>
+          <h3 className="text-sm font-semibold text-white">
+            {detectorType === "health_bar"
+              ? "Health bar ROI"
+              : detectorType === "health_number"
+                ? "Health number ROI"
+                : "ROIs"}
+          </h3>
           <button
             onClick={() => {
               if (detectorType === "health_bar") {
@@ -780,13 +1161,24 @@ export function ScreenHealthIntegrationPage() {
                 captureRoiDebugImages(monitorIndex, [{ name: "health_bar", rect: { ...healthBarRoi } }] as any);
                 return;
               }
+              if (detectorType === "health_number") {
+                if (!healthNumberRoi) return;
+                captureRoiDebugImages(monitorIndex, [{ name: "health_number", rect: { ...healthNumberRoi } }] as any);
+                return;
+              }
               if (rois.length) captureRoiDebugImages(monitorIndex, rois);
             }}
-            disabled={detectorType === "health_bar" ? !healthBarRoi : !rois.length}
+            disabled={
+              detectorType === "health_bar"
+                ? !healthBarRoi
+                : detectorType === "health_number"
+                  ? !healthNumberRoi
+                  : !rois.length
+            }
             className="rounded-lg bg-slate-600/80 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-600 disabled:opacity-50"
             title="Capture current ROI crops for debugging"
           >
-            Capture ROI {detectorType === "health_bar" ? "crop" : "crops"}
+            Capture ROI {detectorType === "health_bar" || detectorType === "health_number" ? "crop" : "crops"}
           </button>
         </div>
 
@@ -801,6 +1193,24 @@ export function ScreenHealthIntegrationPage() {
                 </div>
                 <button
                   onClick={() => setHealthBarRoi(null)}
+                  className="rounded-lg bg-rose-600/70 px-3 py-2 text-sm font-medium text-white transition hover:bg-rose-600"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          )
+        ) : detectorType === "health_number" ? (
+          !healthNumberRoi ? (
+            <div className="text-sm text-slate-500">No health number ROI yet. Capture a screenshot and draw one.</div>
+          ) : (
+            <div className="rounded-lg bg-slate-700/20 p-3 ring-1 ring-white/5">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-xs text-slate-500 font-mono">
+                  x={healthNumberRoi.x.toFixed(3)} y={healthNumberRoi.y.toFixed(3)} w={healthNumberRoi.w.toFixed(3)} h={healthNumberRoi.h.toFixed(3)}
+                </div>
+                <button
+                  onClick={() => setHealthNumberRoi(null)}
                   className="rounded-lg bg-rose-600/70 px-3 py-2 text-sm font-medium text-white transition hover:bg-rose-600"
                 >
                   Clear
@@ -992,7 +1402,14 @@ export function ScreenHealthIntegrationPage() {
     id: e.id,
     type: e.type,
     ts: e.ts,
-    params: { roi: e.roi, direction: e.direction, score: e.score, detector: e.detector, health_percent: e.health_percent },
+    params: {
+      roi: e.roi,
+      direction: e.direction,
+      score: e.score,
+      detector: e.detector,
+      health_percent: e.health_percent,
+      health_value: e.health_value,
+    },
   }));
 
   const formatEventDetails = (e: GameEvent) => {
@@ -1001,11 +1418,13 @@ export function ScreenHealthIntegrationPage() {
     const score = e.params?.score as number | undefined;
     const detector = e.params?.detector as string | undefined;
     const hp = e.params?.health_percent as number | undefined;
+    const hv = e.params?.health_value as number | undefined;
     const parts = [];
     if (roi) parts.push(`roi=${roi}`);
     if (direction) parts.push(`dir=${direction}`);
     if (typeof score === "number") parts.push(`score=${score.toFixed(3)}`);
     if (typeof hp === "number") parts.push(`hp=${(hp * 100).toFixed(1)}%`);
+    if (typeof hv === "number") parts.push(`hv=${hv}`);
     if (detector) parts.push(`det=${detector}`);
     return parts.join(" ");
   };

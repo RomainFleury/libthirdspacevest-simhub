@@ -176,6 +176,90 @@ def health_bar_percent_from_bgra(
     return 1.0
 
 
+def _resize_bitmap_nearest(bits: List[int], src_w: int, src_h: int, dst_w: int, dst_h: int) -> List[int]:
+    if src_w <= 0 or src_h <= 0 or dst_w <= 0 or dst_h <= 0:
+        raise ValueError("bitmap sizes must be > 0")
+    if len(bits) < src_w * src_h:
+        raise ValueError("bitmap bits too small for src size")
+    out: List[int] = [0] * (dst_w * dst_h)
+    for y in range(dst_h):
+        sy = int(y * src_h / dst_h)
+        for x in range(dst_w):
+            sx = int(x * src_w / dst_w)
+            out[y * dst_w + x] = 1 if bits[sy * src_w + sx] else 0
+    return out
+
+
+def binarize_bgra_to_bitmap(
+    raw_bgra: bytes,
+    width: int,
+    height: int,
+    *,
+    threshold: float,
+    invert: bool,
+    scale: int,
+) -> Tuple[List[int], int, int]:
+    """
+    Convert BGRA ROI to a binary bitmap (row-major) with optional integer scaling.
+
+    Output bits are 0/1 with 1 representing "foreground/ink".
+
+    Notes:
+    - Uses integer grayscale: gray ≈ 0.299R + 0.587G + 0.114B
+    - Threshold compares gray/255 >= threshold
+    - If invert=True, bits are flipped
+    - Scaling uses nearest-neighbor replication (equivalent to NN scale before binarization)
+    """
+    if width <= 0 or height <= 0:
+        raise ValueError("width and height must be > 0")
+    expected = width * height * 4
+    if len(raw_bgra) < expected:
+        raise ValueError("raw_bgra is smaller than expected for BGRA frame")
+    if not (0.0 <= float(threshold) <= 1.0):
+        raise ValueError("threshold must be in [0,1]")
+    if not isinstance(scale, int) or scale < 1:
+        raise ValueError("scale must be an int >= 1")
+
+    thr = int(round(float(threshold) * 255.0))
+    out_w = width * scale
+    out_h = height * scale
+    out: List[int] = [0] * (out_w * out_h)
+
+    i = 0
+    for y in range(height):
+        for x in range(width):
+            b = raw_bgra[i]
+            g = raw_bgra[i + 1]
+            r = raw_bgra[i + 2]
+            i += 4
+
+            gray = (r * 299 + g * 587 + b * 114) // 1000
+            bit = 1 if gray >= thr else 0
+            if invert:
+                bit = 0 if bit else 1
+
+            if scale == 1:
+                out[y * out_w + x] = bit
+            else:
+                oy0 = y * scale
+                ox0 = x * scale
+                for yy in range(scale):
+                    row = (oy0 + yy) * out_w
+                    for xx in range(scale):
+                        out[row + (ox0 + xx)] = bit
+
+    return out, out_w, out_h
+
+
+def hamming_distance_bits(a: List[int], b: List[int], n: Optional[int] = None) -> int:
+    if n is None:
+        n = min(len(a), len(b))
+    d = 0
+    for i in range(n):
+        d += 1 if (a[i] ^ b[i]) else 0
+    return d
+
+
 @dataclass(frozen=True)
 class RednessROI:
     name: str
@@ -274,6 +358,98 @@ class HealthBarDetector:
 
 
 @dataclass(frozen=True)
+class HealthNumberPreprocess:
+    invert: bool
+    threshold: float
+    scale: int
+
+    def validate(self) -> None:
+        if not isinstance(self.invert, bool):
+            raise ValueError("preprocess.invert must be a boolean")
+        if not isinstance(self.threshold, (int, float)) or not (0.0 <= float(self.threshold) <= 1.0):
+            raise ValueError("preprocess.threshold must be in [0,1]")
+        if not isinstance(self.scale, int) or self.scale < 1:
+            raise ValueError("preprocess.scale must be an int >= 1")
+
+
+@dataclass(frozen=True)
+class HealthNumberReadout:
+    min_value: int
+    max_value: int
+    stable_reads: int
+
+    def validate(self) -> None:
+        if not isinstance(self.min_value, int) or not isinstance(self.max_value, int):
+            raise ValueError("readout.min and readout.max must be ints")
+        if self.min_value > self.max_value:
+            raise ValueError("readout.min must be <= readout.max")
+        if not isinstance(self.stable_reads, int) or self.stable_reads < 1:
+            raise ValueError("readout.stable_reads must be an int >= 1")
+
+
+@dataclass(frozen=True)
+class HealthNumberHitOnDecrease:
+    min_drop: int
+    cooldown_ms: int
+
+    def validate(self) -> None:
+        if not isinstance(self.min_drop, int) or self.min_drop < 1:
+            raise ValueError("hit_on_decrease.min_drop must be an int >= 1")
+        if not isinstance(self.cooldown_ms, int) or self.cooldown_ms < 0:
+            raise ValueError("hit_on_decrease.cooldown_ms must be an int >= 0")
+
+
+@dataclass(frozen=True)
+class HealthNumberTemplates:
+    template_set_id: str
+    hamming_max: int
+    width: int
+    height: int
+    digits: Dict[str, List[int]]
+
+    def validate(self) -> None:
+        if not isinstance(self.template_set_id, str) or not self.template_set_id:
+            raise ValueError("templates.template_set_id must be a non-empty string")
+        if not isinstance(self.hamming_max, int) or self.hamming_max < 0:
+            raise ValueError("templates.hamming_max must be an int >= 0")
+        if not isinstance(self.width, int) or self.width <= 0:
+            raise ValueError("templates.width must be an int > 0")
+        if not isinstance(self.height, int) or self.height <= 0:
+            raise ValueError("templates.height must be an int > 0")
+        if not isinstance(self.digits, dict) or not self.digits:
+            raise ValueError("templates.digits must be a non-empty dict")
+        expected = self.width * self.height
+        for k, v in self.digits.items():
+            if k not in [str(i) for i in range(10)]:
+                raise ValueError("templates.digits keys must be '0'..'9'")
+            if not isinstance(v, list) or len(v) != expected:
+                raise ValueError(f"templates.digits['{k}'] must be a list of length {expected}")
+
+
+@dataclass(frozen=True)
+class HealthNumberDetector:
+    rect: NormalizedRect
+    digits: int
+    preprocess: HealthNumberPreprocess
+    readout: HealthNumberReadout
+    hit_on_decrease: HealthNumberHitOnDecrease
+    templates: Optional[HealthNumberTemplates] = None
+    name: str = "health_number"
+
+    def validate(self) -> None:
+        self.rect.validate()
+        if not isinstance(self.digits, int) or self.digits < 1:
+            raise ValueError("health_number.digits must be an int >= 1")
+        self.preprocess.validate()
+        self.readout.validate()
+        self.hit_on_decrease.validate()
+        if self.templates is not None:
+            self.templates.validate()
+        if not isinstance(self.name, str) or not self.name:
+            raise ValueError("health_number.name must be a non-empty string")
+
+
+@dataclass(frozen=True)
 class ScreenCaptureConfig:
     monitor_index: int = 1  # 1-based to match common UX in Electron
     tick_ms: int = 50
@@ -287,6 +463,7 @@ class ScreenHealthProfile:
     redness_rois: List[RednessROI]
     redness_detector: Optional[RednessDetectorConfig]
     health_bars: List[HealthBarDetector]
+    health_numbers: List[HealthNumberDetector]
 
 
 class ScreenHealthManager:
@@ -324,6 +501,12 @@ class ScreenHealthManager:
         self._prev_health_percent_by_detector: Dict[str, float] = {}
         self._last_health_emit_by_detector: Dict[str, float] = {}
         self._last_health_percent_emitted: Dict[str, float] = {}
+
+        # Health number OCR state
+        self._health_number_candidate_value: Dict[str, int] = {}
+        self._health_number_candidate_count: Dict[str, int] = {}
+        self._prev_health_value_by_detector: Dict[str, int] = {}
+        self._last_health_value_emitted: Dict[str, int] = {}
 
     @property
     def is_running(self) -> bool:
@@ -525,6 +708,89 @@ class ScreenHealthManager:
                 # Map intensity to drop, but keep within [0,1]
                 self._trigger_hit(intensity=max(0.0, min(1.0, drop)))
 
+            # Health number OCR (Phase D)
+            for hn in profile.health_numbers:
+                if self._stop_evt.is_set():
+                    break
+
+                if hn.templates is None:
+                    continue  # Can't run OCR without templates
+
+                left, top, w, h = normalized_rect_to_pixels(hn.rect, frame_w, frame_h)
+                try:
+                    raw_bgra = capture.capture_bgra(left=left, top=top, width=w, height=h)
+                except Exception:
+                    continue
+
+                bits, bw, bh = binarize_bgra_to_bitmap(
+                    raw_bgra,
+                    w,
+                    h,
+                    threshold=hn.preprocess.threshold,
+                    invert=hn.preprocess.invert,
+                    scale=hn.preprocess.scale,
+                )
+
+                value = self._health_number_try_read(bits, bw, bh, hn)
+                if value is None:
+                    continue
+
+                # Stability filtering: require stable_reads consecutive identical reads.
+                cand = self._health_number_candidate_value.get(hn.name)
+                if cand is None or cand != value:
+                    self._health_number_candidate_value[hn.name] = value
+                    self._health_number_candidate_count[hn.name] = 1
+                    continue
+
+                self._health_number_candidate_count[hn.name] = self._health_number_candidate_count.get(hn.name, 1) + 1
+                if self._health_number_candidate_count[hn.name] < hn.readout.stable_reads:
+                    continue
+
+                # Only emit if it changed (or hasn't been emitted yet)
+                last_emitted = self._last_health_value_emitted.get(hn.name)
+                if last_emitted is None or last_emitted != value:
+                    self._last_health_value_emitted[hn.name] = value
+                    self._emit_game_event(
+                        "health_value",
+                        {
+                            "detector": hn.name,
+                            "value": value,
+                        },
+                    )
+
+                # Hit on decrease (integer)
+                prev_val = self._prev_health_value_by_detector.get(hn.name)
+                self._prev_health_value_by_detector[hn.name] = value
+                if prev_val is None:
+                    continue
+
+                drop_i = int(prev_val) - int(value)
+                if drop_i < hn.hit_on_decrease.min_drop:
+                    continue
+
+                now = time.time()
+                key = f"health_number:{hn.name}"
+                last_hit = self._last_hit_by_roi.get(key, 0.0)
+                if (now - last_hit) * 1000.0 < hn.hit_on_decrease.cooldown_ms:
+                    continue
+
+                self._last_hit_by_roi[key] = now
+                self.last_hit_ts = now
+
+                self._emit_game_event(
+                    "hit_recorded",
+                    {
+                        "roi": hn.name,
+                        "direction": None,
+                        "score": max(0.0, min(1.0, float(drop_i) / 25.0)),
+                        "source": "health_number",
+                        "value": value,
+                        "prev_value": int(prev_val),
+                        "drop": drop_i,
+                    },
+                )
+                self._trigger_hit(intensity=max(0.0, min(1.0, float(drop_i) / 25.0)))
+
             elapsed = time.time() - loop_start
             sleep_for = tick_s - elapsed
             if sleep_for > 0:
@@ -557,6 +823,7 @@ class ScreenHealthManager:
         redness_detector: Optional[RednessDetectorConfig] = None
         redness_rois: List[RednessROI] = []
         health_bars: List[HealthBarDetector] = []
+        health_numbers: List[HealthNumberDetector] = []
 
         # Parse detectors (schema_version 0 extensions)
         for d in detectors:
@@ -670,7 +937,97 @@ class ScreenHealthManager:
                 health_bars.append(hb)
                 continue
 
-        if redness_detector is None and not health_bars:
+            if d_type == "health_number":
+                name_raw = d.get("name") or "health_number"
+                name = str(name_raw)
+
+                roi = d.get("roi")
+                if not isinstance(roi, dict):
+                    raise ValueError("health_number.roi is required")
+                rect = NormalizedRect(
+                    x=float(roi.get("x", 0)),
+                    y=float(roi.get("y", 0)),
+                    w=float(roi.get("w", 0)),
+                    h=float(roi.get("h", 0)),
+                )
+                rect.validate()
+
+                digits = int(d.get("digits", 0))
+                if digits < 1:
+                    raise ValueError("health_number.digits must be >= 1")
+
+                preprocess_data = d.get("preprocess")
+                if not isinstance(preprocess_data, dict):
+                    raise ValueError("health_number.preprocess is required")
+                preprocess = HealthNumberPreprocess(
+                    invert=bool(preprocess_data.get("invert", False)),
+                    threshold=float(preprocess_data.get("threshold", 0.6)),
+                    scale=int(preprocess_data.get("scale", 1)),
+                )
+                preprocess.validate()
+
+                readout_data = d.get("readout")
+                if not isinstance(readout_data, dict):
+                    raise ValueError("health_number.readout is required")
+                readout = HealthNumberReadout(
+                    min_value=int(readout_data.get("min", 0)),
+                    max_value=int(readout_data.get("max", 999)),
+                    stable_reads=int(readout_data.get("stable_reads", 1)),
+                )
+                readout.validate()
+
+                hod_data = d.get("hit_on_decrease")
+                if not isinstance(hod_data, dict):
+                    raise ValueError("health_number.hit_on_decrease is required")
+                hit_on_decrease = HealthNumberHitOnDecrease(
+                    min_drop=int(hod_data.get("min_drop", 1)),
+                    cooldown_ms=int(hod_data.get("cooldown_ms", 150)),
+                )
+                hit_on_decrease.validate()
+
+                templates: Optional[HealthNumberTemplates] = None
+                templates_data = d.get("templates")
+                if isinstance(templates_data, dict):
+                    t_id = str(templates_data.get("template_set_id") or "learned_v1")
+                    hamming_max = int(templates_data.get("hamming_max", 120))
+                    t_w = int(templates_data.get("width", 0))
+                    t_h = int(templates_data.get("height", 0))
+                    digits_map = templates_data.get("digits")
+                    parsed_digits: Dict[str, List[int]] = {}
+                    if isinstance(digits_map, dict) and t_w > 0 and t_h > 0:
+                        expected = t_w * t_h
+                        for k, v in digits_map.items():
+                            kk = str(k)
+                            if isinstance(v, str):
+                                if len(v) != expected:
+                                    continue
+                                parsed_digits[kk] = [1 if ch == "1" else 0 for ch in v]
+                            elif isinstance(v, list) and len(v) == expected:
+                                parsed_digits[kk] = [1 if int(x) else 0 for x in v]
+                    if parsed_digits:
+                        templates = HealthNumberTemplates(
+                            template_set_id=t_id,
+                            hamming_max=hamming_max,
+                            width=t_w,
+                            height=t_h,
+                            digits=parsed_digits,
+                        )
+                        templates.validate()
+
+                hn = HealthNumberDetector(
+                    name=name,
+                    rect=rect,
+                    digits=digits,
+                    preprocess=preprocess,
+                    readout=readout,
+                    hit_on_decrease=hit_on_decrease,
+                    templates=templates,
+                )
+                hn.validate()
+                health_numbers.append(hn)
+                continue
+
+        if redness_detector is None and not health_bars and not health_numbers:
             raise ValueError("profile.detectors must include at least one supported detector")
 
         return ScreenHealthProfile(
@@ -680,7 +1037,55 @@ class ScreenHealthManager:
             redness_rois=redness_rois,
             redness_detector=redness_detector,
             health_bars=health_bars,
+            health_numbers=health_numbers,
         )
+
+    def _health_number_try_read(self, bits: List[int], bw: int, bh: int, hn: HealthNumberDetector) -> Optional[int]:
+        assert hn.templates is not None
+        if hn.digits <= 0:
+            return None
+        if bw <= 0 or bh <= 0:
+            return None
+
+        # Split into fixed-width digit slices.
+        digits_str = ""
+        for i in range(hn.digits):
+            x0 = int(round(i * bw / hn.digits))
+            x1 = int(round((i + 1) * bw / hn.digits))
+            x1 = max(x0 + 1, min(bw, x1))
+            slice_w = x1 - x0
+
+            # Extract slice bits (row-major)
+            slice_bits: List[int] = [0] * (slice_w * bh)
+            for y in range(bh):
+                src_off = y * bw + x0
+                dst_off = y * slice_w
+                slice_bits[dst_off : dst_off + slice_w] = bits[src_off : src_off + slice_w]
+
+            # Resize to template size
+            norm = _resize_bitmap_nearest(slice_bits, slice_w, bh, hn.templates.width, hn.templates.height)
+
+            best_digit: Optional[str] = None
+            best_dist: Optional[int] = None
+            for dch, tmpl in hn.templates.digits.items():
+                dist = hamming_distance_bits(norm, tmpl, n=hn.templates.width * hn.templates.height)
+                if best_dist is None or dist < best_dist:
+                    best_dist = dist
+                    best_digit = dch
+
+            if best_digit is None or best_dist is None or best_dist > hn.templates.hamming_max:
+                return None
+            digits_str += best_digit
+
+        if not digits_str:
+            return None
+        try:
+            value = int(digits_str)
+        except Exception:
+            return None
+        if value < hn.readout.min_value or value > hn.readout.max_value:
+            return None
+        return value
 
     def _health_bar_percent_threshold_fallback(
         self, raw_bgra: bytes, width: int, height: int, fallback: HealthBarThresholdFallback

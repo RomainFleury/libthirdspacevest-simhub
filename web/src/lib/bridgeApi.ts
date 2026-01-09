@@ -41,6 +41,7 @@ export type DaemonEvent = {
   profile_name?: string | null;
   health_percent?: number;
   detector?: string | null;
+  health_value?: number;
 };
 
 export type DaemonStatus = {

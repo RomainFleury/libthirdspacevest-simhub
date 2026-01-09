@@ -29,13 +29,14 @@ import {
 
 export type ScreenHealthGameEvent = {
   id: string;
-  type: "hit_recorded" | "health_percent";
+  type: "hit_recorded" | "health_percent" | "health_value";
   ts: number;
   roi?: string | null;
   direction?: string | null;
   score?: number;
   detector?: string | null;
   health_percent?: number;
+  health_value?: number;
 };
 
 const MAX_EVENTS = 50;
@@ -138,6 +139,20 @@ export function useScreenHealthIntegration() {
           ts: event.ts * 1000,
           detector: (event.detector as string | undefined) ?? null,
           health_percent: typeof event.health_percent === "number" ? event.health_percent : undefined,
+        };
+        setEvents((prev) => [newEvent, ...prev].slice(0, MAX_EVENTS));
+        setStatus((prev) => ({
+          ...prev,
+          events_received: (prev.events_received ?? 0) + 1,
+          last_event_ts: event.ts,
+        }));
+      } else if (event.event === "screen_health_value") {
+        const newEvent: ScreenHealthGameEvent = {
+          id: `sh-${++eventIdCounter.current}`,
+          type: "health_value",
+          ts: event.ts * 1000,
+          detector: (event.detector as string | undefined) ?? null,
+          health_value: typeof event.health_value === "number" ? event.health_value : undefined,
         };
         setEvents((prev) => [newEvent, ...prev].slice(0, MAX_EVENTS));
         setStatus((prev) => ({
