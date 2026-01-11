@@ -206,7 +206,20 @@ class DaemonBridge extends EventEmitter {
           "daemon",
           "--port",
           String(this.port),
+          "--screen-health-debug-dir",
+          path.join(PYTHON_SRC_PATH, "debug_logs"),
+          "--screen-health-debug-every-n",
+          "10",
         ];
+        // Original args:
+        // args = [
+        //   "-u",
+        //   "-m",
+        //   "modern_third_space.cli",
+        //   "daemon",
+        //   "--port",
+        //   String(this.port),
+        // ];
         options = {
           cwd: daemonInfo.path,
           env: {
