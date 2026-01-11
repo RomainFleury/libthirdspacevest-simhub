@@ -481,6 +481,13 @@ class TestIntegrationSnapshot:
             "has_manager": True,
             "event_count_min": 4,
         },
+        "screen_health": {
+            "game_name": "Generic Screen Health (Screen Capture)",
+            "integration_type": "screen_capture",
+            "status": "beta",
+            "has_manager": True,
+            "event_count_min": 1,
+        },
     }
     
     def test_expected_integrations_exist(self, registry):

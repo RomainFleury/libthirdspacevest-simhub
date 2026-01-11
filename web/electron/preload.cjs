@@ -108,6 +108,29 @@ contextBridge.exposeInMainWorld("vestBridge", {
   bf2GetConfigFilePath: () => ipcRenderer.invoke("bf2:getConfigFilePath"),
   bf2WriteConfigFile: () => ipcRenderer.invoke("bf2:writeConfigFile"),
 
+  // Generic Screen Health Watcher API
+  screenHealthListProfiles: () => ipcRenderer.invoke("screenHealth:listProfiles"),
+  screenHealthGetActiveProfile: () => ipcRenderer.invoke("screenHealth:getActiveProfile"),
+  screenHealthSaveProfile: (profile) => ipcRenderer.invoke("screenHealth:saveProfile", profile),
+  screenHealthDeleteProfile: (profileId) => ipcRenderer.invoke("screenHealth:deleteProfile", profileId),
+  screenHealthSetActiveProfile: (profileId) => ipcRenderer.invoke("screenHealth:setActiveProfile", profileId),
+  screenHealthExportProfile: (profileId) => ipcRenderer.invoke("screenHealth:exportProfile", profileId),
+  screenHealthImportProfile: () => ipcRenderer.invoke("screenHealth:importProfile"),
+  screenHealthGetSettings: () => ipcRenderer.invoke("screenHealth:getSettings"),
+  screenHealthSetSettings: (settings) => ipcRenderer.invoke("screenHealth:setSettings", settings),
+  screenHealthChooseScreenshotsDir: () => ipcRenderer.invoke("screenHealth:chooseScreenshotsDir"),
+  screenHealthListScreenshots: () => ipcRenderer.invoke("screenHealth:listScreenshots"),
+  screenHealthGetScreenshotDataUrl: (filename) => ipcRenderer.invoke("screenHealth:getScreenshotDataUrl", filename),
+  screenHealthDeleteScreenshot: (filename) => ipcRenderer.invoke("screenHealth:deleteScreenshot", filename),
+  screenHealthClearScreenshots: () => ipcRenderer.invoke("screenHealth:clearScreenshots"),
+  screenHealthCaptureCalibrationScreenshot: (monitorIndex) =>
+    ipcRenderer.invoke("screenHealth:captureCalibrationScreenshot", monitorIndex),
+  screenHealthCaptureRoiDebugImages: (monitorIndex, rois) =>
+    ipcRenderer.invoke("screenHealth:captureRoiDebugImages", monitorIndex, rois),
+  screenHealthStart: () => ipcRenderer.invoke("screenHealth:start"),
+  screenHealthStop: () => ipcRenderer.invoke("screenHealth:stop"),
+  screenHealthStatus: () => ipcRenderer.invoke("screenHealth:status"),
+
   // Multi-Vest Management API
   listConnectedDevices: () => ipcRenderer.invoke("multivist:listConnectedDevices"),
   setMainDevice: (deviceId) => ipcRenderer.invoke("multivist:setMainDevice", deviceId),

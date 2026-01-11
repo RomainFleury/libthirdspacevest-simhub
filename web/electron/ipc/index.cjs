@@ -16,6 +16,7 @@ const { registerStarCitizenHandlers } = require("./starcitizenHandlers.cjs");
 const { registerL4D2Handlers } = require("./l4d2Handlers.cjs");
 const { registerEffectsHandlers } = require("./effectsHandlers.cjs");
 const { registerBF2Handlers } = require("./bf2Handlers.cjs");
+const { registerScreenHealthHandlers } = require("./screenHealthHandlers.cjs");
 const { registerMultiVestHandlers } = require("./multiVestHandlers.cjs");
 const { registerModsHandlers } = require("./modsHandlers.cjs");
 
@@ -56,6 +57,9 @@ function registerAllHandlers(getDaemonBridge, getMainWindow, reconnectToDaemon) 
   // EA Battlefront 2 (2017) settings handlers
   registerBF2Handlers();
 
+  // Generic Screen Health Watcher handlers
+  registerScreenHealthHandlers(getDaemonBridge, getMainWindow);
+
   // Multi-vest management handlers
   registerMultiVestHandlers(getDaemonBridge);
 
@@ -75,5 +79,6 @@ module.exports = {
   registerPistolWhipHandlers,
   registerEffectsHandlers,
   registerBF2Handlers,
+  registerScreenHealthHandlers,
 };
 

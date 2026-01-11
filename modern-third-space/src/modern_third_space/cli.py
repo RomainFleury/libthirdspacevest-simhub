@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from typing import Any, Dict
 
@@ -127,6 +128,16 @@ def _daemon_start(args: argparse.Namespace) -> int:
     
     host = args.host
     port = args.port
+
+    # Optional screen health debug flags (helpful for calibration).
+    if getattr(args, "screen_health_debug", False):
+        os.environ["THIRD_SPACE_SCREEN_HEALTH_DEBUG"] = "1"
+    if getattr(args, "screen_health_debug_save", False):
+        os.environ["THIRD_SPACE_SCREEN_HEALTH_DEBUG_SAVE"] = "1"
+    if getattr(args, "screen_health_debug_dir", None):
+        os.environ["THIRD_SPACE_SCREEN_HEALTH_DEBUG_DIR"] = str(args.screen_health_debug_dir)
+    if getattr(args, "screen_health_debug_every_n", None):
+        os.environ["THIRD_SPACE_SCREEN_HEALTH_DEBUG_EVERY_N"] = str(args.screen_health_debug_every_n)
     
     print(f"[VEST] Starting vest daemon on {host}:{port}...", flush=True)
     run_daemon(host=host, port=port)
@@ -389,6 +400,28 @@ def build_parser() -> argparse.ArgumentParser:
     daemon_start = daemon_sub.add_parser("start", help="Start the daemon")
     daemon_start.add_argument("--host", type=str, default="127.0.0.1", help="Host to bind to")
     daemon_start.add_argument("--port", type=int, default=5050, help="Port to listen on")
+    daemon_start.add_argument(
+        "--screen-health-debug",
+        action="store_true",
+        help="Enable Generic Screen Health debug value logs (equivalent to THIRD_SPACE_SCREEN_HEALTH_DEBUG=1)",
+    )
+    daemon_start.add_argument(
+        "--screen-health-debug-save",
+        action="store_true",
+        help="Save ROI crops as .bmp during Generic Screen Health runs (equivalent to THIRD_SPACE_SCREEN_HEALTH_DEBUG_SAVE=1)",
+    )
+    daemon_start.add_argument(
+        "--screen-health-debug-dir",
+        type=str,
+        default=None,
+        help="Directory to save ROI crops (equivalent to THIRD_SPACE_SCREEN_HEALTH_DEBUG_DIR=...)",
+    )
+    daemon_start.add_argument(
+        "--screen-health-debug-every-n",
+        type=int,
+        default=None,
+        help="Log cadence in ticks (equivalent to THIRD_SPACE_SCREEN_HEALTH_DEBUG_EVERY_N=...)",
+    )
     
     # daemon stop
     daemon_stop = daemon_sub.add_parser("stop", help="Stop the daemon")
