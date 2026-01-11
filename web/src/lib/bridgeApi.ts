@@ -42,6 +42,7 @@ export type DaemonEvent = {
   health_percent?: number;
   detector?: string | null;
   health_value?: number;
+  // Screen health debug events (extra payload is in params)
 };
 
 export type DaemonStatus = {

@@ -525,6 +525,7 @@ class ScreenHealthManager:
         self._debug_log_every_n_ticks = 20
         self._debug_save_roi_images = False
         self._debug_save_dir: Optional[Path] = None
+        self._debug_emit_events = False
         self._debug_tick = 0
         self._debug_saved_once: set[str] = set()
 
@@ -678,6 +679,8 @@ class ScreenHealthManager:
                 self._debug_save_roi_images = False
                 self._debug_save_dir = None
 
+        self._debug_emit_events = bool(self._debug_log_values or self._debug_save_roi_images)
+
         if self._debug_log_values:
             logger.info(
                 "[screen_health] debug enabled: log_values=%s every_n=%s save_roi_images=%s dir=%s",
@@ -761,6 +764,18 @@ class ScreenHealthManager:
             self._write_bmp_bgra(path, raw_bgra, width, height)
             self._debug_saved_once.add(key)
             logger.info("[screen_health] saved roi kind=%s name=%s file=%s extra=%s", kind, name, fname, extra)
+            if self._debug_emit_events:
+                self._emit_game_event(
+                    "debug",
+                    {
+                        "kind": "roi_saved",
+                        "detector": name,
+                        "detector_kind": kind,
+                        "saved_filename": fname,
+                        "saved_dir": str(self._debug_save_dir) if self._debug_save_dir else None,
+                        "extra": extra,
+                    },
+                )
             return fname
         except Exception as e:
             logger.warning("[screen_health] failed to save roi kind=%s name=%s err=%s", kind, name, str(e))
@@ -817,6 +832,16 @@ class ScreenHealthManager:
                             float(score),
                             float(profile.redness_detector.min_score),
                         )
+                        if self._debug_emit_events:
+                            self._emit_game_event(
+                                "debug",
+                                {
+                                    "kind": "redness_score",
+                                    "detector": roi.name,
+                                    "score": float(score),
+                                    "threshold": float(profile.redness_detector.min_score),
+                                },
+                            )
 
                     # Save one example crop per ROI to ease calibration.
                     self._debug_maybe_save_roi(
@@ -904,6 +929,15 @@ class ScreenHealthManager:
                 percent = max(0.0, min(1.0, float(percent_raw)))
                 if should_periodic_log:
                     logger.info("[screen_health] health_bar detector=%s percent=%.4f", hb.name, float(percent))
+                    if self._debug_emit_events:
+                        self._emit_game_event(
+                            "debug",
+                            {
+                                "kind": "health_bar_percent",
+                                "detector": hb.name,
+                                "percent": float(percent),
+                            },
+                        )
 
                 # Save one example crop per detector to ease calibration.
                 self._debug_maybe_save_roi(
@@ -1024,6 +1058,16 @@ class ScreenHealthManager:
                         value,
                         int(hn.readout.stable_reads),
                     )
+                    if self._debug_emit_events:
+                        self._emit_game_event(
+                            "debug",
+                            {
+                                "kind": "health_number_read",
+                                "detector": hn.name,
+                                "read": int(value) if value is not None else None,
+                                "stable_reads": int(hn.readout.stable_reads),
+                            },
+                        )
 
                 # Save one example crop per detector to ease calibration.
                 self._debug_maybe_save_roi(

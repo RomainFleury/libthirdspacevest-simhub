@@ -4,6 +4,7 @@ export const EVENT_DISPLAY_MAP: Record<string, EventDisplayInfo> = {
   hit_recorded: { label: "Hit", icon: "💥", color: "text-red-400" },
   health_percent: { label: "Health %", icon: "❤️", color: "text-emerald-400" },
   health_value: { label: "Health", icon: "Health", color: "text-emerald-400" },
+  debug: { label: "Debug", icon: "🔎", color: "text-slate-300" },
 };
 
 export const DIRECTION_KEYS = [

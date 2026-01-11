@@ -27,6 +27,7 @@ export function useScreenHealthIntegration() {
     error: daemon.error,
 
     events: events.events,
+    latestDebug: events.latestDebug,
     clearEvents: events.clearEvents,
 
     profiles: profiles.profiles,

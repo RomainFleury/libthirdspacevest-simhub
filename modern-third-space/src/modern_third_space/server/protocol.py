@@ -122,6 +122,7 @@ class EventType(Enum):
     SCREEN_HEALTH_HIT = "screen_health_hit"
     SCREEN_HEALTH_HEALTH = "screen_health_health"
     SCREEN_HEALTH_VALUE = "screen_health_value"
+    SCREEN_HEALTH_DEBUG = "screen_health_debug"
     # Predefined effects
     EFFECT_STARTED = "effect_started"
     EFFECT_COMPLETED = "effect_completed"
@@ -882,6 +883,19 @@ def event_screen_health_value(health_value: int, detector: Optional[str] = None)
         event_type="health_value",
         health_value=int(health_value),
         detector=detector,
+    )
+
+
+def event_screen_health_debug(params: Dict[str, Any], detector: Optional[str] = None) -> Event:
+    """
+    Debug event for calibration: emits evaluated detector values and (optionally)
+    saved ROI crop filenames.
+    """
+    return Event(
+        event=EventType.SCREEN_HEALTH_DEBUG.value,
+        event_type="debug",
+        detector=detector,
+        params=params,
     )
 
 

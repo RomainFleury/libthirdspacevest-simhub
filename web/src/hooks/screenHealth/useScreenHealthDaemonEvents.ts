@@ -7,6 +7,7 @@ export function useScreenHealthDaemonEvents(opts: { setStatus: React.Dispatch<Re
   const { setStatus } = opts;
 
   const [events, setEvents] = useState<ScreenHealthGameEvent[]>([]);
+  const [latestDebug, setLatestDebug] = useState<Record<string, { kind: string; ts: number; data: Record<string, unknown> }>>({});
   const eventIdCounter = useRef(0);
 
   // Subscribe to daemon events
@@ -69,6 +70,28 @@ export function useScreenHealthDaemonEvents(opts: { setStatus: React.Dispatch<Re
           events_received: (prev.events_received ?? 0) + 1,
           last_event_ts: event.ts,
         }));
+        return;
+      }
+      if (event.event === "screen_health_debug") {
+        const params = (event.params || {}) as Record<string, unknown>;
+        const kind = (params.kind as string | undefined) || "debug";
+        const detector = (params.detector as string | undefined) || (event.detector as string | undefined) || "(unknown)";
+
+        const newEvent: ScreenHealthGameEvent = {
+          id: `sh-${++eventIdCounter.current}`,
+          type: "debug",
+          ts: event.ts * 1000,
+          detector,
+          debug_kind: kind,
+          debug: params,
+        };
+        setEvents((prev) => [newEvent, ...prev].slice(0, MAX_SCREEN_HEALTH_EVENTS));
+        setLatestDebug((prev) => ({ ...prev, [detector]: { kind, ts: event.ts * 1000, data: params } }));
+        setStatus((prev) => ({
+          ...prev,
+          events_received: (prev.events_received ?? 0) + 1,
+          last_event_ts: event.ts,
+        }));
       }
     });
     return unsubscribe;
@@ -76,6 +99,6 @@ export function useScreenHealthDaemonEvents(opts: { setStatus: React.Dispatch<Re
 
   const clearEvents = useCallback(() => setEvents([]), []);
 
-  return { events, clearEvents };
+  return { events, latestDebug, clearEvents };
 }
 

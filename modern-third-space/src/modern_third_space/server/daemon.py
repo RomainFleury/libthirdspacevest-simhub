@@ -94,6 +94,7 @@ from .protocol import (
     event_screen_health_hit,
     event_screen_health_health,
     event_screen_health_value,
+    event_screen_health_debug,
     response_screen_health_start,
     response_screen_health_stop,
     response_screen_health_status,
@@ -1434,6 +1435,9 @@ class VestDaemon:
             detector = params.get("detector")
             value = int(params.get("value") or 0)
             event = event_screen_health_value(health_value=value, detector=detector)
+        elif event_type == "debug":
+            detector = params.get("detector")
+            event = event_screen_health_debug(params=params, detector=detector)
         else:
             event = event_error(f"Unknown screen_health event_type: {event_type}")
 
