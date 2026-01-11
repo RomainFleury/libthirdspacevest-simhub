@@ -286,7 +286,7 @@ class VestDaemon:
             except Exception as e:
                 logger.debug(f"Error closing client connection: {e}")
             logger.info(f"Client {client.id} disconnected")
-            print(f"📴 Client {client.id} disconnected")
+            print(f"[VEST] Client {client.id} disconnected")
     
     async def _handle_command(self, client: Client, command: Command) -> Optional[Response]:
         """
