@@ -401,3 +401,26 @@ def test_health_number_try_read_rejects_value_outside_range():
     assert manager._health_number_try_read(bits, bw=3 * w, bh=h, hn=hn) is None
 
 
+def test_debug_write_bmp_bgra_writes_valid_header(tmp_path):
+    manager = shm.ScreenHealthManager(on_game_event=lambda *_: None, on_trigger=lambda *_: None)
+    # 2x1 BGRA: [black, white]
+    raw = bytes(
+        [
+            0,
+            0,
+            0,
+            255,
+            255,
+            255,
+            255,
+            255,
+        ]
+    )
+    out = tmp_path / "roi.bmp"
+    manager._write_bmp_bgra(out, raw, 2, 1)
+    data = out.read_bytes()
+    assert data[:2] == b"BM"
+    # BMP header is 54 bytes, then pixel data
+    assert len(data) == 54 + (2 * 1 * 4)
+
+

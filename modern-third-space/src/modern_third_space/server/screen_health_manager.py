@@ -14,14 +14,20 @@ Design constraints:
 from __future__ import annotations
 
 import json
+import logging
+import os
 import random
+import struct
 import threading
 import time
+from pathlib import Path
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 from ..vest.cell_layout import ALL_CELLS
+
+logger = logging.getLogger(__name__)
 
 
 class DirectionKey(str, Enum):
@@ -456,6 +462,30 @@ class ScreenCaptureConfig:
 
 
 @dataclass(frozen=True)
+class ScreenHealthDebugConfig:
+    """
+    Optional debug config to help calibrate detectors.
+
+    Note: This is intentionally "best effort" and should never make the watcher fail.
+    """
+
+    log_values: bool = False
+    log_every_n_ticks: int = 20  # periodic log (avoid spam)
+    save_roi_images: bool = False
+    save_dir: Optional[str] = None
+
+    def validate(self) -> None:
+        if not isinstance(self.log_values, bool):
+            raise ValueError("debug.log_values must be a boolean")
+        if not isinstance(self.log_every_n_ticks, int) or self.log_every_n_ticks < 1:
+            raise ValueError("debug.log_every_n_ticks must be an int >= 1")
+        if not isinstance(self.save_roi_images, bool):
+            raise ValueError("debug.save_roi_images must be a boolean")
+        if self.save_dir is not None and (not isinstance(self.save_dir, str) or not self.save_dir):
+            raise ValueError("debug.save_dir must be a non-empty string when provided")
+
+
+@dataclass(frozen=True)
 class ScreenHealthProfile:
     schema_version: int
     name: str
@@ -464,6 +494,7 @@ class ScreenHealthProfile:
     redness_detector: Optional[RednessDetectorConfig]
     health_bars: List[HealthBarDetector]
     health_numbers: List[HealthNumberDetector]
+    debug: Optional[ScreenHealthDebugConfig] = None
 
 
 class ScreenHealthManager:
@@ -488,6 +519,14 @@ class ScreenHealthManager:
 
         self._profile: Optional[ScreenHealthProfile] = None
         self._running = False
+
+        # Debug runtime (opt-in)
+        self._debug_log_values = False
+        self._debug_log_every_n_ticks = 20
+        self._debug_save_roi_images = False
+        self._debug_save_dir: Optional[Path] = None
+        self._debug_tick = 0
+        self._debug_saved_once: set[str] = set()
 
         # Stats
         self.events_received = 0
@@ -524,6 +563,9 @@ class ScreenHealthManager:
         # Reset all runtime state so a previous run/profile doesn't affect this run.
         self._reset_runtime_state()
 
+        # Configure optional debug mode (profile.debug + env overrides).
+        self._configure_debug(self._profile.debug if self._profile else None)
+
         self._stop_evt.clear()
         self._thread = threading.Thread(target=self._run_loop, name="screen_health", daemon=True)
         self._thread.start()
@@ -548,6 +590,9 @@ class ScreenHealthManager:
             "events_received": self.events_received,
             "last_event_ts": self.last_event_ts,
             "last_hit_ts": self.last_hit_ts,
+            "debug_log_values": self._debug_log_values,
+            "debug_save_roi_images": self._debug_save_roi_images,
+            "debug_save_dir": str(self._debug_save_dir) if self._debug_save_dir else None,
         }
 
     # ---------------------------------------------------------------------
@@ -580,6 +625,147 @@ class ScreenHealthManager:
         self._prev_health_value_by_detector.clear()
         self._last_health_value_emitted.clear()
 
+        # Debug runtime
+        self._debug_tick = 0
+        self._debug_saved_once.clear()
+
+    def _env_flag(self, name: str) -> bool:
+        v = os.getenv(name)
+        if v is None:
+            return False
+        return str(v).strip().lower() in ("1", "true", "yes", "on")
+
+    def _configure_debug(self, cfg: Optional[ScreenHealthDebugConfig]) -> None:
+        """
+        Configure optional debug mode.
+
+        Env vars:
+        - THIRD_SPACE_SCREEN_HEALTH_DEBUG=1             => enable value logs
+        - THIRD_SPACE_SCREEN_HEALTH_DEBUG_SAVE=1        => save ROI crops as .bmp
+        - THIRD_SPACE_SCREEN_HEALTH_DEBUG_DIR=...       => output dir
+        - THIRD_SPACE_SCREEN_HEALTH_DEBUG_EVERY_N=...   => log cadence (ticks)
+        """
+
+        self._debug_log_values = bool(cfg.log_values) if cfg else False
+        self._debug_log_every_n_ticks = int(cfg.log_every_n_ticks) if cfg else 20
+        self._debug_save_roi_images = bool(cfg.save_roi_images) if cfg else False
+        save_dir = cfg.save_dir if cfg else None
+
+        # Env overrides (useful in dev)
+        if self._env_flag("THIRD_SPACE_SCREEN_HEALTH_DEBUG"):
+            self._debug_log_values = True
+        if self._env_flag("THIRD_SPACE_SCREEN_HEALTH_DEBUG_SAVE"):
+            self._debug_save_roi_images = True
+        every_n = os.getenv("THIRD_SPACE_SCREEN_HEALTH_DEBUG_EVERY_N")
+        if every_n:
+            try:
+                self._debug_log_every_n_ticks = max(1, int(every_n))
+            except Exception:
+                pass
+        env_dir = os.getenv("THIRD_SPACE_SCREEN_HEALTH_DEBUG_DIR")
+        if env_dir:
+            save_dir = env_dir
+
+        self._debug_save_dir = Path(save_dir).expanduser().resolve() if save_dir else None
+        if self._debug_save_roi_images and self._debug_save_dir is None:
+            self._debug_save_dir = Path.cwd() / "screen_health_debug"
+
+        if self._debug_save_roi_images and self._debug_save_dir is not None:
+            try:
+                self._debug_save_dir.mkdir(parents=True, exist_ok=True)
+            except Exception:
+                # Best-effort: disable saving if we can't create the dir.
+                self._debug_save_roi_images = False
+                self._debug_save_dir = None
+
+        if self._debug_log_values:
+            logger.info(
+                "[screen_health] debug enabled: log_values=%s every_n=%s save_roi_images=%s dir=%s",
+                self._debug_log_values,
+                self._debug_log_every_n_ticks,
+                self._debug_save_roi_images,
+                str(self._debug_save_dir) if self._debug_save_dir else None,
+            )
+
+    def _write_bmp_bgra(self, path: Path, raw_bgra: bytes, width: int, height: int) -> None:
+        """
+        Write a simple uncompressed 32bpp BMP (top-down) from BGRA bytes.
+        """
+        if width <= 0 or height <= 0:
+            raise ValueError("width/height must be > 0")
+        expected = width * height * 4
+        if len(raw_bgra) < expected:
+            raise ValueError("raw_bgra is smaller than expected for BGRA frame")
+
+        pixel_bytes = width * height * 4
+        file_header_size = 14
+        dib_header_size = 40
+        off_bits = file_header_size + dib_header_size
+        file_size = off_bits + pixel_bytes
+
+        # BITMAPFILEHEADER
+        bf = struct.pack("<2sIHHI", b"BM", file_size, 0, 0, off_bits)
+        # BITMAPINFOHEADER (negative height => top-down)
+        bi = struct.pack(
+            "<IiiHHIIiiII",
+            dib_header_size,
+            int(width),
+            int(-height),
+            1,  # planes
+            32,  # bpp
+            0,  # BI_RGB
+            pixel_bytes,
+            0,
+            0,
+            0,
+            0,
+        )
+        path.write_bytes(bf + bi + raw_bgra[:expected])
+
+    def _safe_file_part(self, s: str) -> str:
+        out = []
+        for ch in s:
+            if ch.isalnum() or ch in ("-", "_"):
+                out.append(ch)
+            else:
+                out.append("_")
+        return "".join(out).strip("_") or "unnamed"
+
+    def _debug_maybe_save_roi(
+        self,
+        *,
+        key: str,
+        kind: str,
+        name: str,
+        raw_bgra: bytes,
+        width: int,
+        height: int,
+        extra: Dict[str, Any],
+        force: bool = False,
+    ) -> Optional[str]:
+        """
+        Best-effort saving of ROI crops when debug.save_roi_images is enabled.
+
+        Returns saved filename (basename) if saved; otherwise None.
+        """
+        if not self._debug_save_roi_images or self._debug_save_dir is None:
+            return None
+
+        if not force and key in self._debug_saved_once:
+            return None
+
+        ts_ms = int(time.time() * 1000.0)
+        fname = f"{ts_ms}_{self._safe_file_part(kind)}_{self._safe_file_part(name)}_{width}x{height}.bmp"
+        path = self._debug_save_dir / fname
+        try:
+            self._write_bmp_bgra(path, raw_bgra, width, height)
+            self._debug_saved_once.add(key)
+            logger.info("[screen_health] saved roi kind=%s name=%s file=%s extra=%s", kind, name, fname, extra)
+            return fname
+        except Exception as e:
+            logger.warning("[screen_health] failed to save roi kind=%s name=%s err=%s", kind, name, str(e))
+            return None
+
     def _trigger_hit(self, intensity: float) -> None:
         """Trigger a Phase A random-cell haptic."""
         if not self._on_trigger:
@@ -600,6 +786,8 @@ class ScreenHealthManager:
 
         while not self._stop_evt.is_set():
             loop_start = time.time()
+            self._debug_tick += 1
+            should_periodic_log = self._debug_log_values and (self._debug_tick % self._debug_log_every_n_ticks == 0)
 
             try:
                 frame_w, frame_h = capture.get_frame_size()
@@ -622,6 +810,25 @@ class ScreenHealthManager:
                         continue
 
                     score = redness_score_from_bgra(raw_bgra, w, h)
+                    if should_periodic_log:
+                        logger.info(
+                            "[screen_health] redness roi=%s score=%.4f thr=%.4f",
+                            roi.name,
+                            float(score),
+                            float(profile.redness_detector.min_score),
+                        )
+
+                    # Save one example crop per ROI to ease calibration.
+                    self._debug_maybe_save_roi(
+                        key=f"redness_once:{roi.name}",
+                        kind="redness_rois",
+                        name=roi.name,
+                        raw_bgra=raw_bgra,
+                        width=w,
+                        height=h,
+                        extra={"score": float(score)},
+                        force=False,
+                    )
                     if score < profile.redness_detector.min_score:
                         continue
 
@@ -633,6 +840,25 @@ class ScreenHealthManager:
 
                     self._last_hit_by_roi[key] = now
                     self.last_hit_ts = now
+
+                    saved = self._debug_maybe_save_roi(
+                        key=f"redness_hit:{roi.name}",
+                        kind="redness_rois_hit",
+                        name=roi.name,
+                        raw_bgra=raw_bgra,
+                        width=w,
+                        height=h,
+                        extra={"score": float(score)},
+                        force=True,
+                    )
+                    if self._debug_log_values:
+                        logger.info(
+                            "[screen_health] HIT redness roi=%s score=%.4f cooldown_ms=%s saved=%s",
+                            roi.name,
+                            float(score),
+                            int(profile.redness_detector.cooldown_ms),
+                            saved,
+                        )
 
                     self._emit_game_event(
                         "hit_recorded",
@@ -676,6 +902,20 @@ class ScreenHealthManager:
 
                 # Clamp for safety
                 percent = max(0.0, min(1.0, float(percent_raw)))
+                if should_periodic_log:
+                    logger.info("[screen_health] health_bar detector=%s percent=%.4f", hb.name, float(percent))
+
+                # Save one example crop per detector to ease calibration.
+                self._debug_maybe_save_roi(
+                    key=f"health_bar_once:{hb.name}",
+                    kind="health_bar",
+                    name=hb.name,
+                    raw_bgra=raw_bgra,
+                    width=w,
+                    height=h,
+                    extra={"percent": float(percent)},
+                    force=False,
+                )
 
                 # Emit health_percent (throttled)
                 now = time.time()
@@ -718,6 +958,26 @@ class ScreenHealthManager:
                 self._last_hit_by_roi[key] = now
                 self.last_hit_ts = now
 
+                saved = self._debug_maybe_save_roi(
+                    key=f"health_bar_hit:{hb.name}",
+                    kind="health_bar_hit",
+                    name=hb.name,
+                    raw_bgra=raw_bgra,
+                    width=w,
+                    height=h,
+                    extra={"percent": float(percent), "prev_percent": float(prev), "drop": float(drop)},
+                    force=True,
+                )
+                if self._debug_log_values:
+                    logger.info(
+                        "[screen_health] HIT health_bar detector=%s prev=%.4f now=%.4f drop=%.4f saved=%s",
+                        hb.name,
+                        float(prev),
+                        float(percent),
+                        float(drop),
+                        saved,
+                    )
+
                 self._emit_game_event(
                     "hit_recorded",
                     {
@@ -757,6 +1017,25 @@ class ScreenHealthManager:
                 )
 
                 value = self._health_number_try_read(bits, bw, bh, hn)
+                if should_periodic_log:
+                    logger.info(
+                        "[screen_health] health_number detector=%s read=%s stable_reads=%s",
+                        hn.name,
+                        value,
+                        int(hn.readout.stable_reads),
+                    )
+
+                # Save one example crop per detector to ease calibration.
+                self._debug_maybe_save_roi(
+                    key=f"health_number_once:{hn.name}",
+                    kind="health_number",
+                    name=hn.name,
+                    raw_bgra=raw_bgra,
+                    width=w,
+                    height=h,
+                    extra={"read": value},
+                    force=False,
+                )
                 if value is None:
                     continue
 
@@ -765,10 +1044,25 @@ class ScreenHealthManager:
                 if cand is None or cand != value:
                     self._health_number_candidate_value[hn.name] = value
                     self._health_number_candidate_count[hn.name] = 1
+                    if should_periodic_log:
+                        logger.info(
+                            "[screen_health] health_number detector=%s candidate=%s count=1/%s",
+                            hn.name,
+                            value,
+                            int(hn.readout.stable_reads),
+                        )
                     continue
 
                 self._health_number_candidate_count[hn.name] = self._health_number_candidate_count.get(hn.name, 1) + 1
                 if self._health_number_candidate_count[hn.name] < hn.readout.stable_reads:
+                    if should_periodic_log:
+                        logger.info(
+                            "[screen_health] health_number detector=%s candidate=%s count=%s/%s",
+                            hn.name,
+                            value,
+                            int(self._health_number_candidate_count[hn.name]),
+                            int(hn.readout.stable_reads),
+                        )
                     continue
 
                 # Only emit if it changed (or hasn't been emitted yet)
@@ -801,6 +1095,26 @@ class ScreenHealthManager:
 
                 self._last_hit_by_roi[key] = now
                 self.last_hit_ts = now
+
+                saved = self._debug_maybe_save_roi(
+                    key=f"health_number_hit:{hn.name}",
+                    kind="health_number_hit",
+                    name=hn.name,
+                    raw_bgra=raw_bgra,
+                    width=w,
+                    height=h,
+                    extra={"value": int(value), "prev_value": int(prev_val), "drop": int(drop_i)},
+                    force=True,
+                )
+                if self._debug_log_values:
+                    logger.info(
+                        "[screen_health] HIT health_number detector=%s prev=%s now=%s drop=%s saved=%s",
+                        hn.name,
+                        int(prev_val),
+                        int(value),
+                        int(drop_i),
+                        saved,
+                    )
 
                 self._emit_game_event(
                     "hit_recorded",
@@ -840,6 +1154,19 @@ class ScreenHealthManager:
         )
         if capture.tick_ms <= 0:
             raise ValueError("capture.tick_ms must be > 0")
+
+        debug_cfg: Optional[ScreenHealthDebugConfig] = None
+        debug_data = data.get("debug")
+        if debug_data is not None:
+            if not isinstance(debug_data, dict):
+                raise ValueError("profile.debug must be an object")
+            debug_cfg = ScreenHealthDebugConfig(
+                log_values=bool(debug_data.get("log_values", False)),
+                log_every_n_ticks=int(debug_data.get("log_every_n_ticks", 20)),
+                save_roi_images=bool(debug_data.get("save_roi_images", False)),
+                save_dir=(str(debug_data.get("save_dir")) if debug_data.get("save_dir") else None),
+            )
+            debug_cfg.validate()
 
         detectors = data.get("detectors") or []
         if not isinstance(detectors, list) or not detectors:
@@ -1063,6 +1390,7 @@ class ScreenHealthManager:
             redness_detector=redness_detector,
             health_bars=health_bars,
             health_numbers=health_numbers,
+            debug=debug_cfg,
         )
 
     def _health_number_try_read(self, bits: List[int], bw: int, bh: int, hn: HealthNumberDetector) -> Optional[int]:
