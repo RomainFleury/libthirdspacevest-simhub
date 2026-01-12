@@ -13,6 +13,6 @@ set LIBUSB_DLL_PATH=%USERPROFILE%\AppData\Local\Programs\Python\Python313\Lib\si
 set PATH=%LIBUSB_DLL_PATH%;%PATH%
 
 cd modern-third-space\src
-%PYTHON_EXE% -u -m modern_third_space.cli daemon start --port 5050
+%PYTHON_EXE% -u -m modern_third_space.cli daemon start --port 5050 --screen-health-debug --screen-health-debug-save --screen-health-debug-dir debug_logs --screen-health-debug-every-n 10
 cd ..
 
