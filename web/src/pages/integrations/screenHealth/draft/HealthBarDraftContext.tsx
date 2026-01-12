@@ -28,7 +28,7 @@ type ActionsCtx = {
   setHitCooldownMs: (v: number) => void;
   setColorPickMode: (v: null | "filled" | "empty") => void;
   replaceAll: (next: Partial<HealthBarDraftState>) => void;
-  getSnapshot: () => HealthBarDraftState;
+  readDraft: () => HealthBarDraftState;
 };
 
 const StateC = createContext<StateCtx | null>(null);
@@ -71,7 +71,7 @@ export function ScreenHealthHealthBarDraftProvider(props: { children: React.Reac
       setHitCooldownMs: (v) => setStateAndRef((p) => ({ ...p, hitCooldownMs: v })),
       setColorPickMode: (v) => setStateAndRef((p) => ({ ...p, colorPickMode: v })),
       replaceAll: (next) => setStateAndRef((p) => ({ ...p, ...next })),
-      getSnapshot: () => stateRef.current,
+      readDraft: () => stateRef.current,
     };
   }, []);
 

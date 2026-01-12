@@ -18,7 +18,7 @@ type ActionsCtx = {
   setMonitorIndex: (v: number) => void;
   setTickMs: (v: number) => void;
   replaceAll: (next: Partial<ProfileDraftState>) => void;
-  getSnapshot: () => ProfileDraftState;
+  readDraft: () => ProfileDraftState;
 };
 
 const StateC = createContext<StateCtx | null>(null);
@@ -51,7 +51,7 @@ export function ScreenHealthProfileDraftProvider(props: { defaultPresetId: strin
       setMonitorIndex: (v) => setStateAndRef((p) => ({ ...p, monitorIndex: v })),
       setTickMs: (v) => setStateAndRef((p) => ({ ...p, tickMs: v })),
       replaceAll: (next) => setStateAndRef((p) => ({ ...p, ...next })),
-      getSnapshot: () => stateRef.current,
+      readDraft: () => stateRef.current,
     };
   }, []);
 

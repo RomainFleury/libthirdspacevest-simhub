@@ -16,7 +16,7 @@ type ActionsCtx = {
   updateRoi: (index: number, patch: Partial<RoiDraft>) => void;
   removeRoi: (index: number) => void;
   replaceAll: (next: Partial<RednessDraftState>) => void;
-  getSnapshot: () => RednessDraftState;
+  readDraft: () => RednessDraftState;
 };
 
 const StateC = createContext<StateCtx | null>(null);
@@ -55,7 +55,7 @@ export function ScreenHealthRednessDraftProvider(props: { children: React.ReactN
         })),
       removeRoi: (index) => setStateAndRef((p) => ({ ...p, rois: p.rois.filter((_, i) => i !== index) })),
       replaceAll: (next) => setStateAndRef((p) => ({ ...p, ...next })),
-      getSnapshot: () => stateRef.current,
+      readDraft: () => stateRef.current,
     };
   }, []);
 

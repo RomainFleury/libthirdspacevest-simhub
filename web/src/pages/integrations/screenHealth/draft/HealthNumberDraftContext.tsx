@@ -41,7 +41,7 @@ type ActionsCtx = {
   setTestResult: (v: HealthNumberTestResult) => void;
   clearTemplates: () => void;
   replaceAll: (next: Partial<HealthNumberDraftState>) => void;
-  getSnapshot: () => HealthNumberDraftState;
+  readDraft: () => HealthNumberDraftState;
 };
 
 const StateC = createContext<StateCtx | null>(null);
@@ -102,7 +102,7 @@ export function ScreenHealthHealthNumberDraftProvider(props: { children: React.R
       setTestResult: (v) => setStateAndRef((p) => ({ ...p, testResult: v })),
       clearTemplates: () => setStateAndRef((p) => ({ ...p, templates: {}, testResult: null, calibrationError: null })),
       replaceAll: (next) => setStateAndRef((p) => ({ ...p, ...next })),
-      getSnapshot: () => stateRef.current,
+      readDraft: () => stateRef.current,
     };
   }, []);
 

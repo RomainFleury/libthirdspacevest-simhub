@@ -157,7 +157,7 @@ function DetectorSettingsSwitch() {
 
 function DraftFromActiveProfileSync(props: { activeProfile: ScreenHealthStoredProfile | null }) {
   const { activeProfile } = props;
-  const { replaceAll: replaceProfileDraft, setDetectorType, getSnapshot: getProfileDraft } = useScreenHealthProfileDraftControls();
+  const { replaceAll: replaceProfileDraft, setDetectorType } = useScreenHealthProfileDraftControls();
   const { replaceAll: replaceRednessDraft } = useScreenHealthRednessDraftControls();
   const { replaceAll: replaceHealthBarDraft, setColorPickMode } = useScreenHealthHealthBarDraftControls();
   const { replaceAll: replaceHealthNumberDraft } = useScreenHealthHealthNumberDraftControls();
@@ -339,19 +339,19 @@ function ProfileControlsController(props: {
 }) {
   const { profiles, activeProfileId, activeProfile, saveProfile, deleteProfile, setActive, exportProfile, importProfile } = props;
   const profileState = useScreenHealthProfileDraft();
-  const { setProfileName, getSnapshot: getProfileDraft } = useScreenHealthProfileDraftControls();
-  const { getSnapshot: getRednessDraft } = useScreenHealthRednessDraftControls();
-  const { getSnapshot: getHealthBarDraft } = useScreenHealthHealthBarDraftControls();
-  const { getSnapshot: getHealthNumberDraft } = useScreenHealthHealthNumberDraftControls();
+  const { setProfileName, readDraft: readProfileDraft } = useScreenHealthProfileDraftControls();
+  const { readDraft: readRednessDraft } = useScreenHealthRednessDraftControls();
+  const { readDraft: readHealthBarDraft } = useScreenHealthHealthBarDraftControls();
+  const { readDraft: readHealthNumberDraft } = useScreenHealthHealthNumberDraftControls();
 
   const [saving, setSaving] = useState(false);
 
   const buildDaemonProfile = () => {
     // Snapshot reads: this controller does not subscribe to draft state updates.
-    const profileDraft = getProfileDraft();
-    const redness = getRednessDraft();
-    const hb = getHealthBarDraft();
-    const hn = getHealthNumberDraft();
+    const profileDraft = readProfileDraft();
+    const redness = readRednessDraft();
+    const hb = readHealthBarDraft();
+    const hn = readHealthNumberDraft();
 
     if (profileDraft.detectorType === "health_bar") {
       const roi = hb.roi ?? { x: 0.1, y: 0.9, w: 0.3, h: 0.03 };
