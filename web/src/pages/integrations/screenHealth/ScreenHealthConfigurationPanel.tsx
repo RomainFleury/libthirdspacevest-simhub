@@ -4,21 +4,20 @@ import type { ScreenHealthStoredProfile } from "../../../lib/bridgeApi";
 import { ScreenHealthCalibrationProvider } from "./draft/CalibrationContext";
 import {
   ScreenHealthHealthBarDraftProvider,
-  useScreenHealthHealthBarDraftActions,
-  useScreenHealthHealthBarDraftState,
+  useScreenHealthHealthBarDraftControls,
 } from "./draft/HealthBarDraftContext";
 import {
   ScreenHealthHealthNumberDraftProvider,
-  useScreenHealthHealthNumberDraftActions,
+  useScreenHealthHealthNumberDraftControls,
 } from "./draft/HealthNumberDraftContext";
 import {
   ScreenHealthProfileDraftProvider,
-  useScreenHealthProfileDraftActions,
-  useScreenHealthProfileDraftState,
+  useScreenHealthProfileDraftControls,
+  useScreenHealthProfileDraft,
 } from "./draft/ProfileDraftContext";
 import {
   ScreenHealthRednessDraftProvider,
-  useScreenHealthRednessDraftActions,
+  useScreenHealthRednessDraftControls,
 } from "./draft/RednessDraftContext";
 import { CalibrationCanvasSection } from "./sections/CalibrationCanvasSection";
 import { CaptureSettingsSection } from "./sections/CaptureSettingsSection";
@@ -150,7 +149,7 @@ function ScreenHealthConfigurationPanelInner(props: Props) {
 }
 
 function DetectorSettingsSwitch() {
-  const state = useScreenHealthProfileDraftState();
+  const state = useScreenHealthProfileDraft();
   if (state.detectorType === "redness_rois") return <RednessSettings />;
   if (state.detectorType === "health_bar") return <HealthBarSettings />;
   return <HealthNumberSettings />;
@@ -158,16 +157,16 @@ function DetectorSettingsSwitch() {
 
 function DraftFromActiveProfileSync(props: { activeProfile: ScreenHealthStoredProfile | null }) {
   const { activeProfile } = props;
-  const profile = useScreenHealthProfileDraftActions();
-  const redness = useScreenHealthRednessDraftActions();
-  const hb = useScreenHealthHealthBarDraftActions();
-  const hn = useScreenHealthHealthNumberDraftActions();
+  const { replaceAll: replaceProfileDraft, setDetectorType, getSnapshot: getProfileDraft } = useScreenHealthProfileDraftControls();
+  const { replaceAll: replaceRednessDraft } = useScreenHealthRednessDraftControls();
+  const { replaceAll: replaceHealthBarDraft, setColorPickMode } = useScreenHealthHealthBarDraftControls();
+  const { replaceAll: replaceHealthNumberDraft } = useScreenHealthHealthNumberDraftControls();
 
   useEffect(() => {
     if (!activeProfile?.profile) return;
     const p: any = activeProfile.profile;
 
-    profile.replaceAll({
+    replaceProfileDraft({
       profileName: activeProfile.name || p.name || "Unnamed Profile",
       monitorIndex: Number(p.capture?.monitor_index || 1),
       tickMs: Number(p.capture?.tick_ms || 50),
@@ -179,8 +178,8 @@ function DraftFromActiveProfileSync(props: { activeProfile: ScreenHealthStoredPr
     const redD = detectors.find((d: any) => d.type === "redness_rois");
 
     if (hnD) {
-      profile.setDetectorType("health_number");
-      hn.replaceAll({
+      setDetectorType("health_number");
+      replaceHealthNumberDraft({
         roi: {
           x: Number(hnD.roi?.x ?? 0),
           y: Number(hnD.roi?.y ?? 0),
@@ -205,13 +204,13 @@ function DraftFromActiveProfileSync(props: { activeProfile: ScreenHealthStoredPr
         calibrationError: null,
         testResult: null,
       });
-      hb.setColorPickMode(null);
+      setColorPickMode(null);
       return;
     }
 
     if (hbD) {
-      profile.setDetectorType("health_bar");
-      hb.replaceAll({
+      setDetectorType("health_bar");
+      replaceHealthBarDraft({
         roi: {
           x: Number(hbD.roi?.x ?? 0),
           y: Number(hbD.roi?.y ?? 0),
@@ -243,8 +242,8 @@ function DraftFromActiveProfileSync(props: { activeProfile: ScreenHealthStoredPr
       return;
     }
 
-    profile.setDetectorType("redness_rois");
-    redness.replaceAll({
+    setDetectorType("redness_rois");
+    replaceRednessDraft({
       minScore: Number(redD?.threshold?.min_score ?? 0.35),
       cooldownMs: Number(redD?.cooldown_ms ?? 200),
       rois: (Array.isArray(redD?.rois) ? redD.rois : []).map((r: any, idx: number) => ({
@@ -258,7 +257,7 @@ function DraftFromActiveProfileSync(props: { activeProfile: ScreenHealthStoredPr
         },
       })),
     });
-    hb.setColorPickMode(null);
+    setColorPickMode(null);
   }, [activeProfile]);
 
   return null;
@@ -274,7 +273,7 @@ function PresetProfilesController(props: {
   captureCalibrationScreenshot: (monitorIndex: number) => Promise<any>;
 }) {
   const { presets, profiles, activeProfileId, activeProfile, saveProfile, setActive, captureCalibrationScreenshot } = props;
-  const state = useScreenHealthProfileDraftState();
+  const state = useScreenHealthProfileDraft();
 
   const findInstalledPresetProfileId = (presetId: string): string | null => {
     for (const p of profiles) {
@@ -339,26 +338,28 @@ function ProfileControlsController(props: {
   importProfile: () => Promise<ScreenHealthStoredProfile | null>;
 }) {
   const { profiles, activeProfileId, activeProfile, saveProfile, deleteProfile, setActive, exportProfile, importProfile } = props;
-  const profileState = useScreenHealthProfileDraftState();
-  const profileActions = useScreenHealthProfileDraftActions();
-  const rednessSnap = useScreenHealthRednessDraftActions().getSnapshot;
-  const hbSnap = useScreenHealthHealthBarDraftActions().getSnapshot;
-  const hnSnap = useScreenHealthHealthNumberDraftActions().getSnapshot;
+  const profileState = useScreenHealthProfileDraft();
+  const { setProfileName, getSnapshot: getProfileDraft } = useScreenHealthProfileDraftControls();
+  const { getSnapshot: getRednessDraft } = useScreenHealthRednessDraftControls();
+  const { getSnapshot: getHealthBarDraft } = useScreenHealthHealthBarDraftControls();
+  const { getSnapshot: getHealthNumberDraft } = useScreenHealthHealthNumberDraftControls();
 
   const [saving, setSaving] = useState(false);
 
   const buildDaemonProfile = () => {
-    const redness = rednessSnap();
-    const hb = hbSnap();
-    const hn = hnSnap();
+    // Snapshot reads: this controller does not subscribe to draft state updates.
+    const profileDraft = getProfileDraft();
+    const redness = getRednessDraft();
+    const hb = getHealthBarDraft();
+    const hn = getHealthNumberDraft();
 
-    if (profileState.detectorType === "health_bar") {
+    if (profileDraft.detectorType === "health_bar") {
       const roi = hb.roi ?? { x: 0.1, y: 0.9, w: 0.3, h: 0.03 };
       return {
         schema_version: 0,
-        name: profileState.profileName,
+        name: profileDraft.profileName,
         meta: (activeProfile?.profile as any)?.meta,
-        capture: { source: "monitor", monitor_index: profileState.monitorIndex, tick_ms: profileState.tickMs },
+        capture: { source: "monitor", monitor_index: profileDraft.monitorIndex, tick_ms: profileDraft.tickMs },
         detectors: [
           {
             type: "health_bar",
@@ -388,13 +389,13 @@ function ProfileControlsController(props: {
       };
     }
 
-    if (profileState.detectorType === "health_number") {
+    if (profileDraft.detectorType === "health_number") {
       const roi = hn.roi ?? { x: 0.05, y: 0.9, w: 0.12, h: 0.06 };
       return {
         schema_version: 0,
-        name: profileState.profileName,
+        name: profileDraft.profileName,
         meta: (activeProfile?.profile as any)?.meta,
-        capture: { source: "monitor", monitor_index: profileState.monitorIndex, tick_ms: profileState.tickMs },
+        capture: { source: "monitor", monitor_index: profileDraft.monitorIndex, tick_ms: profileDraft.tickMs },
         detectors: [
           {
             type: "health_number",
@@ -429,9 +430,9 @@ function ProfileControlsController(props: {
 
     return {
       schema_version: 0,
-      name: profileState.profileName,
+      name: profileDraft.profileName,
       meta: (activeProfile?.profile as any)?.meta,
-      capture: { source: "monitor", monitor_index: profileState.monitorIndex, tick_ms: profileState.tickMs },
+      capture: { source: "monitor", monitor_index: profileDraft.monitorIndex, tick_ms: profileDraft.tickMs },
       detectors: [
         {
           type: "redness_rois",
@@ -485,7 +486,7 @@ function ProfileControlsController(props: {
       onImport={importProfile}
       onDelete={() => activeProfileId && deleteProfile(activeProfileId)}
       profileName={profileState.profileName}
-      setProfileName={profileActions.setProfileName}
+      setProfileName={setProfileName}
       onSave={onSave}
       saving={saving}
     />
