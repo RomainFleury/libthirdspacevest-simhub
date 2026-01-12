@@ -1,8 +1,9 @@
-import { useScreenHealthProfileDraft } from "../draft/ProfileDraftContext";
+import { useScreenHealthProfileDraftActions, useScreenHealthProfileDraftState } from "../draft/ProfileDraftContext";
 
 export function CaptureSettingsSection(props: { onCapture: (monitorIndex: number) => void }) {
   const { onCapture } = props;
-  const { state, setMonitorIndex, setTickMs } = useScreenHealthProfileDraft();
+  const state = useScreenHealthProfileDraftState();
+  const { setMonitorIndex, setTickMs } = useScreenHealthProfileDraftActions();
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
       <div>

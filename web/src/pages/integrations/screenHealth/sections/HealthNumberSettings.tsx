@@ -1,10 +1,11 @@
-import { useScreenHealthHealthNumberDraft } from "../draft/HealthNumberDraftContext";
+import { useScreenHealthHealthNumberDraftActions, useScreenHealthHealthNumberDraftState } from "../draft/HealthNumberDraftContext";
 import { useScreenHealthCalibration } from "../draft/CalibrationContext";
 import { learnDigitTemplatesFromCanvas, tryReadDigitValueFromCanvas } from "../templateLearning";
 
 export function HealthNumberSettings() {
-  const { state, setDigits, setThreshold, setScale, setInvert, setReadMin, setReadMax, setStableReads, setHammingMax, setTemplateSize, setHitMinDrop, setHitCooldownMs, setLearnValue, setTemplates, setCalibrationError, setTestResult, clearTemplates } =
-    useScreenHealthHealthNumberDraft();
+  const state = useScreenHealthHealthNumberDraftState();
+  const { setDigits, setThreshold, setScale, setInvert, setReadMin, setReadMax, setStableReads, setHammingMax, setTemplateSize, setHitMinDrop, setHitCooldownMs, setLearnValue, setTemplates, setCalibrationError, setTestResult, clearTemplates } =
+    useScreenHealthHealthNumberDraftActions();
   const { getCanvasOrThrow } = useScreenHealthCalibration();
   const learnedDigits = Object.keys(state.templates).sort().join(", ");
 

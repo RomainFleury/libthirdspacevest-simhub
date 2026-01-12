@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useMemo, useRef, useState } from "react";
 import type { DetectorType } from "./types";
 
 type ProfileDraftState = {
@@ -9,45 +9,68 @@ type ProfileDraftState = {
   tickMs: number;
 };
 
-type Ctx = {
-  state: ProfileDraftState;
+type StateCtx = ProfileDraftState;
+
+type ActionsCtx = {
   setSelectedPresetId: (v: string) => void;
   setDetectorType: (v: DetectorType) => void;
   setProfileName: (v: string) => void;
   setMonitorIndex: (v: number) => void;
   setTickMs: (v: number) => void;
   replaceAll: (next: Partial<ProfileDraftState>) => void;
+  getSnapshot: () => ProfileDraftState;
 };
 
-const C = createContext<Ctx | null>(null);
+const StateC = createContext<StateCtx | null>(null);
+const ActionsC = createContext<ActionsCtx | null>(null);
 
 export function ScreenHealthProfileDraftProvider(props: { defaultPresetId: string; children: React.ReactNode }) {
-  const [state, setState] = useState<ProfileDraftState>({
+  const initial: ProfileDraftState = {
     selectedPresetId: props.defaultPresetId,
     detectorType: "redness_rois",
     profileName: "Default",
     monitorIndex: 1,
     tickMs: 50,
-  });
+  };
+  const [state, setState] = useState<ProfileDraftState>(initial);
+  const stateRef = useRef<ProfileDraftState>(initial);
 
-  const api = useMemo<Ctx>(() => {
+  const setStateAndRef = (updater: (prev: ProfileDraftState) => ProfileDraftState) => {
+    setState((prev) => {
+      const next = updater(prev);
+      stateRef.current = next;
+      return next;
+    });
+  };
+
+  const actions = useMemo<ActionsCtx>(() => {
     return {
-      state,
-      setSelectedPresetId: (v) => setState((p) => ({ ...p, selectedPresetId: v })),
-      setDetectorType: (v) => setState((p) => ({ ...p, detectorType: v })),
-      setProfileName: (v) => setState((p) => ({ ...p, profileName: v })),
-      setMonitorIndex: (v) => setState((p) => ({ ...p, monitorIndex: v })),
-      setTickMs: (v) => setState((p) => ({ ...p, tickMs: v })),
-      replaceAll: (next) => setState((p) => ({ ...p, ...next })),
+      setSelectedPresetId: (v) => setStateAndRef((p) => ({ ...p, selectedPresetId: v })),
+      setDetectorType: (v) => setStateAndRef((p) => ({ ...p, detectorType: v })),
+      setProfileName: (v) => setStateAndRef((p) => ({ ...p, profileName: v })),
+      setMonitorIndex: (v) => setStateAndRef((p) => ({ ...p, monitorIndex: v })),
+      setTickMs: (v) => setStateAndRef((p) => ({ ...p, tickMs: v })),
+      replaceAll: (next) => setStateAndRef((p) => ({ ...p, ...next })),
+      getSnapshot: () => stateRef.current,
     };
-  }, [state]);
+  }, []);
 
-  return <C.Provider value={api}>{props.children}</C.Provider>;
+  return (
+    <ActionsC.Provider value={actions}>
+      <StateC.Provider value={state}>{props.children}</StateC.Provider>
+    </ActionsC.Provider>
+  );
 }
 
-export function useScreenHealthProfileDraft() {
-  const ctx = useContext(C);
-  if (!ctx) throw new Error("useScreenHealthProfileDraft must be used within ScreenHealthProfileDraftProvider");
+export function useScreenHealthProfileDraftState() {
+  const ctx = useContext(StateC);
+  if (!ctx) throw new Error("useScreenHealthProfileDraftState must be used within ScreenHealthProfileDraftProvider");
+  return ctx;
+}
+
+export function useScreenHealthProfileDraftActions() {
+  const ctx = useContext(ActionsC);
+  if (!ctx) throw new Error("useScreenHealthProfileDraftActions must be used within ScreenHealthProfileDraftProvider");
   return ctx;
 }
 

@@ -1,7 +1,8 @@
-import { useScreenHealthProfileDraft } from "../draft/ProfileDraftContext";
+import { useScreenHealthProfileDraftActions, useScreenHealthProfileDraftState } from "../draft/ProfileDraftContext";
 
 export function DetectorSelectionSection() {
-  const { state, setDetectorType } = useScreenHealthProfileDraft();
+  const state = useScreenHealthProfileDraftState();
+  const { setDetectorType } = useScreenHealthProfileDraftActions();
   return (
     <div className="space-y-2">
       <h3 className="text-sm font-semibold text-white">Detector</h3>

@@ -1,18 +1,21 @@
 import { useCallback, useMemo, useState } from "react";
 import { useScreenHealthCalibration } from "../draft/CalibrationContext";
-import { useScreenHealthHealthBarDraft } from "../draft/HealthBarDraftContext";
-import { useScreenHealthHealthNumberDraft } from "../draft/HealthNumberDraftContext";
-import { useScreenHealthProfileDraft } from "../draft/ProfileDraftContext";
-import { useScreenHealthRednessDraft } from "../draft/RednessDraftContext";
+import { useScreenHealthHealthBarDraftActions, useScreenHealthHealthBarDraftState } from "../draft/HealthBarDraftContext";
+import { useScreenHealthHealthNumberDraftActions, useScreenHealthHealthNumberDraftState } from "../draft/HealthNumberDraftContext";
+import { useScreenHealthProfileDraftState } from "../draft/ProfileDraftContext";
+import { useScreenHealthRednessDraftActions, useScreenHealthRednessDraftState } from "../draft/RednessDraftContext";
 import { clamp01, clampInt } from "../utils";
 
 export function CalibrationCanvasSection(props: { lastCapturedImage: { dataUrl: string } | null }) {
   const { lastCapturedImage } = props;
   const { imgContainerRef, offscreenCanvasRef, imageLoadedRef } = useScreenHealthCalibration();
-  const { state: profile } = useScreenHealthProfileDraft();
-  const { state: redness, setRois } = useScreenHealthRednessDraft();
-  const { state: hb, setRoi: setHealthBarRoi, setFilledRgb, setEmptyRgb, setColorPickMode } = useScreenHealthHealthBarDraft();
-  const { state: hn, setRoi: setHealthNumberRoi } = useScreenHealthHealthNumberDraft();
+  const profile = useScreenHealthProfileDraftState();
+  const redness = useScreenHealthRednessDraftState();
+  const { setRois } = useScreenHealthRednessDraftActions();
+  const hb = useScreenHealthHealthBarDraftState();
+  const { setRoi: setHealthBarRoi, setFilledRgb, setEmptyRgb, setColorPickMode } = useScreenHealthHealthBarDraftActions();
+  const hn = useScreenHealthHealthNumberDraftState();
+  const { setRoi: setHealthNumberRoi } = useScreenHealthHealthNumberDraftActions();
 
   const detectorType = profile.detectorType;
 

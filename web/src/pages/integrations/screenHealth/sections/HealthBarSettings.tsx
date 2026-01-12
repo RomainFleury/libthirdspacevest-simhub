@@ -1,9 +1,10 @@
-import { useScreenHealthHealthBarDraft } from "../draft/HealthBarDraftContext";
+import { useScreenHealthHealthBarDraftActions, useScreenHealthHealthBarDraftState } from "../draft/HealthBarDraftContext";
 import { parseRgbTriplet } from "../utils";
 
 export function HealthBarSettings() {
-  const { state: healthBar, setMode, setFallbackMode, setFallbackMin, setFilledRgb, setEmptyRgb, setToleranceL1, setHitMinDrop, setHitCooldownMs, setColorPickMode } =
-    useScreenHealthHealthBarDraft();
+  const healthBar = useScreenHealthHealthBarDraftState();
+  const { setMode, setFallbackMode, setFallbackMin, setFilledRgb, setEmptyRgb, setToleranceL1, setHitMinDrop, setHitCooldownMs, setColorPickMode } =
+    useScreenHealthHealthBarDraftActions();
 
   return (
     <div className="space-y-3">

@@ -1,17 +1,20 @@
 import { DIRECTION_KEYS } from "../constants";
-import { useScreenHealthProfileDraft } from "../draft/ProfileDraftContext";
-import { useScreenHealthRednessDraft } from "../draft/RednessDraftContext";
-import { useScreenHealthHealthBarDraft } from "../draft/HealthBarDraftContext";
-import { useScreenHealthHealthNumberDraft } from "../draft/HealthNumberDraftContext";
+import { useScreenHealthProfileDraftState } from "../draft/ProfileDraftContext";
+import { useScreenHealthRednessDraftActions, useScreenHealthRednessDraftState } from "../draft/RednessDraftContext";
+import { useScreenHealthHealthBarDraftActions, useScreenHealthHealthBarDraftState } from "../draft/HealthBarDraftContext";
+import { useScreenHealthHealthNumberDraftActions, useScreenHealthHealthNumberDraftState } from "../draft/HealthNumberDraftContext";
 
 export function RoiListSection(props: {
   captureRoiDebugImages: (monitorIndex: number, rois: Array<{ name: string; rect: { x: number; y: number; w: number; h: number } }>) => void;
 }) {
   const { captureRoiDebugImages } = props;
-  const { state: profile } = useScreenHealthProfileDraft();
-  const { state: redness, updateRoi, removeRoi } = useScreenHealthRednessDraft();
-  const { state: hb, setRoi: setHealthBarRoi } = useScreenHealthHealthBarDraft();
-  const { state: hn, setRoi: setHealthNumberRoi } = useScreenHealthHealthNumberDraft();
+  const profile = useScreenHealthProfileDraftState();
+  const redness = useScreenHealthRednessDraftState();
+  const { updateRoi, removeRoi } = useScreenHealthRednessDraftActions();
+  const hb = useScreenHealthHealthBarDraftState();
+  const { setRoi: setHealthBarRoi } = useScreenHealthHealthBarDraftActions();
+  const hn = useScreenHealthHealthNumberDraftState();
+  const { setRoi: setHealthNumberRoi } = useScreenHealthHealthNumberDraftActions();
 
   const detectorType = profile.detectorType;
   const monitorIndex = profile.monitorIndex;

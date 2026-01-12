@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { HealthNumberTestResult, RoiRect } from "./types";
 
 type HealthNumberDraftState = {
@@ -20,8 +20,9 @@ type HealthNumberDraftState = {
   testResult: HealthNumberTestResult;
 };
 
-type Ctx = {
-  state: HealthNumberDraftState;
+type StateCtx = HealthNumberDraftState;
+
+type ActionsCtx = {
   setRoi: (v: RoiRect | null) => void;
   setDigits: (v: number) => void;
   setInvert: (v: boolean) => void;
@@ -40,12 +41,14 @@ type Ctx = {
   setTestResult: (v: HealthNumberTestResult) => void;
   clearTemplates: () => void;
   replaceAll: (next: Partial<HealthNumberDraftState>) => void;
+  getSnapshot: () => HealthNumberDraftState;
 };
 
-const C = createContext<Ctx | null>(null);
+const StateC = createContext<StateCtx | null>(null);
+const ActionsC = createContext<ActionsCtx | null>(null);
 
 export function ScreenHealthHealthNumberDraftProvider(props: { children: React.ReactNode }) {
-  const [state, setState] = useState<HealthNumberDraftState>({
+  const initial: HealthNumberDraftState = {
     roi: null,
     digits: 3,
     invert: false,
@@ -62,43 +65,63 @@ export function ScreenHealthHealthNumberDraftProvider(props: { children: React.R
     learnValue: "",
     calibrationError: null,
     testResult: null,
-  });
+  };
+  const [state, setState] = useState<HealthNumberDraftState>(initial);
+  const stateRef = useRef<HealthNumberDraftState>(initial);
+
+  const setStateAndRef = (updater: (prev: HealthNumberDraftState) => HealthNumberDraftState) => {
+    setState((prev) => {
+      const next = updater(prev);
+      stateRef.current = next;
+      return next;
+    });
+  };
 
   // If template size changes, existing learned bitstrings are invalid.
   useEffect(() => {
-    setState((p) => ({ ...p, templates: {}, testResult: null, calibrationError: null }));
+    setStateAndRef((p) => ({ ...p, templates: {}, testResult: null, calibrationError: null }));
   }, [state.templateSize.w, state.templateSize.h]);
 
-  const api = useMemo<Ctx>(() => {
+  const actions = useMemo<ActionsCtx>(() => {
     return {
-      state,
-      setRoi: (v) => setState((p) => ({ ...p, roi: v })),
-      setDigits: (v) => setState((p) => ({ ...p, digits: v })),
-      setInvert: (v) => setState((p) => ({ ...p, invert: v })),
-      setThreshold: (v) => setState((p) => ({ ...p, threshold: v })),
-      setScale: (v) => setState((p) => ({ ...p, scale: v })),
-      setReadMin: (v) => setState((p) => ({ ...p, readMin: v })),
-      setReadMax: (v) => setState((p) => ({ ...p, readMax: v })),
-      setStableReads: (v) => setState((p) => ({ ...p, stableReads: v })),
-      setHitMinDrop: (v) => setState((p) => ({ ...p, hitMinDrop: v })),
-      setHitCooldownMs: (v) => setState((p) => ({ ...p, hitCooldownMs: v })),
-      setHammingMax: (v) => setState((p) => ({ ...p, hammingMax: v })),
-      setTemplateSize: (v) => setState((p) => ({ ...p, templateSize: v })),
-      setTemplates: (v) => setState((p) => ({ ...p, templates: v })),
-      setLearnValue: (v) => setState((p) => ({ ...p, learnValue: v })),
-      setCalibrationError: (v) => setState((p) => ({ ...p, calibrationError: v })),
-      setTestResult: (v) => setState((p) => ({ ...p, testResult: v })),
-      clearTemplates: () => setState((p) => ({ ...p, templates: {}, testResult: null, calibrationError: null })),
-      replaceAll: (next) => setState((p) => ({ ...p, ...next })),
+      setRoi: (v) => setStateAndRef((p) => ({ ...p, roi: v })),
+      setDigits: (v) => setStateAndRef((p) => ({ ...p, digits: v })),
+      setInvert: (v) => setStateAndRef((p) => ({ ...p, invert: v })),
+      setThreshold: (v) => setStateAndRef((p) => ({ ...p, threshold: v })),
+      setScale: (v) => setStateAndRef((p) => ({ ...p, scale: v })),
+      setReadMin: (v) => setStateAndRef((p) => ({ ...p, readMin: v })),
+      setReadMax: (v) => setStateAndRef((p) => ({ ...p, readMax: v })),
+      setStableReads: (v) => setStateAndRef((p) => ({ ...p, stableReads: v })),
+      setHitMinDrop: (v) => setStateAndRef((p) => ({ ...p, hitMinDrop: v })),
+      setHitCooldownMs: (v) => setStateAndRef((p) => ({ ...p, hitCooldownMs: v })),
+      setHammingMax: (v) => setStateAndRef((p) => ({ ...p, hammingMax: v })),
+      setTemplateSize: (v) => setStateAndRef((p) => ({ ...p, templateSize: v })),
+      setTemplates: (v) => setStateAndRef((p) => ({ ...p, templates: v })),
+      setLearnValue: (v) => setStateAndRef((p) => ({ ...p, learnValue: v })),
+      setCalibrationError: (v) => setStateAndRef((p) => ({ ...p, calibrationError: v })),
+      setTestResult: (v) => setStateAndRef((p) => ({ ...p, testResult: v })),
+      clearTemplates: () => setStateAndRef((p) => ({ ...p, templates: {}, testResult: null, calibrationError: null })),
+      replaceAll: (next) => setStateAndRef((p) => ({ ...p, ...next })),
+      getSnapshot: () => stateRef.current,
     };
-  }, [state]);
+  }, []);
 
-  return <C.Provider value={api}>{props.children}</C.Provider>;
+  return (
+    <ActionsC.Provider value={actions}>
+      <StateC.Provider value={state}>{props.children}</StateC.Provider>
+    </ActionsC.Provider>
+  );
 }
 
-export function useScreenHealthHealthNumberDraft() {
-  const ctx = useContext(C);
-  if (!ctx) throw new Error("useScreenHealthHealthNumberDraft must be used within ScreenHealthHealthNumberDraftProvider");
+export function useScreenHealthHealthNumberDraftState() {
+  const ctx = useContext(StateC);
+  if (!ctx) throw new Error("useScreenHealthHealthNumberDraftState must be used within ScreenHealthHealthNumberDraftProvider");
+  return ctx;
+}
+
+export function useScreenHealthHealthNumberDraftActions() {
+  const ctx = useContext(ActionsC);
+  if (!ctx) throw new Error("useScreenHealthHealthNumberDraftActions must be used within ScreenHealthHealthNumberDraftProvider");
   return ctx;
 }
 
