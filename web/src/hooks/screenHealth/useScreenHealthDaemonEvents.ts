@@ -10,6 +10,47 @@ export function useScreenHealthDaemonEvents(opts: { setStatus: React.Dispatch<Re
   const [latestDebug, setLatestDebug] = useState<Record<string, { kind: string; ts: number; data: Record<string, unknown> }>>({});
   const eventIdCounter = useRef(0);
 
+  // Buffer incoming daemon events to avoid freezing renderer:
+  // If we call setState on every TCP event we can easily overwhelm React/Electron.
+  const pendingEventsRef = useRef<ScreenHealthGameEvent[]>([]);
+  const pendingLatestDebugRef = useRef<Record<string, { kind: string; ts: number; data: Record<string, unknown> }>>({});
+  const pendingStatusRef = useRef<{ delta: number; last_event_ts?: number; last_hit_ts?: number }>({ delta: 0 });
+  const flushTimerRef = useRef<number | null>(null);
+
+  const scheduleFlush = useCallback(() => {
+    if (flushTimerRef.current != null) return;
+    flushTimerRef.current = window.setTimeout(() => {
+      flushTimerRef.current = null;
+
+      const batch = pendingEventsRef.current;
+      pendingEventsRef.current = [];
+      if (batch.length) {
+        setEvents((prev) => {
+          // newest-first
+          const next = [...batch.reverse(), ...prev];
+          return next.slice(0, MAX_SCREEN_HEALTH_EVENTS);
+        });
+      }
+
+      const dbg = pendingLatestDebugRef.current;
+      if (Object.keys(dbg).length) {
+        pendingLatestDebugRef.current = {};
+        setLatestDebug((prev) => ({ ...prev, ...dbg }));
+      }
+
+      const st = pendingStatusRef.current;
+      pendingStatusRef.current = { delta: 0 };
+      if (st.delta || st.last_event_ts != null || st.last_hit_ts != null) {
+        setStatus((prev) => ({
+          ...prev,
+          events_received: (prev.events_received ?? 0) + (st.delta || 0),
+          last_event_ts: st.last_event_ts ?? prev.last_event_ts,
+          last_hit_ts: st.last_hit_ts ?? prev.last_hit_ts,
+        }));
+      }
+    }, 100); // 10Hz flush
+  }, [setStatus]);
+
   // Subscribe to daemon events
   useEffect(() => {
     const unsubscribe = subscribeToDaemonEvents((event: DaemonEvent) => {
@@ -31,13 +72,11 @@ export function useScreenHealthDaemonEvents(opts: { setStatus: React.Dispatch<Re
           direction: (event.direction as string | undefined) ?? null,
           score: typeof event.score === "number" ? event.score : undefined,
         };
-        setEvents((prev) => [newEvent, ...prev].slice(0, MAX_SCREEN_HEALTH_EVENTS));
-        setStatus((prev) => ({
-          ...prev,
-          events_received: (prev.events_received ?? 0) + 1,
-          last_event_ts: event.ts,
-          last_hit_ts: event.ts,
-        }));
+        pendingEventsRef.current.push(newEvent);
+        pendingStatusRef.current.delta += 1;
+        pendingStatusRef.current.last_event_ts = event.ts;
+        pendingStatusRef.current.last_hit_ts = event.ts;
+        scheduleFlush();
         return;
       }
       if (event.event === "screen_health_health") {
@@ -48,12 +87,10 @@ export function useScreenHealthDaemonEvents(opts: { setStatus: React.Dispatch<Re
           detector: (event.detector as string | undefined) ?? null,
           health_percent: typeof event.health_percent === "number" ? event.health_percent : undefined,
         };
-        setEvents((prev) => [newEvent, ...prev].slice(0, MAX_SCREEN_HEALTH_EVENTS));
-        setStatus((prev) => ({
-          ...prev,
-          events_received: (prev.events_received ?? 0) + 1,
-          last_event_ts: event.ts,
-        }));
+        pendingEventsRef.current.push(newEvent);
+        pendingStatusRef.current.delta += 1;
+        pendingStatusRef.current.last_event_ts = event.ts;
+        scheduleFlush();
         return;
       }
       if (event.event === "screen_health_value") {
@@ -64,12 +101,10 @@ export function useScreenHealthDaemonEvents(opts: { setStatus: React.Dispatch<Re
           detector: (event.detector as string | undefined) ?? null,
           health_value: typeof event.health_value === "number" ? event.health_value : undefined,
         };
-        setEvents((prev) => [newEvent, ...prev].slice(0, MAX_SCREEN_HEALTH_EVENTS));
-        setStatus((prev) => ({
-          ...prev,
-          events_received: (prev.events_received ?? 0) + 1,
-          last_event_ts: event.ts,
-        }));
+        pendingEventsRef.current.push(newEvent);
+        pendingStatusRef.current.delta += 1;
+        pendingStatusRef.current.last_event_ts = event.ts;
+        scheduleFlush();
         return;
       }
       if (event.event === "screen_health_debug") {
@@ -85,17 +120,24 @@ export function useScreenHealthDaemonEvents(opts: { setStatus: React.Dispatch<Re
           debug_kind: kind,
           debug: params,
         };
-        setEvents((prev) => [newEvent, ...prev].slice(0, MAX_SCREEN_HEALTH_EVENTS));
-        setLatestDebug((prev) => ({ ...prev, [detector]: { kind, ts: event.ts * 1000, data: params } }));
-        setStatus((prev) => ({
-          ...prev,
-          events_received: (prev.events_received ?? 0) + 1,
-          last_event_ts: event.ts,
-        }));
+        pendingEventsRef.current.push(newEvent);
+        pendingLatestDebugRef.current[detector] = { kind, ts: event.ts * 1000, data: params };
+        pendingStatusRef.current.delta += 1;
+        pendingStatusRef.current.last_event_ts = event.ts;
+        scheduleFlush();
       }
     });
-    return unsubscribe;
-  }, [setStatus]);
+    return () => {
+      unsubscribe();
+      if (flushTimerRef.current != null) {
+        window.clearTimeout(flushTimerRef.current);
+        flushTimerRef.current = null;
+      }
+      pendingEventsRef.current = [];
+      pendingLatestDebugRef.current = {};
+      pendingStatusRef.current = { delta: 0 };
+    };
+  }, [setStatus, scheduleFlush]);
 
   const clearEvents = useCallback(() => setEvents([]), []);
 
