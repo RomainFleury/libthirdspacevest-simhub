@@ -1,8 +1,8 @@
-import { useScreenHealthConfig } from "../state/context";
+import { useScreenHealthProfileDraft } from "../draft/ProfileDraftContext";
 
-export function CaptureSettingsSection(props: { onCapture: () => void }) {
+export function CaptureSettingsSection(props: { onCapture: (monitorIndex: number) => void }) {
   const { onCapture } = props;
-  const { state, dispatch } = useScreenHealthConfig();
+  const { state, setMonitorIndex, setTickMs } = useScreenHealthProfileDraft();
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
       <div>
@@ -11,7 +11,7 @@ export function CaptureSettingsSection(props: { onCapture: () => void }) {
           type="number"
           min={1}
           value={state.monitorIndex}
-          onChange={(e) => dispatch({ type: "setMonitorIndex", value: parseInt(e.target.value, 10) || 1 })}
+          onChange={(e) => setMonitorIndex(parseInt(e.target.value, 10) || 1)}
           className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
         />
       </div>
@@ -21,13 +21,13 @@ export function CaptureSettingsSection(props: { onCapture: () => void }) {
           type="number"
           min={10}
           value={state.tickMs}
-          onChange={(e) => dispatch({ type: "setTickMs", value: parseInt(e.target.value, 10) || 50 })}
+          onChange={(e) => setTickMs(parseInt(e.target.value, 10) || 50)}
           className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
         />
       </div>
       <div className="flex items-end gap-2">
         <button
-          onClick={onCapture}
+          onClick={() => onCapture(state.monitorIndex)}
           className="rounded-lg bg-blue-600/80 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-600"
         >
           Capture screenshot

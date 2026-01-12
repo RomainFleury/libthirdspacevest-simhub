@@ -1,5 +1,5 @@
 import type { ScreenHealthPreset } from "../../../../data/screenHealthPresets";
-import { useScreenHealthConfig } from "../state/context";
+import { useScreenHealthProfileDraft } from "../draft/ProfileDraftContext";
 
 export function PresetProfilesSection(props: {
   presets: ScreenHealthPreset[];
@@ -8,7 +8,7 @@ export function PresetProfilesSection(props: {
   activeProfileMeta?: any;
 }) {
   const { presets, onInstall, onResetToDefaults, activeProfileMeta } = props;
-  const { state, dispatch } = useScreenHealthConfig();
+  const { state, setSelectedPresetId } = useScreenHealthProfileDraft();
   const presetId = activeProfileMeta?.preset_id;
   const hints: string[] = Array.isArray(activeProfileMeta?.hints) ? activeProfileMeta.hints : [];
 
@@ -18,7 +18,7 @@ export function PresetProfilesSection(props: {
       <div className="flex flex-wrap items-center gap-3">
         <select
           value={state.selectedPresetId}
-          onChange={(e) => dispatch({ type: "setSelectedPresetId", value: e.target.value })}
+          onChange={(e) => setSelectedPresetId(e.target.value)}
           className="rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
         >
           {presets.map((p) => (

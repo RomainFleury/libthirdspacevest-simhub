@@ -1,9 +1,9 @@
-import { useScreenHealthConfig } from "../state/context";
+import { useScreenHealthHealthBarDraft } from "../draft/HealthBarDraftContext";
 import { parseRgbTriplet } from "../utils";
 
 export function HealthBarSettings() {
-  const { state, dispatch } = useScreenHealthConfig();
-  const { healthBar } = state;
+  const { state: healthBar, setMode, setFallbackMode, setFallbackMin, setFilledRgb, setEmptyRgb, setToleranceL1, setHitMinDrop, setHitCooldownMs, setColorPickMode } =
+    useScreenHealthHealthBarDraft();
 
   return (
     <div className="space-y-3">
@@ -11,7 +11,7 @@ export function HealthBarSettings() {
         <label className="text-sm text-slate-400">Mode</label>
         <select
           value={healthBar.mode}
-          onChange={(e) => dispatch({ type: "setHealthBarMode", value: e.target.value as any })}
+          onChange={(e) => setMode(e.target.value as any)}
           className="rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
         >
           <option value="color_sampling">Color sampling</option>
@@ -30,7 +30,7 @@ export function HealthBarSettings() {
             <label className="text-sm text-slate-400 block mb-1">Fallback mode</label>
             <select
               value={healthBar.fallbackMode}
-              onChange={(e) => dispatch({ type: "setHealthBarFallbackMode", value: e.target.value as any })}
+              onChange={(e) => setFallbackMode(e.target.value as any)}
               className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
             >
               <option value="brightness">brightness</option>
@@ -45,7 +45,7 @@ export function HealthBarSettings() {
               min={0}
               max={1}
               value={healthBar.fallbackMin}
-              onChange={(e) => dispatch({ type: "setHealthBarFallbackMin", value: parseFloat(e.target.value) || 0 })}
+              onChange={(e) => setFallbackMin(parseFloat(e.target.value) || 0)}
               className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
             />
           </div>
@@ -60,7 +60,7 @@ export function HealthBarSettings() {
               value={healthBar.filledRgb.join(",")}
               onChange={(e) => {
                 const parsed = parseRgbTriplet(e.target.value);
-                if (parsed) dispatch({ type: "setHealthBarFilledRgb", value: parsed });
+                if (parsed) setFilledRgb(parsed);
               }}
               className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
             />
@@ -69,14 +69,12 @@ export function HealthBarSettings() {
               style={{ backgroundColor: `rgb(${healthBar.filledRgb[0]},${healthBar.filledRgb[1]},${healthBar.filledRgb[2]})` }}
             />
             <button
-              onClick={() =>
-                dispatch({ type: "setColorPickMode", value: state.colorPickMode === "filled" ? null : "filled" })
-              }
+              onClick={() => setColorPickMode(healthBar.colorPickMode === "filled" ? null : "filled")}
               className="rounded-lg bg-slate-600/80 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-600"
               disabled={healthBar.mode !== "color_sampling"}
               title={healthBar.mode !== "color_sampling" ? "Switch to Color sampling to pick colors" : "Pick from screenshot"}
             >
-              {state.colorPickMode === "filled" ? "Picking…" : "Pick"}
+              {healthBar.colorPickMode === "filled" ? "Picking…" : "Pick"}
             </button>
           </div>
         </div>
@@ -87,7 +85,7 @@ export function HealthBarSettings() {
               value={healthBar.emptyRgb.join(",")}
               onChange={(e) => {
                 const parsed = parseRgbTriplet(e.target.value);
-                if (parsed) dispatch({ type: "setHealthBarEmptyRgb", value: parsed });
+                if (parsed) setEmptyRgb(parsed);
               }}
               className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
             />
@@ -96,14 +94,12 @@ export function HealthBarSettings() {
               style={{ backgroundColor: `rgb(${healthBar.emptyRgb[0]},${healthBar.emptyRgb[1]},${healthBar.emptyRgb[2]})` }}
             />
             <button
-              onClick={() =>
-                dispatch({ type: "setColorPickMode", value: state.colorPickMode === "empty" ? null : "empty" })
-              }
+              onClick={() => setColorPickMode(healthBar.colorPickMode === "empty" ? null : "empty")}
               className="rounded-lg bg-slate-600/80 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-600"
               disabled={healthBar.mode !== "color_sampling"}
               title={healthBar.mode !== "color_sampling" ? "Switch to Color sampling to pick colors" : "Pick from screenshot"}
             >
-              {state.colorPickMode === "empty" ? "Picking…" : "Pick"}
+              {healthBar.colorPickMode === "empty" ? "Picking…" : "Pick"}
             </button>
           </div>
         </div>
@@ -117,7 +113,7 @@ export function HealthBarSettings() {
             min={0}
             max={765}
             value={healthBar.toleranceL1}
-            onChange={(e) => dispatch({ type: "setHealthBarToleranceL1", value: parseInt(e.target.value, 10) || 0 })}
+            onChange={(e) => setToleranceL1(parseInt(e.target.value, 10) || 0)}
             className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
             disabled={healthBar.mode !== "color_sampling"}
           />
@@ -130,7 +126,7 @@ export function HealthBarSettings() {
             min={0}
             max={1}
             value={healthBar.hitMinDrop}
-            onChange={(e) => dispatch({ type: "setHealthBarHitMinDrop", value: parseFloat(e.target.value) || 0 })}
+            onChange={(e) => setHitMinDrop(parseFloat(e.target.value) || 0)}
             className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
           />
         </div>
@@ -140,7 +136,7 @@ export function HealthBarSettings() {
             type="number"
             min={0}
             value={healthBar.hitCooldownMs}
-            onChange={(e) => dispatch({ type: "setHealthBarHitCooldownMs", value: parseInt(e.target.value, 10) || 0 })}
+            onChange={(e) => setHitCooldownMs(parseInt(e.target.value, 10) || 0)}
             className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
           />
         </div>

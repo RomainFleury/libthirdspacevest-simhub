@@ -1,16 +1,23 @@
 import { DIRECTION_KEYS } from "../constants";
-import { useScreenHealthConfig } from "../state/context";
+import { useScreenHealthProfileDraft } from "../draft/ProfileDraftContext";
+import { useScreenHealthRednessDraft } from "../draft/RednessDraftContext";
+import { useScreenHealthHealthBarDraft } from "../draft/HealthBarDraftContext";
+import { useScreenHealthHealthNumberDraft } from "../draft/HealthNumberDraftContext";
 
 export function RoiListSection(props: {
   captureRoiDebugImages: (monitorIndex: number, rois: Array<{ name: string; rect: { x: number; y: number; w: number; h: number } }>) => void;
 }) {
   const { captureRoiDebugImages } = props;
-  const { state, dispatch } = useScreenHealthConfig();
-  const detectorType = state.detectorType;
-  const monitorIndex = state.monitorIndex;
-  const rois = state.redness.rois;
-  const healthBarRoi = state.healthBar.roi;
-  const healthNumberRoi = state.healthNumber.roi;
+  const { state: profile } = useScreenHealthProfileDraft();
+  const { state: redness, updateRoi, removeRoi } = useScreenHealthRednessDraft();
+  const { state: hb, setRoi: setHealthBarRoi } = useScreenHealthHealthBarDraft();
+  const { state: hn, setRoi: setHealthNumberRoi } = useScreenHealthHealthNumberDraft();
+
+  const detectorType = profile.detectorType;
+  const monitorIndex = profile.monitorIndex;
+  const rois = redness.rois;
+  const healthBarRoi = hb.roi;
+  const healthNumberRoi = hn.roi;
 
   const title =
     detectorType === "health_bar" ? "Health bar ROI" : detectorType === "health_number" ? "Health number ROI" : "ROIs";
@@ -56,7 +63,7 @@ export function RoiListSection(props: {
                 x={healthBarRoi.x.toFixed(3)} y={healthBarRoi.y.toFixed(3)} w={healthBarRoi.w.toFixed(3)} h={healthBarRoi.h.toFixed(3)}
               </div>
               <button
-                onClick={() => dispatch({ type: "setHealthBarRoi", value: null })}
+                onClick={() => setHealthBarRoi(null)}
                 className="rounded-lg bg-rose-600/70 px-3 py-2 text-sm font-medium text-white transition hover:bg-rose-600"
               >
                 Clear
@@ -74,7 +81,7 @@ export function RoiListSection(props: {
                 x={healthNumberRoi.x.toFixed(3)} y={healthNumberRoi.y.toFixed(3)} w={healthNumberRoi.w.toFixed(3)} h={healthNumberRoi.h.toFixed(3)}
               </div>
               <button
-                onClick={() => dispatch({ type: "setHealthNumberRoi", value: null })}
+                onClick={() => setHealthNumberRoi(null)}
                 className="rounded-lg bg-rose-600/70 px-3 py-2 text-sm font-medium text-white transition hover:bg-rose-600"
               >
                 Clear
@@ -93,7 +100,7 @@ export function RoiListSection(props: {
                   <label className="text-xs text-slate-400 block mb-1">Name</label>
                   <input
                     value={r.name}
-                    onChange={(e) => dispatch({ type: "updateRednessRoi", index: idx, patch: { name: e.target.value } })}
+                    onChange={(e) => updateRoi(idx, { name: e.target.value })}
                     className="w-full rounded-lg bg-slate-800/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
                   />
                 </div>
@@ -101,7 +108,7 @@ export function RoiListSection(props: {
                   <label className="text-xs text-slate-400 block mb-1">Direction (optional — defaults to random)</label>
                   <select
                     value={r.direction || ""}
-                    onChange={(e) => dispatch({ type: "updateRednessRoi", index: idx, patch: { direction: e.target.value } })}
+                    onChange={(e) => updateRoi(idx, { direction: e.target.value })}
                     className="w-full rounded-lg bg-slate-800/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
                   >
                     {DIRECTION_KEYS.map((k) => (
@@ -116,7 +123,7 @@ export function RoiListSection(props: {
                     x={r.rect.x.toFixed(3)} y={r.rect.y.toFixed(3)} w={r.rect.w.toFixed(3)} h={r.rect.h.toFixed(3)}
                   </div>
                   <button
-                    onClick={() => dispatch({ type: "removeRednessRoi", index: idx })}
+                    onClick={() => removeRoi(idx)}
                     className="rounded-lg bg-rose-600/70 px-3 py-2 text-sm font-medium text-white transition hover:bg-rose-600"
                   >
                     Remove

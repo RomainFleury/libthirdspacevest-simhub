@@ -1,22 +1,93 @@
-import type { RefObject } from "react";
-import { useScreenHealthConfig } from "../state/context";
+import { useCallback, useMemo, useState } from "react";
+import { useScreenHealthCalibration } from "../draft/CalibrationContext";
+import { useScreenHealthHealthBarDraft } from "../draft/HealthBarDraftContext";
+import { useScreenHealthHealthNumberDraft } from "../draft/HealthNumberDraftContext";
+import { useScreenHealthProfileDraft } from "../draft/ProfileDraftContext";
+import { useScreenHealthRednessDraft } from "../draft/RednessDraftContext";
+import { clamp01, clampInt } from "../utils";
 
-export function CalibrationCanvasSection(props: {
-  lastCapturedImage: { dataUrl: string } | null;
-  imgContainerRef: RefObject<HTMLDivElement>;
-  offscreenCanvasRef: RefObject<HTMLCanvasElement>;
-  drawing: { startX: number; startY: number; curX: number; curY: number } | null;
-  onMouseDown: (e: any) => void;
-  onMouseMove: (e: any) => void;
-  onMouseUp: () => void;
-}) {
-  const { state } = useScreenHealthConfig();
-  const { lastCapturedImage, imgContainerRef, offscreenCanvasRef, drawing, onMouseDown, onMouseMove, onMouseUp } = props;
-  const detectorType = state.detectorType;
-  const colorPickMode = state.colorPickMode;
-  const rois = state.redness.rois;
-  const healthBarRoi = state.healthBar.roi;
-  const healthNumberRoi = state.healthNumber.roi;
+export function CalibrationCanvasSection(props: { lastCapturedImage: { dataUrl: string } | null }) {
+  const { lastCapturedImage } = props;
+  const { imgContainerRef, offscreenCanvasRef, imageLoadedRef } = useScreenHealthCalibration();
+  const { state: profile } = useScreenHealthProfileDraft();
+  const { state: redness, setRois } = useScreenHealthRednessDraft();
+  const { state: hb, setRoi: setHealthBarRoi, setFilledRgb, setEmptyRgb, setColorPickMode } = useScreenHealthHealthBarDraft();
+  const { state: hn, setRoi: setHealthNumberRoi } = useScreenHealthHealthNumberDraft();
+
+  const detectorType = profile.detectorType;
+
+  const [drawing, setDrawing] = useState<{ startX: number; startY: number; curX: number; curY: number } | null>(null);
+
+  const pickColorAtMouse = useCallback(
+    (e: React.MouseEvent) => {
+      if (!hb.colorPickMode || !imgContainerRef.current) return false;
+      const canvas = offscreenCanvasRef.current;
+      if (!canvas || !imageLoadedRef.current) return false;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return false;
+
+      const rect = imgContainerRef.current.getBoundingClientRect();
+      const nx = clamp01((e.clientX - rect.left) / rect.width);
+      const ny = clamp01((e.clientY - rect.top) / rect.height);
+      const px = clampInt(Math.floor(nx * canvas.width), 0, canvas.width - 1);
+      const py = clampInt(Math.floor(ny * canvas.height), 0, canvas.height - 1);
+      const data = ctx.getImageData(px, py, 1, 1).data; // RGBA
+      const rgb: [number, number, number] = [data[0], data[1], data[2]];
+      if (hb.colorPickMode === "filled") setFilledRgb(rgb);
+      else setEmptyRgb(rgb);
+      setColorPickMode(null);
+      return true;
+    },
+    [hb.colorPickMode, imgContainerRef, offscreenCanvasRef, imageLoadedRef, setEmptyRgb, setFilledRgb, setColorPickMode]
+  );
+
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (pickColorAtMouse(e)) return;
+      if (!imgContainerRef.current) return;
+      const rect = imgContainerRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      setDrawing({ startX: x, startY: y, curX: x, curY: y });
+    },
+    [pickColorAtMouse, imgContainerRef]
+  );
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (!drawing || !imgContainerRef.current) return;
+      const rect = imgContainerRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      setDrawing({ ...drawing, curX: x, curY: y });
+    },
+    [drawing, imgContainerRef]
+  );
+
+  const handleMouseUp = useCallback(() => {
+    if (!drawing || !imgContainerRef.current) return;
+    const rect = imgContainerRef.current.getBoundingClientRect();
+    const x1 = Math.min(drawing.startX, drawing.curX);
+    const y1 = Math.min(drawing.startY, drawing.curY);
+    const x2 = Math.max(drawing.startX, drawing.curX);
+    const y2 = Math.max(drawing.startY, drawing.curY);
+    const w = x2 - x1;
+    const h = y2 - y1;
+    setDrawing(null);
+    if (w < 5 || h < 5) return;
+
+    const newRect = { x: clamp01(x1 / rect.width), y: clamp01(y1 / rect.height), w: clamp01(w / rect.width), h: clamp01(h / rect.height) };
+    if (detectorType === "health_bar") setHealthBarRoi(newRect);
+    else if (detectorType === "health_number") setHealthNumberRoi(newRect);
+    else setRois((prev) => [...prev, { name: `roi_${prev.length + 1}`, direction: "", rect: newRect }]);
+  }, [drawing, detectorType, imgContainerRef, setHealthBarRoi, setHealthNumberRoi, setRois]);
+
+  const cursor = hb.colorPickMode ? "copy" : "crosshair";
+  const overlays = useMemo(() => {
+    if (detectorType === "redness_rois") return { rois: redness.rois, hbRoi: null, hnRoi: null };
+    if (detectorType === "health_bar") return { rois: [], hbRoi: hb.roi, hnRoi: null };
+    return { rois: [], hbRoi: null, hnRoi: hn.roi };
+  }, [detectorType, redness.rois, hb.roi, hn.roi]);
 
   if (!lastCapturedImage) return null;
 
@@ -32,16 +103,16 @@ export function CalibrationCanvasSection(props: {
       <div
         ref={imgContainerRef}
         className="relative w-full overflow-hidden rounded-xl ring-1 ring-white/10 bg-slate-900/30"
-        onMouseDown={onMouseDown}
-        onMouseMove={onMouseMove}
-        onMouseUp={onMouseUp}
-        style={{ cursor: colorPickMode ? "copy" : "crosshair" }}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        style={{ cursor }}
       >
         <img src={lastCapturedImage.dataUrl} className="block w-full select-none" draggable={false} />
         <canvas ref={offscreenCanvasRef} className="hidden" />
 
         {detectorType === "redness_rois" &&
-          rois.map((r, idx) => (
+          overlays.rois.map((r, idx) => (
             <div
               key={`${r.name}-${idx}`}
               className="absolute border-2 border-emerald-400/80 bg-emerald-400/10"
@@ -55,27 +126,27 @@ export function CalibrationCanvasSection(props: {
             />
           ))}
 
-        {detectorType === "health_bar" && healthBarRoi && (
+        {detectorType === "health_bar" && overlays.hbRoi && (
           <div
             className="absolute border-2 border-emerald-400/80 bg-emerald-400/10"
             style={{
-              left: `${healthBarRoi.x * 100}%`,
-              top: `${healthBarRoi.y * 100}%`,
-              width: `${healthBarRoi.w * 100}%`,
-              height: `${healthBarRoi.h * 100}%`,
+              left: `${overlays.hbRoi.x * 100}%`,
+              top: `${overlays.hbRoi.y * 100}%`,
+              width: `${overlays.hbRoi.w * 100}%`,
+              height: `${overlays.hbRoi.h * 100}%`,
             }}
             title="health_bar"
           />
         )}
 
-        {detectorType === "health_number" && healthNumberRoi && (
+        {detectorType === "health_number" && overlays.hnRoi && (
           <div
             className="absolute border-2 border-emerald-400/80 bg-emerald-400/10"
             style={{
-              left: `${healthNumberRoi.x * 100}%`,
-              top: `${healthNumberRoi.y * 100}%`,
-              width: `${healthNumberRoi.w * 100}%`,
-              height: `${healthNumberRoi.h * 100}%`,
+              left: `${overlays.hnRoi.x * 100}%`,
+              top: `${overlays.hnRoi.y * 100}%`,
+              width: `${overlays.hnRoi.w * 100}%`,
+              height: `${overlays.hnRoi.h * 100}%`,
             }}
             title="health_number"
           />

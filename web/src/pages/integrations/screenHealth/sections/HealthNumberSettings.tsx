@@ -1,13 +1,57 @@
-import { useScreenHealthConfig } from "../state/context";
+import { useScreenHealthHealthNumberDraft } from "../draft/HealthNumberDraftContext";
+import { useScreenHealthCalibration } from "../draft/CalibrationContext";
+import { learnDigitTemplatesFromCanvas, tryReadDigitValueFromCanvas } from "../templateLearning";
 
-export function HealthNumberSettings(props: { onLearn: () => void; onTest: () => void; onClearTemplates: () => void; learnedDigits: string }) {
-  const { onLearn, onTest, onClearTemplates, learnedDigits } = props;
-  const { state, dispatch } = useScreenHealthConfig();
+export function HealthNumberSettings() {
+  const { state, setDigits, setThreshold, setScale, setInvert, setReadMin, setReadMax, setStableReads, setHammingMax, setTemplateSize, setHitMinDrop, setHitCooldownMs, setLearnValue, setTemplates, setCalibrationError, setTestResult, clearTemplates } =
+    useScreenHealthHealthNumberDraft();
+  const { getCanvasOrThrow } = useScreenHealthCalibration();
+  const learnedDigits = Object.keys(state.templates).sort().join(", ");
+
+  const onLearn = () => {
+    setCalibrationError(null);
+    setTestResult(null);
+    if (!state.roi) throw new Error("No health number ROI set");
+    const canvas = getCanvasOrThrow();
+    const digitsCount = Math.max(1, Math.floor(state.digits));
+    const next = learnDigitTemplatesFromCanvas({
+      canvas,
+      roi: state.roi,
+      digitsCount,
+      displayedValue: state.learnValue,
+      threshold: state.threshold,
+      invert: state.invert,
+      scale: state.scale,
+      templateSize: state.templateSize,
+      prevTemplates: state.templates,
+    });
+    setTemplates(next);
+  };
+
+  const onTest = () => {
+    setCalibrationError(null);
+    setTestResult(null);
+    if (!state.roi) throw new Error("No health number ROI set");
+    const canvas = getCanvasOrThrow();
+    const digitsCount = Math.max(1, Math.floor(state.digits));
+    const result = tryReadDigitValueFromCanvas({
+      canvas,
+      roi: state.roi,
+      digitsCount,
+      threshold: state.threshold,
+      invert: state.invert,
+      scale: state.scale,
+      templateSize: state.templateSize,
+      templates: state.templates,
+      hammingMax: state.hammingMax,
+    });
+    setTestResult(result);
+  };
+
   const p = {
-    ...state.healthNumber,
-    digits: state.healthNumber.digits,
-    templateW: state.healthNumber.templateSize.w,
-    templateH: state.healthNumber.templateSize.h,
+    ...state,
+    templateW: state.templateSize.w,
+    templateH: state.templateSize.h,
   };
   return (
     <div className="space-y-3">
@@ -18,7 +62,7 @@ export function HealthNumberSettings(props: { onLearn: () => void; onTest: () =>
             type="number"
             min={1}
             value={p.digits}
-            onChange={(e) => dispatch({ type: "setHealthNumberDigits", value: parseInt(e.target.value, 10) || 1 })}
+            onChange={(e) => setDigits(parseInt(e.target.value, 10) || 1)}
             className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
           />
         </div>
@@ -30,7 +74,7 @@ export function HealthNumberSettings(props: { onLearn: () => void; onTest: () =>
             min={0}
             max={1}
             value={p.threshold}
-            onChange={(e) => dispatch({ type: "setHealthNumberThreshold", value: parseFloat(e.target.value) || 0 })}
+            onChange={(e) => setThreshold(parseFloat(e.target.value) || 0)}
             className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
           />
         </div>
@@ -40,7 +84,7 @@ export function HealthNumberSettings(props: { onLearn: () => void; onTest: () =>
             type="number"
             min={1}
             value={p.scale}
-            onChange={(e) => dispatch({ type: "setHealthNumberScale", value: parseInt(e.target.value, 10) || 1 })}
+            onChange={(e) => setScale(parseInt(e.target.value, 10) || 1)}
             className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
           />
         </div>
@@ -51,7 +95,7 @@ export function HealthNumberSettings(props: { onLearn: () => void; onTest: () =>
         <input
           type="checkbox"
           checked={p.invert}
-          onChange={(e) => dispatch({ type: "setHealthNumberInvert", value: e.target.checked })}
+          onChange={(e) => setInvert(e.target.checked)}
           className="h-4 w-4"
         />
       </div>
@@ -62,7 +106,7 @@ export function HealthNumberSettings(props: { onLearn: () => void; onTest: () =>
           <input
             type="number"
             value={p.readMin}
-            onChange={(e) => dispatch({ type: "setHealthNumberReadMin", value: parseInt(e.target.value, 10) || 0 })}
+            onChange={(e) => setReadMin(parseInt(e.target.value, 10) || 0)}
             className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
           />
         </div>
@@ -71,7 +115,7 @@ export function HealthNumberSettings(props: { onLearn: () => void; onTest: () =>
           <input
             type="number"
             value={p.readMax}
-            onChange={(e) => dispatch({ type: "setHealthNumberReadMax", value: parseInt(e.target.value, 10) || 0 })}
+            onChange={(e) => setReadMax(parseInt(e.target.value, 10) || 0)}
             className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
           />
         </div>
@@ -81,7 +125,7 @@ export function HealthNumberSettings(props: { onLearn: () => void; onTest: () =>
             type="number"
             min={1}
             value={p.stableReads}
-            onChange={(e) => dispatch({ type: "setHealthNumberStableReads", value: parseInt(e.target.value, 10) || 1 })}
+            onChange={(e) => setStableReads(parseInt(e.target.value, 10) || 1)}
             className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
           />
         </div>
@@ -94,7 +138,7 @@ export function HealthNumberSettings(props: { onLearn: () => void; onTest: () =>
             type="number"
             min={0}
             value={p.hammingMax}
-            onChange={(e) => dispatch({ type: "setHealthNumberHammingMax", value: parseInt(e.target.value, 10) || 0 })}
+            onChange={(e) => setHammingMax(parseInt(e.target.value, 10) || 0)}
             className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
           />
         </div>
@@ -104,12 +148,7 @@ export function HealthNumberSettings(props: { onLearn: () => void; onTest: () =>
             type="number"
             min={4}
             value={p.templateW}
-            onChange={(e) =>
-              dispatch({
-                type: "setHealthNumberTemplateSize",
-                value: { w: Math.max(4, parseInt(e.target.value, 10) || 4), h: state.healthNumber.templateSize.h },
-              })
-            }
+            onChange={(e) => setTemplateSize({ w: Math.max(4, parseInt(e.target.value, 10) || 4), h: state.templateSize.h })}
             className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
           />
         </div>
@@ -119,12 +158,7 @@ export function HealthNumberSettings(props: { onLearn: () => void; onTest: () =>
             type="number"
             min={4}
             value={p.templateH}
-            onChange={(e) =>
-              dispatch({
-                type: "setHealthNumberTemplateSize",
-                value: { w: state.healthNumber.templateSize.w, h: Math.max(4, parseInt(e.target.value, 10) || 4) },
-              })
-            }
+            onChange={(e) => setTemplateSize({ w: state.templateSize.w, h: Math.max(4, parseInt(e.target.value, 10) || 4) })}
             className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
           />
         </div>
@@ -137,7 +171,7 @@ export function HealthNumberSettings(props: { onLearn: () => void; onTest: () =>
             type="number"
             min={1}
             value={p.hitMinDrop}
-            onChange={(e) => dispatch({ type: "setHealthNumberHitMinDrop", value: parseInt(e.target.value, 10) || 1 })}
+            onChange={(e) => setHitMinDrop(parseInt(e.target.value, 10) || 1)}
             className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
           />
         </div>
@@ -147,9 +181,7 @@ export function HealthNumberSettings(props: { onLearn: () => void; onTest: () =>
             type="number"
             min={0}
             value={p.hitCooldownMs}
-            onChange={(e) =>
-              dispatch({ type: "setHealthNumberHitCooldownMs", value: parseInt(e.target.value, 10) || 0 })
-            }
+            onChange={(e) => setHitCooldownMs(parseInt(e.target.value, 10) || 0)}
             className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
           />
         </div>
@@ -160,28 +192,46 @@ export function HealthNumberSettings(props: { onLearn: () => void; onTest: () =>
         <div className="text-xs text-slate-400">Draw the digits ROI, type the number currently shown, then Learn.</div>
         <div className="flex flex-wrap items-center gap-2">
           <input
-            value={state.healthNumber.learnValue}
-            onChange={(e) => dispatch({ type: "setHealthNumberLearnValue", value: e.target.value })}
+            value={state.learnValue}
+            onChange={(e) => setLearnValue(e.target.value)}
             placeholder={`e.g. ${"7".repeat(Math.max(1, Math.floor(p.digits)))}`}
             className="rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
           />
-          <button onClick={onLearn} className="rounded-lg bg-emerald-600/80 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-600">
+          <button
+            onClick={() => {
+              try {
+                onLearn();
+              } catch (e) {
+                setCalibrationError(e instanceof Error ? e.message : "Failed to learn templates");
+              }
+            }}
+            className="rounded-lg bg-emerald-600/80 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-600"
+          >
             Learn from screenshot
           </button>
-          <button onClick={onTest} className="rounded-lg bg-slate-600/80 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-600">
+          <button
+            onClick={() => {
+              try {
+                onTest();
+              } catch (e) {
+                setCalibrationError(e instanceof Error ? e.message : "Failed to test OCR");
+              }
+            }}
+            className="rounded-lg bg-slate-600/80 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-600"
+          >
             Test OCR once
           </button>
-          <button onClick={onClearTemplates} className="rounded-lg bg-slate-600/80 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-600">
+          <button onClick={clearTemplates} className="rounded-lg bg-slate-600/80 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-600">
             Clear templates
           </button>
         </div>
-        {state.healthNumber.calibrationError && <div className="text-xs text-rose-300">{state.healthNumber.calibrationError}</div>}
-        {state.healthNumber.testResult && (
+        {state.calibrationError && <div className="text-xs text-rose-300">{state.calibrationError}</div>}
+        {state.testResult && (
           <div className="text-xs text-slate-300">
             Test result:{" "}
-            {typeof state.healthNumber.testResult.value === "number"
-              ? `value=${state.healthNumber.testResult.value}`
-              : `no match${state.healthNumber.testResult.reason ? ` (${state.healthNumber.testResult.reason})` : ""}`}
+            {typeof state.testResult.value === "number"
+              ? `value=${state.testResult.value}`
+              : `no match${state.testResult.reason ? ` (${state.testResult.reason})` : ""}`}
           </div>
         )}
         <div className="text-xs text-slate-500">

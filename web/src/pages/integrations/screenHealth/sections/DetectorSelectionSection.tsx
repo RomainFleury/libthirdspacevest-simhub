@@ -1,7 +1,7 @@
-import { useScreenHealthConfig } from "../state/context";
+import { useScreenHealthProfileDraft } from "../draft/ProfileDraftContext";
 
 export function DetectorSelectionSection() {
-  const { state, dispatch } = useScreenHealthConfig();
+  const { state, setDetectorType } = useScreenHealthProfileDraft();
   return (
     <div className="space-y-2">
       <h3 className="text-sm font-semibold text-white">Detector</h3>
@@ -9,7 +9,7 @@ export function DetectorSelectionSection() {
         <label className="text-sm text-slate-400">Type</label>
         <select
           value={state.detectorType}
-          onChange={(e) => dispatch({ type: "setDetectorType", value: e.target.value as any })}
+          onChange={(e) => setDetectorType(e.target.value as any)}
           className="rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
         >
           <option value="redness_rois">Red vignette (ROIs)</option>
