@@ -88,9 +88,13 @@ export function useScreenHealthHealthBarDraftState() {
   return ctx;
 }
 
-export function useScreenHealthHealthBarDraftActions() {
+export function useScreenHealthHealthBarDraftControls() {
   const ctx = useContext(ActionsC);
-  if (!ctx) throw new Error("useScreenHealthHealthBarDraftActions must be used within ScreenHealthHealthBarDraftProvider");
+  if (!ctx) throw new Error("useScreenHealthHealthBarDraftControls must be used within ScreenHealthHealthBarDraftProvider");
   return ctx;
+}
+
+export function useScreenHealthHealthBarDraft() {
+  return useScreenHealthHealthBarDraftState();
 }
 

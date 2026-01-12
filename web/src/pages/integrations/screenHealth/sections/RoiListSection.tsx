@@ -1,20 +1,20 @@
 import { DIRECTION_KEYS } from "../constants";
-import { useScreenHealthProfileDraftState } from "../draft/ProfileDraftContext";
-import { useScreenHealthRednessDraftActions, useScreenHealthRednessDraftState } from "../draft/RednessDraftContext";
-import { useScreenHealthHealthBarDraftActions, useScreenHealthHealthBarDraftState } from "../draft/HealthBarDraftContext";
-import { useScreenHealthHealthNumberDraftActions, useScreenHealthHealthNumberDraftState } from "../draft/HealthNumberDraftContext";
+import { useScreenHealthProfileDraft } from "../draft/ProfileDraftContext";
+import { useScreenHealthRednessDraft, useScreenHealthRednessDraftControls } from "../draft/RednessDraftContext";
+import { useScreenHealthHealthBarDraft, useScreenHealthHealthBarDraftControls } from "../draft/HealthBarDraftContext";
+import { useScreenHealthHealthNumberDraft, useScreenHealthHealthNumberDraftControls } from "../draft/HealthNumberDraftContext";
 
 export function RoiListSection(props: {
   captureRoiDebugImages: (monitorIndex: number, rois: Array<{ name: string; rect: { x: number; y: number; w: number; h: number } }>) => void;
 }) {
   const { captureRoiDebugImages } = props;
-  const profile = useScreenHealthProfileDraftState();
-  const redness = useScreenHealthRednessDraftState();
-  const { updateRoi, removeRoi } = useScreenHealthRednessDraftActions();
-  const hb = useScreenHealthHealthBarDraftState();
-  const { setRoi: setHealthBarRoi } = useScreenHealthHealthBarDraftActions();
-  const hn = useScreenHealthHealthNumberDraftState();
-  const { setRoi: setHealthNumberRoi } = useScreenHealthHealthNumberDraftActions();
+  const profile = useScreenHealthProfileDraft();
+  const redness = useScreenHealthRednessDraft();
+  const { updateRoi, removeRoi } = useScreenHealthRednessDraftControls();
+  const hb = useScreenHealthHealthBarDraft();
+  const { setRoi: setHealthBarRoi } = useScreenHealthHealthBarDraftControls();
+  const hn = useScreenHealthHealthNumberDraft();
+  const { setRoi: setHealthNumberRoi } = useScreenHealthHealthNumberDraftControls();
 
   const detectorType = profile.detectorType;
   const monitorIndex = profile.monitorIndex;

@@ -68,9 +68,13 @@ export function useScreenHealthProfileDraftState() {
   return ctx;
 }
 
-export function useScreenHealthProfileDraftActions() {
+export function useScreenHealthProfileDraftControls() {
   const ctx = useContext(ActionsC);
-  if (!ctx) throw new Error("useScreenHealthProfileDraftActions must be used within ScreenHealthProfileDraftProvider");
+  if (!ctx) throw new Error("useScreenHealthProfileDraftControls must be used within ScreenHealthProfileDraftProvider");
   return ctx;
 }
 
+// Preferred "read" hook name (clear at call sites)
+export function useScreenHealthProfileDraft() {
+  return useScreenHealthProfileDraftState();
+}

@@ -72,9 +72,13 @@ export function useScreenHealthRednessDraftState() {
   return ctx;
 }
 
-export function useScreenHealthRednessDraftActions() {
+export function useScreenHealthRednessDraftControls() {
   const ctx = useContext(ActionsC);
-  if (!ctx) throw new Error("useScreenHealthRednessDraftActions must be used within ScreenHealthRednessDraftProvider");
+  if (!ctx) throw new Error("useScreenHealthRednessDraftControls must be used within ScreenHealthRednessDraftProvider");
   return ctx;
+}
+
+export function useScreenHealthRednessDraft() {
+  return useScreenHealthRednessDraftState();
 }
 

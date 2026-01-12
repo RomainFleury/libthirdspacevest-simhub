@@ -1,5 +1,5 @@
 import type { ScreenHealthPreset } from "../../../../data/screenHealthPresets";
-import { useScreenHealthProfileDraftActions, useScreenHealthProfileDraftState } from "../draft/ProfileDraftContext";
+import { useScreenHealthProfileDraft, useScreenHealthProfileDraftControls } from "../draft/ProfileDraftContext";
 
 export function PresetProfilesSection(props: {
   presets: ScreenHealthPreset[];
@@ -8,8 +8,8 @@ export function PresetProfilesSection(props: {
   activeProfileMeta?: any;
 }) {
   const { presets, onInstall, onResetToDefaults, activeProfileMeta } = props;
-  const state = useScreenHealthProfileDraftState();
-  const { setSelectedPresetId } = useScreenHealthProfileDraftActions();
+  const state = useScreenHealthProfileDraft();
+  const { setSelectedPresetId } = useScreenHealthProfileDraftControls();
   const presetId = activeProfileMeta?.preset_id;
   const hints: string[] = Array.isArray(activeProfileMeta?.hints) ? activeProfileMeta.hints : [];
 

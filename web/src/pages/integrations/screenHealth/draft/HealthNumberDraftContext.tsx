@@ -119,9 +119,13 @@ export function useScreenHealthHealthNumberDraftState() {
   return ctx;
 }
 
-export function useScreenHealthHealthNumberDraftActions() {
+export function useScreenHealthHealthNumberDraftControls() {
   const ctx = useContext(ActionsC);
-  if (!ctx) throw new Error("useScreenHealthHealthNumberDraftActions must be used within ScreenHealthHealthNumberDraftProvider");
+  if (!ctx) throw new Error("useScreenHealthHealthNumberDraftControls must be used within ScreenHealthHealthNumberDraftProvider");
   return ctx;
+}
+
+export function useScreenHealthHealthNumberDraft() {
+  return useScreenHealthHealthNumberDraftState();
 }
 

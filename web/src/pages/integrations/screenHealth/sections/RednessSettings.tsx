@@ -1,8 +1,8 @@
-import { useScreenHealthRednessDraftActions, useScreenHealthRednessDraftState } from "../draft/RednessDraftContext";
+import { useScreenHealthRednessDraft, useScreenHealthRednessDraftControls } from "../draft/RednessDraftContext";
 
 export function RednessSettings() {
-  const state = useScreenHealthRednessDraftState();
-  const { setMinScore, setCooldownMs } = useScreenHealthRednessDraftActions();
+  const state = useScreenHealthRednessDraft();
+  const { setMinScore, setCooldownMs } = useScreenHealthRednessDraftControls();
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
       <div>
