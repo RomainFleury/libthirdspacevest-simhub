@@ -1,9 +1,10 @@
-import { useParams, Navigate } from "react-router-dom";
+import { useParams, Navigate, Routes, Route } from "react-router-dom";
 import { 
   CS2IntegrationPage, 
   AlyxIntegrationPage,
   L4D2IntegrationPage,
   ScreenHealthIntegrationPage,
+  ScreenHealthCalibrationPage,
 } from "./integrations";
 
 /**
@@ -14,6 +15,10 @@ const INTEGRATION_PAGES: Record<string, React.ComponentType> = {
   alyx: AlyxIntegrationPage,
   l4d2: L4D2IntegrationPage,
   screen_health: ScreenHealthIntegrationPage,
+};
+
+const INTEGRATION_SUBPAGES: Record<string, { calibration?: React.ComponentType }> = {
+  screen_health: { calibration: ScreenHealthCalibrationPage },
 };
 
 /**
@@ -27,6 +32,7 @@ export function IntegrationPage() {
   }
 
   const PageComponent = INTEGRATION_PAGES[gameId];
+  const sub = INTEGRATION_SUBPAGES[gameId] || {};
   
   if (!PageComponent) {
     // Game not found or not yet implemented
@@ -49,5 +55,11 @@ export function IntegrationPage() {
     );
   }
 
-  return <PageComponent />;
+  return (
+    <Routes>
+      <Route index element={<PageComponent />} />
+      {sub.calibration && <Route path="calibration" element={<sub.calibration />} />}
+      <Route path="*" element={<Navigate to={`/games/${gameId}`} replace />} />
+    </Routes>
+  );
 }

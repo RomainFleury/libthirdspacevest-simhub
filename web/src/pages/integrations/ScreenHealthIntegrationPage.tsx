@@ -1,8 +1,8 @@
+import { Link } from "react-router-dom";
 import { GameIntegrationPage } from "../../components/GameIntegrationPage";
 import { getIntegratedGame } from "../../data/integratedGames";
 import type { GameEvent } from "../../types/integratedGames";
 import { useScreenHealthIntegration } from "../../hooks/useScreenHealthIntegration";
-import { ScreenHealthConfigurationPanel } from "./screenHealth/ScreenHealthConfigurationPanel";
 import { EVENT_DISPLAY_MAP } from "./screenHealth/constants";
 
 const game = getIntegratedGame("screen_health")!;
@@ -11,27 +11,20 @@ export function ScreenHealthIntegrationPage() {
   const integration = useScreenHealthIntegration();
 
   const configurationPanel = (
-    <ScreenHealthConfigurationPanel
-      profiles={integration.profiles}
-      activeProfileId={integration.activeProfileId}
-      activeProfile={integration.activeProfile}
-      saveProfile={integration.saveProfile}
-      deleteProfile={integration.deleteProfile}
-      setActive={integration.setActive}
-      exportProfile={integration.exportProfile}
-      importProfile={integration.importProfile}
-      settings={integration.settings}
-      updateSettings={integration.updateSettings}
-      chooseScreenshotsDir={integration.chooseScreenshotsDir}
-      screenshots={integration.screenshots}
-      screenshotPreview={integration.screenshotPreview}
-      loadScreenshotPreview={integration.loadScreenshotPreview}
-      deleteScreenshot={integration.deleteScreenshot}
-      clearScreenshots={integration.clearScreenshots}
-      lastCapturedImage={integration.lastCapturedImage}
-      captureCalibrationScreenshot={integration.captureCalibrationScreenshot}
-      captureRoiDebugImages={integration.captureRoiDebugImages}
-    />
+    <div className="space-y-3">
+      <div className="text-sm text-slate-400">
+        Calibration (screenshots + ROI drawing) is in a separate page to avoid UI freezes.
+      </div>
+      <Link
+        to="/games/screen_health/calibration"
+        className="inline-flex items-center gap-2 rounded-lg bg-blue-600/80 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-600"
+      >
+        Open calibration & settings →
+      </Link>
+      <div className="text-xs text-slate-500">
+        Tip: keep this page open while playing; do calibration once, then come back here.
+      </div>
+    </div>
   );
 
   const setupGuide = (
@@ -42,9 +35,9 @@ export function ScreenHealthIntegrationPage() {
       </p>
       <ol className="list-decimal list-inside space-y-2 text-slate-400">
         <li>Run your game in borderless/windowed mode (recommended for capture reliability).</li>
-        <li>Pick a monitor index and click “Capture screenshot”.</li>
-        <li>Select a detector (red vignette, health bar, or digits OCR).</li>
-        <li>Draw the ROI(s) and tune settings, then click “Save profile”.</li>
+        <li>Open “Calibration & settings”.</li>
+        <li>Capture a screenshot and draw ROIs for your detector.</li>
+        <li>Tune settings and click “Save profile”.</li>
         <li>Click “Start” to enable the watcher in the daemon.</li>
       </ol>
       <p className="text-slate-500 text-xs">Tip: Use “Capture ROI crop(s)” to verify you’re sampling the right pixels.</p>
