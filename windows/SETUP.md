@@ -14,11 +14,12 @@
 2. Download the **LTS** version (green button)
 3. Run the installer, click Next through all steps
 
-### Step 2: Install the App
+### Step 2: Check Setup & Install Dependencies
 
-1. **Double-click** `install.bat` in this folder
-2. Wait for it to finish (may take 2-3 minutes)
-3. You'll see "✓ Setup complete!" when done
+1. **Double-click** `check-setup.bat` in this folder
+2. Follow the prompts (it will ask if you want to save your Python configuration)
+3. Wait for all checks to complete
+4. You'll see a summary showing passed/failed checks
 
 ### Step 3: Run the App
 
@@ -34,7 +35,7 @@
 - Make sure you installed Node.js LTS from nodejs.org
 
 ### "yarn is not recognized"  
-- Run `install.bat` again
+- Run `check-setup.bat` again
 - Or open Command Prompt and run: `corepack enable`
 
 ### The app window doesn't open
@@ -42,7 +43,11 @@
 - Check if port 5173 is free (close other dev tools)
 
 ### Install fails with permission error
-- Right-click `install.bat` → "Run as administrator"
+- Right-click `check-setup.bat` → "Run as administrator"
+
+### Wrong Python version being used
+- Run `check-setup.bat` to configure the correct Python
+- Or manually edit `windows\.env.bat` to set `TSV_PYTHON=py -3.11`
 
 ---
 
@@ -51,11 +56,19 @@
 Open Command Prompt (cmd) and run these commands:
 
 ```cmd
+:: Set Python version (optional but recommended)
+set TSV_PYTHON=py -3.11
+
+:: Install Python package
+cd path\to\libthirdspacevest-simhub\modern-third-space
+pip install -e .
+pip install libusb rapidshot
+
 :: Enable Yarn
 corepack enable
 
 :: Go to web folder
-cd path\to\libthirdspacevest-simhub\web
+cd ..\web
 
 :: Install dependencies
 yarn install

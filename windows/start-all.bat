@@ -58,10 +58,11 @@ echo [INFO] Python: %PYTHON_CMD%
 echo.
 
 ::: Install and validate libusb DLL
-call "%~dp0install-validate-libusb.bat"
+call "%~dp0setup\check-libusb.bat"
 if %ERRORLEVEL% neq 0 (
     echo.
     echo This is required for USB device communication.
+    echo Run check-setup.bat for more details.
     pause
     exit /b 1
 )

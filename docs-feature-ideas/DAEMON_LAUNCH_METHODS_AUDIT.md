@@ -309,8 +309,23 @@ The following changes have been made:
 | `web/scripts/runPythonCommand.mjs` | Added same Python detection logic | ✅ Done |
 | `windows/start-ui.bat` | Resolves Python and exports TSV_PYTHON | ✅ Done |
 | `windows/start-all.bat` | Exports TSV_PYTHON to Electron | ✅ Done |
+| `windows/start-daemon.bat` | Updated to call `setup/check-libusb.bat` | ✅ Done |
+| `windows/build-release.bat` | Updated to call `setup/check-libusb.bat` | ✅ Done |
 | `windows/README.md` | Updated script list, added Python detection docs | ✅ Done |
-| `windows/SETUP.md` | Updated to reference start-all.bat | ✅ Done |
+| `windows/SETUP.md` | Updated to reference check-setup.bat | ✅ Done |
+
+## Files Added
+
+| File | Purpose |
+|------|---------|
+| `windows/check-setup.bat` | Main setup checker - orchestrates all checks |
+| `windows/setup/check-python.bat` | Python detection + .env.bat creation helper |
+| `windows/setup/check-node.bat` | Node.js installation check |
+| `windows/setup/check-yarn.bat` | Yarn installation/setup |
+| `windows/setup/check-python-packages.bat` | modern_third_space package install |
+| `windows/setup/check-libusb.bat` | libusb DLL check/install |
+| `windows/setup/check-rapidshot.bat` | rapidshot check/install (Screen Health) |
+| `windows/setup/check-web-dependencies.bat` | web/node_modules install |
 
 ## Files Removed
 
@@ -319,6 +334,10 @@ The following changes have been made:
 | `windows/run.bat` | Redundant with `start-ui.bat` and `yarn dev` |
 | `windows/run-with-python.bat` | Utility script no longer needed |
 | `windows/start-daemon-custom.bat` | Debug flags can be set via environment |
+| `windows/install.bat` | Replaced by `check-setup.bat` |
+| `windows/install-validate-libusb.bat` | Moved to `setup/check-libusb.bat` |
+| `windows/install-validate-rapidshot.bat` | Moved to `setup/check-rapidshot.bat` |
+| `check-setup.ps1` | Replaced by `windows/check-setup.bat` |
 
 ---
 
