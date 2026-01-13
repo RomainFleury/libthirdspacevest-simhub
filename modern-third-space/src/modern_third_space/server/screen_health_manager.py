@@ -1763,50 +1763,49 @@ class _MSSCaptureBackend:
         return img.raw  # BGRA bytes
 
 
-class _DXCamCaptureBackend:
+class _RapidShotCaptureBackend:
     """
-    Optional dxcam-based capture backend (Windows, DXGI).
+    Optional RapidShot-based capture backend (Windows, DXGI).
 
-    Faster than mss/GDI on many systems. Optional-import to keep tests/dev
-    environments working even without dxcam installed.
+    Optional-import to keep tests/dev environments working even without rapidshot installed.
     """
 
     def __init__(self, monitor_index: int) -> None:
         self._monitor_index = monitor_index
-        self._cam = None
-        self._output_left = 0
-        self._output_top = 0
+        self._cap = None
         self._output_w = 0
         self._output_h = 0
 
     def _ensure(self) -> None:
-        if self._cam is not None:
+        if self._cap is not None:
             return
         try:
-            import dxcam  # type: ignore
+            import rapidshot  # type: ignore
         except Exception as e:  # pragma: no cover
-            raise RuntimeError("dxcam is required for dxcam capture backend") from e
+            raise RuntimeError("rapidshot is required for rapidshot capture backend") from e
 
-        # dxcam uses 0-based output index; our UI/daemon config is 1-based.
+        # rapidshot uses 0-based output index; our UI/daemon config is 1-based.
         out_idx = int(self._monitor_index) - 1
         if out_idx < 0:
             raise ValueError(f"Invalid monitor_index={self._monitor_index}. Must be >= 1")
 
-        # output_color="BGRA" gives uint8 (H, W, 4) compatible with existing code.
-        cam = dxcam.create(output_idx=out_idx, output_color="BGRA")
-        if cam is None:  # pragma: no cover
-            raise RuntimeError("dxcam.create returned None")
-        self._cam = cam
+        # Create capture for this output. Use BGRA to match our downstream processing.
+        cap = rapidshot.create(output_idx=out_idx, output_color="BGRA")
+        if cap is None:  # pragma: no cover
+            raise RuntimeError("rapidshot.create returned None")
+        self._cap = cap
 
-        # Determine output geometry from the first full-frame grab.
-        frame = self._cam.grab()
-        if frame is None:
-            raise RuntimeError("dxcam.grab returned None (capture not available)")
-        self._output_h = int(frame.shape[0])
-        self._output_w = int(frame.shape[1])
-        # Region coordinates are relative to the selected output.
-        self._output_left = 0
-        self._output_top = 0
+        # Determine output geometry; fall back to a one-time full grab if needed.
+        res = getattr(getattr(self._cap, "output", None), "resolution", None)
+        if isinstance(res, (tuple, list)) and len(res) == 2:
+            self._output_w = int(res[0])
+            self._output_h = int(res[1])
+        else:
+            frame = self._cap.grab()
+            if frame is None:
+                raise RuntimeError("rapidshot grab returned None (capture not available)")
+            self._output_h = int(frame.shape[0])
+            self._output_w = int(frame.shape[1])
 
     def get_frame_size(self) -> Tuple[int, int]:
         self._ensure()
@@ -1814,15 +1813,15 @@ class _DXCamCaptureBackend:
 
     def capture_bgra(self, left: int, top: int, width: int, height: int) -> bytes:
         self._ensure()
-        assert self._cam is not None
+        assert self._cap is not None
 
-        l = self._output_left + int(left)
-        t = self._output_top + int(top)
+        l = int(left)
+        t = int(top)
         r = l + int(width)
         b = t + int(height)
-        frame = self._cam.grab(region=(l, t, r, b))
+        frame = self._cap.grab(region=(l, t, r, b))
         if frame is None:
-            raise RuntimeError("dxcam.grab returned None")
+            raise RuntimeError("rapidshot grab returned None")
         # Ensure contiguous bytes in row-major order.
         try:
             return frame.tobytes(order="C")
@@ -1834,11 +1833,11 @@ def _create_capture_backend(*, monitor_index: int):
     """
     Create the best available capture backend.
 
-    Prefer dxcam on Windows (DXGI), fallback to mss (GDI).
+    Prefer rapidshot on Windows (DXGI), fallback to mss (GDI).
     """
     if os.name == "nt":
         try:
-            return _DXCamCaptureBackend(monitor_index=monitor_index)
+            return _RapidShotCaptureBackend(monitor_index=monitor_index)
         except Exception:
             # Fall back to mss below.
             pass
