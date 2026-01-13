@@ -32,7 +32,7 @@ cd web && yarn install && yarn dev
 ### Windows
 
 1. Install [Node.js LTS](https://nodejs.org/) and [Python 3.11+](https://python.org/)
-2. Double-click `windows/install.bat`
+2. Double-click `windows/check-setup.bat` (checks prerequisites, installs packages)
 3. Double-click `windows/start-all.bat`
 
 See [`windows/SETUP.md`](./windows/SETUP.md) for detailed instructions.
@@ -128,16 +128,17 @@ The Electron debugger console allows you to monitor USB connectivity, trigger in
    - [Node.js LTS](https://nodejs.org/) (click the green LTS button)
    - [Python 3.11+](https://python.org/) (check "Add to PATH" during install)
 
-2. **Install dependencies:** Double-click `windows/install.bat`
+2. **Check setup & install:** Double-click `windows/check-setup.bat`
+   - This checks all prerequisites, installs missing packages, and helps configure Python
 
 3. **Run the app:** Double-click `windows/start-all.bat`
 
 | Script | Purpose |
 |--------|---------|
-| `install.bat` | Install Node.js dependencies |
+| `check-setup.bat` | Check prerequisites, install packages, configure Python |
 | `start-all.bat` | Start daemon + app together |
-| `run.bat` | Start just the Electron app |
 | `start-daemon.bat` | Start just the Python daemon |
+| `start-ui.bat` | Start just the Electron app (daemon auto-starts if needed) |
 
 For detailed instructions and troubleshooting, see [`windows/SETUP.md`](./windows/SETUP.md).
 

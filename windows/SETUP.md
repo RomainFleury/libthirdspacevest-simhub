@@ -2,17 +2,17 @@
 
 ## Quick Start (5 minutes)
 
-### Step 1: Install Node.js
+### Step 1: Install Node.js and Python
 
-**Option A: Using Windows Store (Easiest)**
-1. Open Microsoft Store
-2. Search for "Node.js LTS"
-3. Click Install
+**Node.js:**
+- **Windows Store (Easiest):** Search "Node.js LTS" in Microsoft Store, click Install
+- **Direct Download:** Go to https://nodejs.org/, download the LTS version
 
-**Option B: Direct Download**
-1. Go to https://nodejs.org/
-2. Download the **LTS** version (green button)
-3. Run the installer, click Next through all steps
+**Python 3.11+:**
+1. Go to https://www.python.org/downloads/
+2. Download Python 3.11 or newer
+3. Run installer, **CHECK "Add to PATH"** ⚠️
+4. Restart your terminal after installation
 
 ### Step 2: Check Setup & Install Dependencies
 
@@ -82,6 +82,7 @@ yarn dev
 ## Requirements
 
 - Windows 10 or 11
+- Python 3.11+ (Add to PATH during install)
 - Node.js 18+ (LTS recommended)
 - ~500MB disk space for dependencies
 
