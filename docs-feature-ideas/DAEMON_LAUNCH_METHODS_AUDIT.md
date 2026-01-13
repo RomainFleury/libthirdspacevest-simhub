@@ -272,62 +272,53 @@ function getPythonCommand() {
 
 ---
 
-## Recommended Action Plan
+## Implementation Status
 
-### Phase 1: Quick Win (Option A - Partial)
+### ✅ IMPLEMENTED: Option A - Unified Python Detection
 
-1. Update `daemonBridge.cjs` to:
-   - Read `TSV_PYTHON` environment variable if set
-   - Log which Python command is being used
+The following changes have been made:
 
-```javascript
-// In _startDaemon()
-const tsvPython = process.env.TSV_PYTHON;
-let cmd, args;
+1. **`daemonBridge.cjs`** - Added `detectPythonCommand()` function that:
+   - Reads `TSV_PYTHON` environment variable if set
+   - Tries `py -3.11` on Windows via py launcher
+   - Falls back to `python`/`python3`
+   - Logs which Python is being used
 
-if (tsvPython) {
-  const parts = tsvPython.split(' ');
-  cmd = parts[0];
-  args = [...parts.slice(1), '-u', '-m', 'modern_third_space.cli', ...];
-  console.log(`[daemon] Using TSV_PYTHON: ${tsvPython}`);
-} else {
-  cmd = process.platform === 'win32' ? 'python' : 'python3';
-  args = ['-u', '-m', 'modern_third_space.cli', ...];
-  console.log(`[daemon] Using default Python: ${cmd}`);
-}
-```
+2. **`runPythonCommand.mjs`** - Added same Python detection logic for consistency
 
-2. Update `start-ui.bat` to set `TSV_PYTHON` in the environment before launching Electron:
-   - When Electron starts from batch script, it inherits the TSV_PYTHON
+3. **`start-ui.bat`** - Now resolves Python and sets `TSV_PYTHON` environment variable before launching Electron, so the JavaScript code inherits the correct Python
 
-3. Update documentation
+4. **`start-all.bat`** - Updated to pass `TSV_PYTHON` to Electron via `endlocal`
 
-### Phase 2: Full Solution
+5. **Removed redundant scripts:**
+   - `run.bat` (replaced by `start-ui.bat` or `yarn dev`)
+   - `run-with-python.bat` (utility script no longer needed)
+   - `start-daemon-custom.bat` (debug flags can be added via environment)
 
-1. Implement full Python detection in JS (including py launcher detection)
-2. Consider consolidating batch scripts to just:
-   - `build-release.bat` (required for build)
-   - `start-all.bat` (convenience for developers who prefer batch)
-3. Remove redundant scripts or mark as deprecated
-
-### Phase 3: Cleanup
-
-1. Review and possibly remove:
-   - `run.bat` (redundant with `yarn dev` and `start-ui.bat`)
-   - `run-with-python.bat` (utility script, may not be needed)
-   - `start-daemon-custom.bat` (debug flags should be configurable)
+6. **Updated documentation:**
+   - `windows/README.md` - Updated script list, added Python detection section
+   - `windows/SETUP.md` - Updated to reference `start-all.bat`
 
 ---
 
-## Files to Modify
+## Files Modified
 
-| File | Changes |
-|------|---------|
-| `web/electron/daemonBridge.cjs` | Add TSV_PYTHON support, py launcher detection |
-| `web/scripts/runPythonCommand.mjs` | Add TSV_PYTHON support |
-| `windows/start-ui.bat` | Pass TSV_PYTHON to spawned processes |
-| `windows/README.md` | Update documentation |
-| `AI_ONBOARDING.md` | Document canonical development workflow |
+| File | Changes | Status |
+|------|---------|--------|
+| `web/electron/daemonBridge.cjs` | Added `detectPythonCommand()` with TSV_PYTHON + py launcher | ✅ Done |
+| `web/scripts/runPythonCommand.mjs` | Added same Python detection logic | ✅ Done |
+| `windows/start-ui.bat` | Resolves Python and exports TSV_PYTHON | ✅ Done |
+| `windows/start-all.bat` | Exports TSV_PYTHON to Electron | ✅ Done |
+| `windows/README.md` | Updated script list, added Python detection docs | ✅ Done |
+| `windows/SETUP.md` | Updated to reference start-all.bat | ✅ Done |
+
+## Files Removed
+
+| File | Reason |
+|------|--------|
+| `windows/run.bat` | Redundant with `start-ui.bat` and `yarn dev` |
+| `windows/run-with-python.bat` | Utility script no longer needed |
+| `windows/start-daemon-custom.bat` | Debug flags can be set via environment |
 
 ---
 

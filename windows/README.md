@@ -34,10 +34,29 @@ This opens two windows:
 | Script | What it does |
 |--------|--------------|
 | `install.bat` | Installs Node.js dependencies |
-| `start-all.bat` | Starts daemon + app together |
-| `run.bat` | Starts just the Electron app |
+| `start-all.bat` | Starts daemon + app together (recommended) |
 | `start-daemon.bat` | Starts just the Python daemon |
+| `start-ui.bat` | Starts just the Electron app (daemon auto-starts if needed) |
 | `build-release.bat` | Builds a distributable installer (see below) |
+
+---
+
+## Python Version Detection
+
+All scripts automatically detect the best Python to use:
+
+1. **TSV_PYTHON** environment variable (if set in `.env.bat`)
+2. **py -3.11** via the Python Launcher (if available)
+3. **python** or **python3** as fallback
+
+To pin a specific Python version, create `windows\.env.bat`:
+
+```batch
+@echo off
+set TSV_PYTHON=py -3.11
+```
+
+See `.env.bat.example` for more options.
 
 ---
 

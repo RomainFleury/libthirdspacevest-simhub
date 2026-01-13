@@ -2,7 +2,7 @@
 setlocal EnableDelayedExpansion
 
 :: Third Space Vest - Start UI (Electron dev)
-:: This script starts only the UI. (Daemon can be started separately.)
+:: This script starts only the UI. (Daemon can be started separately or auto-started by Electron.)
 
 echo.
 echo ========================================
@@ -22,12 +22,31 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 
-:: Optional: show which Python is configured (useful for dev when UI spawns daemon)
-if defined TSV_PYTHON (
-    echo [INFO] TSV_PYTHON=%TSV_PYTHON%
-) else (
-    echo [INFO] TSV_PYTHON not set (see windows\.env.bat.example)
+:: Resolve Python command and set TSV_PYTHON for Electron to inherit
+:: This ensures the JavaScript daemon code uses the same Python as batch scripts
+if not defined TSV_PYTHON (
+    where py >nul 2>&1
+    if !ERRORLEVEL! equ 0 (
+        py -3.11 -c "import sys" >nul 2>&1
+        if !ERRORLEVEL! equ 0 (
+            set "TSV_PYTHON=py -3.11"
+        )
+    )
+    if not defined TSV_PYTHON (
+        where python >nul 2>&1
+        if !ERRORLEVEL! equ 0 (
+            set "TSV_PYTHON=python"
+        ) else (
+            where python3 >nul 2>&1
+            if !ERRORLEVEL! equ 0 (
+                set "TSV_PYTHON=python3"
+            )
+        )
+    )
 )
+
+echo [INFO] TSV_PYTHON=%TSV_PYTHON%
+echo        (Electron will use this Python if it needs to start the daemon)
 echo.
 
 :: Navigate to web directory
@@ -42,7 +61,9 @@ if not exist "node_modules" (
 
 echo [OK] Starting Electron app...
 echo.
-call yarn dev
+
+:: Use endlocal with variable pass-through so TSV_PYTHON is available to yarn/Electron
+endlocal & set "TSV_PYTHON=%TSV_PYTHON%" & call yarn dev
 
 echo.
 echo App stopped.

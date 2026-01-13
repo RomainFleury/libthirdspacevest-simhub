@@ -15,7 +15,7 @@
 
 const net = require("net");
 const { EventEmitter } = require("events");
-const { spawn } = require("child_process");
+const { spawn, execSync } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 const { createWriteStream } = require("fs");
@@ -36,6 +36,46 @@ const PYTHON_SRC_PATH = path.resolve(
   "modern-third-space",
   "src"
 );
+
+/**
+ * Detect the best Python command to use.
+ * 
+ * Resolution order:
+ * 1. TSV_PYTHON environment variable (e.g., "py -3.11" or "C:\Python311\python.exe")
+ * 2. On Windows: py launcher with Python 3.11 (py -3.11)
+ * 3. Fallback: python (Windows) or python3 (Unix)
+ * 
+ * This matches the logic in windows/*.bat scripts for consistency.
+ * 
+ * @returns {{ cmd: string, args: string[] }} Command and initial args to spawn Python
+ */
+function detectPythonCommand() {
+  // 1. Check TSV_PYTHON environment variable
+  const tsvPython = process.env.TSV_PYTHON;
+  if (tsvPython) {
+    const parts = tsvPython.trim().split(/\s+/);
+    console.log(`[daemon] Using TSV_PYTHON: ${tsvPython}`);
+    return { cmd: parts[0], args: parts.slice(1) };
+  }
+
+  // 2. On Windows, try py launcher with Python 3.11
+  if (process.platform === "win32") {
+    try {
+      // Test if py -3.11 works
+      execSync('py -3.11 -c "import sys"', { stdio: "ignore", timeout: 5000 });
+      console.log("[daemon] Using Python: py -3.11 (detected via py launcher)");
+      return { cmd: "py", args: ["-3.11"] };
+    } catch (e) {
+      // py -3.11 not available, fall through
+      console.log("[daemon] py -3.11 not available, falling back to python");
+    }
+  }
+
+  // 3. Fallback to python/python3
+  const fallback = process.platform === "win32" ? "python" : "python3";
+  console.log(`[daemon] Using Python: ${fallback} (default fallback)`);
+  return { cmd: fallback, args: [] };
+}
 
 /**
  * Get the path to the daemon executable.
@@ -196,10 +236,11 @@ class DaemonBridge extends EventEmitter {
         console.log(`[daemon] Spawning: ${cmd} ${args.join(" ")}`);
         console.log(`[daemon] Log file: ${logFile}`);
       } else {
-        // Development: run Python
-        const pythonCmd = process.platform === "win32" ? "python" : "python3";
-        cmd = pythonCmd;
+        // Development: run Python with proper detection
+        const pythonInfo = detectPythonCommand();
+        cmd = pythonInfo.cmd;
         args = [
+          ...pythonInfo.args,  // e.g., ["-3.11"] for py launcher
           "-u",
           "-m",
           "modern_third_space.cli",
@@ -214,15 +255,6 @@ class DaemonBridge extends EventEmitter {
           "--screen-health-debug-every-n",
           "10",
         ];
-        // Original args:
-        // args = [
-        //   "-u",
-        //   "-m",
-        //   "modern_third_space.cli",
-        //   "daemon",
-        //   "--port",
-        //   String(this.port),
-        // ];
         options = {
           cwd: daemonInfo.path,
           env: {

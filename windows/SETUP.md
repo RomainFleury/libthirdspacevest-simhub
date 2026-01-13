@@ -22,8 +22,8 @@
 
 ### Step 3: Run the App
 
-1. **Double-click** `run.bat` in this folder
-2. The app window will open automatically
+1. **Double-click** `start-all.bat` in this folder
+2. Two windows will open: the daemon and the app UI
 
 ---
 
