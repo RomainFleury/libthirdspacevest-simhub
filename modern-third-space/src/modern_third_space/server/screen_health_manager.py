@@ -1721,6 +1721,11 @@ class _MSSCaptureBackend:
         self._monitor_index = monitor_index
         self._sct = None
         self._monitor = None
+        # Cache monitor origin to avoid dict lookups each tick
+        self._base_left = 0
+        self._base_top = 0
+        # Reuse a single region dict to avoid per-tick allocations
+        self._region = {"left": 0, "top": 0, "width": 1, "height": 1}
 
     def _ensure(self) -> None:
         if self._sct is not None and self._monitor is not None:
@@ -1735,6 +1740,8 @@ class _MSSCaptureBackend:
         if not (1 <= self._monitor_index < len(monitors)):
             raise ValueError(f"Invalid monitor_index={self._monitor_index}. Available: 1..{len(monitors) - 1}")
         self._monitor = monitors[self._monitor_index]
+        self._base_left = int(self._monitor["left"])
+        self._base_top = int(self._monitor["top"])
 
     def get_frame_size(self) -> Tuple[int, int]:
         self._ensure()
@@ -1747,12 +1754,11 @@ class _MSSCaptureBackend:
         assert self._monitor is not None
 
         # ROI is relative to monitor; convert to global coordinates.
-        region = {
-            "left": int(self._monitor["left"] + left),
-            "top": int(self._monitor["top"] + top),
-            "width": int(width),
-            "height": int(height),
-        }
+        region = self._region
+        region["left"] = self._base_left + int(left)
+        region["top"] = self._base_top + int(top)
+        region["width"] = int(width)
+        region["height"] = int(height)
         img = self._sct.grab(region)
         return img.raw  # BGRA bytes
 
