@@ -1781,8 +1781,15 @@ class _RapidShotCaptureBackend:
             return
         try:
             import rapidshot  # type: ignore
+        except (ModuleNotFoundError, ImportError) as e:  # pragma: no cover
+            raise RuntimeError(
+                "rapidshot is required for rapidshot capture backend "
+                "(pip install rapidshot)"
+            ) from e
         except Exception as e:  # pragma: no cover
-            raise RuntimeError("rapidshot is required for rapidshot capture backend") from e
+            # rapidshot can fail during import/init on some systems (e.g. RDP, missing DXGI adapters).
+            # Preserve the original error so users know what to fix.
+            raise RuntimeError(f"rapidshot import failed: {e}") from e
 
         # rapidshot uses 0-based output index; our UI/daemon config is 1-based.
         out_idx = int(self._monitor_index) - 1
