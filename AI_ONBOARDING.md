@@ -67,6 +67,22 @@ Game Mod 2 ───┘
 
 ## First Steps Checklist
 
+### Windows Users
+
+On Windows, use the setup scripts in `windows/`:
+
+```cmd
+:: Run the setup checker (checks Python, Node, installs packages)
+windows\check-setup.bat
+
+:: Start everything
+windows\start-all.bat
+```
+
+The setup scripts automatically detect the best Python version (see `windows/README.md` for details).
+
+### macOS / Linux Users
+
 1. **Verify project structure:**
 
    ```bash

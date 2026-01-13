@@ -41,14 +41,24 @@ Windows scripts now do this near the top:
 
 ### Files updated to support `TSV_PYTHON`
 
-These scripts should all load `windows/.env.bat` and prefer `TSV_PYTHON`:
+These scripts load `windows/.env.bat` and prefer `TSV_PYTHON`:
+
+**Main scripts:**
+- `windows/check-setup.bat` (orchestrates all setup checks)
 - `windows/build-release.bat`
 - `windows/start-daemon.bat`
-- `windows/start-daemon-custom.bat`
 - `windows/start-all.bat`
-- `windows/run-with-python.bat`
-- `windows/install-validate-libusb.bat`
-- `windows/install-validate-rapidshot.bat`
+- `windows/start-ui.bat`
+
+**Individual setup scripts (in `windows/setup/`):**
+- `setup/check-python.bat` (also helps create `.env.bat`)
+- `setup/check-python-packages.bat`
+- `setup/check-libusb.bat`
+- `setup/check-rapidshot.bat`
+
+**JavaScript code:**
+- `web/electron/daemonBridge.cjs` - reads `TSV_PYTHON` environment variable
+- `web/scripts/runPythonCommand.mjs` - reads `TSV_PYTHON` environment variable
 
 ### Why we use `.env.bat` (not `.env`)
 

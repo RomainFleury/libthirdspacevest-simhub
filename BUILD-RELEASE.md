@@ -51,7 +51,15 @@ reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUn
 
 ## Quick Build (Windows)
 
-**Double-click to build:**
+**First, ensure prerequisites are installed:**
+
+```
+windows/check-setup.bat
+```
+
+This checks Python, Node.js, and all dependencies. Fix any issues before building.
+
+**Then, double-click to build:**
 
 ```
 windows/build-release.bat

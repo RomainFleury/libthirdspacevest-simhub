@@ -23,22 +23,23 @@ if %ERRORLEVEL% neq 0 (
 )
 
 ::: Resolve Python command (TSV_PYTHON -> py -3.11 -> python/python3)
+::: This resolved value is also exported as TSV_PYTHON for child processes
 set "PYTHON_CMD="
 if defined TSV_PYTHON (
     set "PYTHON_CMD=%TSV_PYTHON%"
 ) else (
     where py >nul 2>&1
-    if %ERRORLEVEL% equ 0 (
+    if !ERRORLEVEL! equ 0 (
         py -3.11 -c "import sys" >nul 2>&1
-        if %ERRORLEVEL% equ 0 set "PYTHON_CMD=py -3.11"
+        if !ERRORLEVEL! equ 0 set "PYTHON_CMD=py -3.11"
     )
     if not defined PYTHON_CMD (
         where python >nul 2>&1
-        if %ERRORLEVEL% equ 0 (
+        if !ERRORLEVEL! equ 0 (
             set "PYTHON_CMD=python"
         ) else (
             where python3 >nul 2>&1
-            if %ERRORLEVEL% equ 0 set "PYTHON_CMD=python3"
+            if !ERRORLEVEL! equ 0 set "PYTHON_CMD=python3"
         )
     )
 )
@@ -49,14 +50,19 @@ if not defined PYTHON_CMD (
     exit /b 1
 )
 
+:: Set TSV_PYTHON so Electron can use the same Python if needed
+set "TSV_PYTHON=%PYTHON_CMD%"
+
 echo [OK] Node.js and Python found
+echo [INFO] Python: %PYTHON_CMD%
 echo.
 
 ::: Install and validate libusb DLL
-call "%~dp0install-validate-libusb.bat"
+call "%~dp0setup\check-libusb.bat"
 if %ERRORLEVEL% neq 0 (
     echo.
     echo This is required for USB device communication.
+    echo Run check-setup.bat for more details.
     pause
     exit /b 1
 )
@@ -98,8 +104,8 @@ echo.
 echo Close the app window to stop, then close the daemon window.
 echo.
 
-::: Start the app
-call yarn dev
+::: Start the app (pass TSV_PYTHON to Electron so it uses same Python for auto-start)
+endlocal & set "TSV_PYTHON=%TSV_PYTHON%" & call yarn dev
 
 ::: If we get here, the app was stopped
 echo.

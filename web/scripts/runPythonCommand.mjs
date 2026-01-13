@@ -1,11 +1,17 @@
 #!/usr/bin/env node
 
 /**
- * Script to check Python bridge setup
- * Tests ping and list commands to verify the Python CLI is working correctly
+ * Helper module to run Python CLI commands with proper Python detection.
+ * 
+ * Python Resolution Order:
+ * 1. TSV_PYTHON environment variable (e.g., "py -3.11" or "C:\Python311\python.exe")
+ * 2. On Windows: py launcher with Python 3.11 (py -3.11)
+ * 3. Fallback: python (Windows) or python3 (Unix)
+ * 
+ * This matches the logic in windows/*.bat scripts and daemonBridge.cjs for consistency.
  */
 
-import { spawn } from "child_process";
+import { spawn, execSync } from "child_process";
 import { fileURLToPath } from "url";
 import { dirname, resolve } from "path";
 
@@ -21,11 +27,45 @@ const PYTHON_SRC_PATH = resolve(
   "src"
 );
 
-export default function runPythonCommand(command, args = []) {
-  return new Promise((resolve, reject) => {
+/**
+ * Detect the best Python command to use.
+ * @returns {{ cmd: string, args: string[] }} Command and initial args to spawn Python
+ */
+function detectPythonCommand() {
+  // 1. Check TSV_PYTHON environment variable
+  const tsvPython = process.env.TSV_PYTHON;
+  if (tsvPython) {
+    const parts = tsvPython.trim().split(/\s+/);
+    console.log(`[python] Using TSV_PYTHON: ${tsvPython}`);
+    return { cmd: parts[0], args: parts.slice(1) };
+  }
+
+  // 2. On Windows, try py launcher with Python 3.11
+  if (process.platform === "win32") {
     try {
-      // Run as module: python3 -m modern_third_space.cli <command> <args>
+      execSync('py -3.11 -c "import sys"', { stdio: "ignore", timeout: 5000 });
+      console.log("[python] Using: py -3.11 (detected via py launcher)");
+      return { cmd: "py", args: ["-3.11"] };
+    } catch (e) {
+      // py -3.11 not available, fall through
+    }
+  }
+
+  // 3. Fallback to python/python3
+  const fallback = process.platform === "win32" ? "python" : "python3";
+  console.log(`[python] Using: ${fallback} (default fallback)`);
+  return { cmd: fallback, args: [] };
+}
+
+export default function runPythonCommand(command, args = []) {
+  return new Promise((resolvePromise, reject) => {
+    try {
+      // Detect Python command
+      const pythonInfo = detectPythonCommand();
+      
+      // Run as module: python -m modern_third_space.cli <command> <args>
       const pythonArgs = [
+        ...pythonInfo.args,  // e.g., ["-3.11"] for py launcher
         "-u", // unbuffered output
         "-m",
         "modern_third_space.cli",
@@ -33,7 +73,7 @@ export default function runPythonCommand(command, args = []) {
         ...args,
       ];
 
-      const pythonProcess = spawn("python3", pythonArgs, {
+      const pythonProcess = spawn(pythonInfo.cmd, pythonArgs, {
         cwd: PYTHON_SRC_PATH,
         env: {
           ...process.env,
@@ -69,10 +109,10 @@ export default function runPythonCommand(command, args = []) {
 
         try {
           const parsed = JSON.parse(output);
-          resolve(parsed);
+          resolvePromise(parsed);
         } catch (parseError) {
           if(output.includes("[OK] Daemon stopped") || output.includes("[ERROR] Daemon is not running")) {
-            resolve({ status: "ok", message: "Daemon stopped successfully" });
+            resolvePromise({ status: "ok", message: "Daemon stopped successfully" });
             return;
           }
           // If JSON parsing fails, the output might be an error message

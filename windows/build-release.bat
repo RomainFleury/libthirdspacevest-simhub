@@ -78,10 +78,11 @@ cd ..
 
 :: Install and validate libusb DLL
 echo [CHECK] Verifying libusb DLL installation...
-call "%~dp0install-validate-libusb.bat"
+call "%~dp0setup\check-libusb.bat"
 if %ERRORLEVEL% neq 0 (
     echo.
     echo This is required for USB device communication and must be available for the build.
+    echo Run check-setup.bat for more details.
     pause
     exit /b 1
 )
