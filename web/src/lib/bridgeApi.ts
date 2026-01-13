@@ -448,6 +448,7 @@ declare global {
         canceled?: boolean;
         error?: string;
       }>;
+      screenHealthOpenScreenshotsDir: () => Promise<{ success: boolean; error?: string }>;
       screenHealthListScreenshots: () => Promise<{
         success: boolean;
         files?: ScreenHealthScreenshotFile[];
@@ -871,6 +872,10 @@ export async function screenHealthSetSettings(settings: Partial<ScreenHealthSett
 
 export async function screenHealthChooseScreenshotsDir() {
   return await ensureBridge().screenHealthChooseScreenshotsDir();
+}
+
+export async function screenHealthOpenScreenshotsDir() {
+  return await ensureBridge().screenHealthOpenScreenshotsDir();
 }
 
 export async function screenHealthListScreenshots() {

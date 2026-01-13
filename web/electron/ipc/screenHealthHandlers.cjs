@@ -9,7 +9,7 @@
  * - screenHealth:start / stop / status (daemon commands)
  */
 
-const { ipcMain, dialog, desktopCapturer, nativeImage, screen } = require("electron");
+const { ipcMain, dialog, desktopCapturer, nativeImage, screen, shell } = require("electron");
 const fs = require("fs");
 const path = require("path");
 
@@ -191,6 +191,20 @@ function registerScreenHealthHandlers(getDaemonBridge, getMainWindow) {
       const dir = result.filePaths[0];
       const settings = storage.setSettings({ ...storage.getSettings(), screenshotsDir: dir });
       return { success: true, settings };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle("screenHealth:openScreenshotsDir", async () => {
+    try {
+      const dir = storage.getScreenshotsDir();
+      if (!dir) {
+        return { success: false, error: "No screenshots folder configured" };
+      }
+      const res = await shell.openPath(dir);
+      if (res) return { success: false, error: res };
+      return { success: true };
     } catch (e) {
       return { success: false, error: e.message };
     }

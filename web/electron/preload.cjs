@@ -119,6 +119,7 @@ contextBridge.exposeInMainWorld("vestBridge", {
   screenHealthGetSettings: () => ipcRenderer.invoke("screenHealth:getSettings"),
   screenHealthSetSettings: (settings) => ipcRenderer.invoke("screenHealth:setSettings", settings),
   screenHealthChooseScreenshotsDir: () => ipcRenderer.invoke("screenHealth:chooseScreenshotsDir"),
+  screenHealthOpenScreenshotsDir: () => ipcRenderer.invoke("screenHealth:openScreenshotsDir"),
   screenHealthListScreenshots: () => ipcRenderer.invoke("screenHealth:listScreenshots"),
   screenHealthGetScreenshotDataUrl: (filename) => ipcRenderer.invoke("screenHealth:getScreenshotDataUrl", filename),
   screenHealthDeleteScreenshot: (filename) => ipcRenderer.invoke("screenHealth:deleteScreenshot", filename),

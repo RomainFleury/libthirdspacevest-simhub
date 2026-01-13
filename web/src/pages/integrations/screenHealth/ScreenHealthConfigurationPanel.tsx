@@ -46,10 +46,7 @@ type Props = {
   settings: any;
   updateSettings: (patch: any) => Promise<void>;
   chooseScreenshotsDir: () => Promise<void>;
-  screenshots: any[];
-  screenshotPreview: { filename: string; dataUrl: string } | null;
-  loadScreenshotPreview: (filename: string) => Promise<void>;
-  deleteScreenshot: (filename: string) => Promise<void>;
+  openScreenshotsDir?: () => Promise<void> | void;
   clearScreenshots: () => Promise<void>;
 
   lastCapturedImage: { dataUrl: string; width: number; height: number; filename: string; path: string } | null;
@@ -92,10 +89,7 @@ function ScreenHealthConfigurationPanelInner(props: Props) {
     settings,
     updateSettings,
     chooseScreenshotsDir,
-    screenshots,
-    screenshotPreview,
-    loadScreenshotPreview,
-    deleteScreenshot,
+    openScreenshotsDir,
     clearScreenshots,
     lastCapturedImage,
     captureCalibrationScreenshot,
@@ -139,10 +133,7 @@ function ScreenHealthConfigurationPanelInner(props: Props) {
         settings={settings}
         updateSettings={updateSettings}
         chooseScreenshotsDir={chooseScreenshotsDir}
-        screenshots={screenshots}
-        screenshotPreview={screenshotPreview}
-        loadScreenshotPreview={loadScreenshotPreview}
-        deleteScreenshot={deleteScreenshot}
+        openScreenshotsDir={openScreenshotsDir as any}
         clearScreenshots={clearScreenshots}
       />
     </div>

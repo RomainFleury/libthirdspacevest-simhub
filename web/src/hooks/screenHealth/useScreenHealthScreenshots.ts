@@ -11,6 +11,7 @@ import {
   screenHealthGetSettings,
   screenHealthListScreenshots,
   screenHealthChooseScreenshotsDir,
+  screenHealthOpenScreenshotsDir,
   screenHealthSetSettings,
 } from "../../lib/bridgeApi";
 
@@ -52,6 +53,11 @@ export function useScreenHealthScreenshots() {
     if (result.settings) setSettingsState(result.settings);
     await refreshScreenshots();
   }, [refreshScreenshots]);
+
+  const openScreenshotsDir = useCallback(async () => {
+    const result = await screenHealthOpenScreenshotsDir();
+    if (!result.success) throw new Error(result.error || "Failed to open screenshots dir");
+  }, []);
 
   const captureCalibrationScreenshot = useCallback(
     async (monitorIndex: number) => {
@@ -112,6 +118,7 @@ export function useScreenHealthScreenshots() {
     refreshScreenshots,
     updateSettings,
     chooseScreenshotsDir,
+    openScreenshotsDir,
     captureCalibrationScreenshot,
     captureRoiDebugImages,
     deleteScreenshot,
