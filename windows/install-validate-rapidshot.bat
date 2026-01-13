@@ -14,15 +14,51 @@ setlocal EnableDelayedExpansion
 ::: Exits with error code 1 on failure
 
 ::: Get Python command
-set "PYTHON_CMD=python"
-where python >nul 2>&1
-if %ERRORLEVEL% neq 0 (
-    where python3 >nul 2>&1
+set "PYTHON_CMD="
+
+:: Prefer Windows Python Launcher with a known-good version (3.11)
+where py >nul 2>&1
+if %ERRORLEVEL% equ 0 (
+    py -3.11 -c "import sys" >nul 2>&1
+    if %ERRORLEVEL% equ 0 (
+        set "PYTHON_CMD=py -3.11"
+    )
+)
+
+:: Fallback to python/python3 on PATH
+if not defined PYTHON_CMD (
+    set "PYTHON_CMD=python"
+    where python >nul 2>&1
     if %ERRORLEVEL% neq 0 (
-        echo [ERROR] Python is not installed or not in PATH!
+        where python3 >nul 2>&1
+        if %ERRORLEVEL% neq 0 (
+            echo [ERROR] Python is not installed or not in PATH!
+            echo Install Python 3.11+ and re-run this script.
+            exit /b 1
+        )
+        set "PYTHON_CMD=python3"
+    )
+)
+
+:: Verify Python version (RapidShot ecosystem may not support 3.14+ yet)
+set "PY_MAJOR="
+set "PY_MINOR="
+for /f "delims=" %%i in ('%PYTHON_CMD% -c "import sys; print(sys.version_info.major)" 2^>nul') do set "PY_MAJOR=%%i"
+for /f "delims=" %%i in ('%PYTHON_CMD% -c "import sys; print(sys.version_info.minor)" 2^>nul') do set "PY_MINOR=%%i"
+if not defined PY_MAJOR (
+    echo [ERROR] Failed to detect Python version.
+    exit /b 1
+)
+if "%PY_MAJOR%"=="3" (
+    if %PY_MINOR% GEQ 14 (
+        echo [ERROR] Python %PY_MAJOR%.%PY_MINOR% detected. rapidshot (or its dependencies) is not compatible with Python 3.14+ yet.
+        echo.
+        echo Fix:
+        echo   - Install Python 3.11 (recommended) and re-run this script, OR
+        echo   - Use the Windows launcher explicitly: py -3.11 -m pip install rapidshot
+        echo.
         exit /b 1
     )
-    set "PYTHON_CMD=python3"
 )
 
 ::: Check if rapidshot package is installed
