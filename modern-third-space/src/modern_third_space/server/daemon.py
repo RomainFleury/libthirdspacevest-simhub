@@ -1421,13 +1421,94 @@ class VestDaemon:
         if not command.profile:
             return response_screen_health_test(success=False, error="profile is required", req_id=command.req_id)
 
+        # Always log/print test runs for debugging (even if profile debug mode is off).
+        try:
+            prof_name = None
+            mon_idx = None
+            tick_ms = None
+            if isinstance(command.profile, dict):
+                prof_name = command.profile.get("name")
+                cap = command.profile.get("capture") if isinstance(command.profile.get("capture"), dict) else None
+                if cap:
+                    mon_idx = cap.get("monitor_index")
+                    tick_ms = cap.get("tick_ms")
+        except Exception:
+            prof_name = None
+            mon_idx = None
+            tick_ms = None
+
+        msg0 = (
+            f"[screen_health_test] start req_id={command.req_id} "
+            f"profile={prof_name or '<unnamed>'} monitor_index={mon_idx} tick_ms={tick_ms} "
+            f"output_dir={command.output_dir or '<none>'}"
+        )
+        logger.info(msg0)
+        print(msg0)
+
         try:
             ok, result, err = self._screen_health_manager.test_profile_once(
                 command.profile,
                 output_dir=command.output_dir,
             )
+            if ok and result:
+                msg1 = (
+                    f"[screen_health_test] ok req_id={command.req_id} "
+                    f"total_ms={float(result.get('total_ms') or 0.0):.2f} "
+                    f"frame={result.get('frame')} output_dir={result.get('output_dir')}"
+                )
+                logger.info(msg1)
+                print(msg1)
+
+                detectors = result.get("detectors") if isinstance(result.get("detectors"), list) else []
+                for d in detectors:
+                    if not isinstance(d, dict):
+                        continue
+                    dtype = d.get("type")
+                    name = d.get("name")
+                    cap_ms = d.get("capture_ms")
+                    eval_ms = d.get("eval_ms")
+                    if dtype == "redness_rois":
+                        score = d.get("score")
+                        thr = d.get("threshold")
+                        hit = d.get("hit")
+                        line = (
+                            f"[screen_health_test] redness name={name} score={score} threshold={thr} hit={hit} "
+                            f"cap_ms={cap_ms} eval_ms={eval_ms} image={d.get('image_path')}"
+                        )
+                    elif dtype == "health_bar":
+                        line = (
+                            f"[screen_health_test] health_bar name={name} mode={d.get('mode')} "
+                            f"percent={d.get('percent')} cap_ms={cap_ms} eval_ms={eval_ms} image={d.get('image_path')}"
+                        )
+                    elif dtype == "health_number":
+                        if d.get("error"):
+                            line = f"[screen_health_test] health_number name={name} error={d.get('error')}"
+                        else:
+                            line = (
+                                f"[screen_health_test] health_number name={name} read={d.get('read')} digits={d.get('digits')} "
+                                f"hamming_max={d.get('hamming_max')} cap_ms={cap_ms} eval_ms={eval_ms} image={d.get('image_path')}"
+                            )
+                    else:
+                        line = f"[screen_health_test] detector type={dtype} name={name} cap_ms={cap_ms} eval_ms={eval_ms}"
+                    logger.info(line)
+                    print(line)
+
+                errors = result.get("errors") if isinstance(result.get("errors"), list) else []
+                for e in errors:
+                    if not e:
+                        continue
+                    line = f"[screen_health_test] warning req_id={command.req_id} {e}"
+                    logger.warning(line)
+                    print(line)
+            else:
+                msg1 = f"[screen_health_test] failed req_id={command.req_id} error={err or '<unknown>'}"
+                logger.warning(msg1)
+                print(msg1)
             return response_screen_health_test(success=ok, test_result=result, error=err, req_id=command.req_id)
         except Exception as e:
+            msg1 = f"[screen_health_test] exception req_id={command.req_id} error={str(e)}"
+            logger.exception(msg1)
+            print(msg1)
             return response_screen_health_test(success=False, error=str(e), req_id=command.req_id)
 
     # -------------------------------------------------------------------------

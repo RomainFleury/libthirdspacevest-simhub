@@ -14,12 +14,11 @@ export function useScreenHealthIntegration() {
   useEffect(() => {
     profiles.refreshProfiles();
     screenshots.refreshSettings();
-    screenshots.refreshScreenshots();
     daemon.refreshStatus();
 
     const interval = setInterval(daemon.refreshStatus, 5000);
     return () => clearInterval(interval);
-  }, [profiles.refreshProfiles, screenshots.refreshSettings, screenshots.refreshScreenshots, daemon.refreshStatus]);
+  }, [profiles.refreshProfiles, screenshots.refreshSettings, daemon.refreshStatus]);
 
   return {
     status: daemon.status,

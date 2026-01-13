@@ -171,7 +171,6 @@ function registerScreenHealthHandlers(getDaemonBridge, getMainWindow) {
   ipcMain.handle("screenHealth:setSettings", async (_, newSettings) => {
     try {
       const settings = storage.setSettings(newSettings);
-      storage.enforceRetention();
       return { success: true, settings };
     } catch (e) {
       return { success: false, error: e.message };
@@ -181,9 +180,11 @@ function registerScreenHealthHandlers(getDaemonBridge, getMainWindow) {
   ipcMain.handle("screenHealth:chooseScreenshotsDir", async () => {
     try {
       const mainWindow = getMainWindow();
+      const currentDir = storage.getScreenshotsDir();
       const result = await dialog.showOpenDialog(mainWindow, {
         title: "Choose Screenshot Folder",
         properties: ["openDirectory", "createDirectory"],
+        defaultPath: currentDir,
       });
       if (result.canceled || result.filePaths.length === 0) {
         return { success: false, canceled: true };

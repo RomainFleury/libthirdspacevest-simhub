@@ -42,17 +42,15 @@ export function useScreenHealthScreenshots() {
       const result = await screenHealthSetSettings(patch);
       if (!result.success) throw new Error(result.error || "Failed to update settings");
       if (result.settings) setSettingsState(result.settings);
-      await refreshScreenshots();
     },
-    [refreshScreenshots]
+    []
   );
 
   const chooseScreenshotsDir = useCallback(async () => {
     const result = await screenHealthChooseScreenshotsDir();
     if (!result.success && !result.canceled) throw new Error(result.error || "Failed to choose screenshots dir");
     if (result.settings) setSettingsState(result.settings);
-    await refreshScreenshots();
-  }, [refreshScreenshots]);
+  }, []);
 
   const openScreenshotsDir = useCallback(async () => {
     const result = await screenHealthOpenScreenshotsDir();
@@ -72,36 +70,32 @@ export function useScreenHealthScreenshots() {
         filename: result.filename,
         path: result.path,
       });
-      await refreshScreenshots();
       return result;
     },
-    [refreshScreenshots]
+    []
   );
 
   const captureRoiDebugImages = useCallback(
     async (monitorIndex: number, rois: Array<{ name: string; rect: { x: number; y: number; w: number; h: number } }>) => {
       const result = await screenHealthCaptureRoiDebugImages(monitorIndex, rois);
       if (!result.success) throw new Error(result.error || "Failed to capture ROI debug images");
-      await refreshScreenshots();
       return (result.outputs || []) as ScreenHealthCapturedImage[];
     },
-    [refreshScreenshots]
+    []
   );
 
   const deleteScreenshot = useCallback(
     async (filename: string) => {
       const result = await screenHealthDeleteScreenshot(filename);
       if (!result.success) throw new Error(result.error || "Failed to delete screenshot");
-      await refreshScreenshots();
     },
-    [refreshScreenshots]
+    []
   );
 
   const clearScreenshots = useCallback(async () => {
     const result = await screenHealthClearScreenshots();
     if (!result.success) throw new Error(result.error || "Failed to clear screenshots");
-    await refreshScreenshots();
-  }, [refreshScreenshots]);
+  }, []);
 
   const loadScreenshotPreview = useCallback(async (filename: string) => {
     const result = await screenHealthGetScreenshotDataUrl(filename);
