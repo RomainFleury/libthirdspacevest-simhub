@@ -1,4 +1,5 @@
 export function ProfileControlsSection(props: {
+  onLoad: () => void;
   onExport: () => void;
   profileName: string;
   setProfileName: (v: string) => void;
@@ -6,6 +7,7 @@ export function ProfileControlsSection(props: {
   testing?: boolean;
 }) {
   const {
+    onLoad,
     onExport,
     profileName,
     setProfileName,
@@ -25,6 +27,13 @@ export function ProfileControlsSection(props: {
           />
         </div>
         <div className="flex items-end gap-2">
+          <button
+            onClick={onLoad}
+            className="rounded-lg bg-slate-600/80 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-600"
+            title="Load a JSON profile into the current draft (not saved anywhere)."
+          >
+            Load JSON
+          </button>
           <button
             onClick={onExport}
             className="rounded-lg bg-slate-600/80 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-600"

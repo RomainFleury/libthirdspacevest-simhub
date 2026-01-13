@@ -404,6 +404,13 @@ declare global {
         canceled?: boolean;
         error?: string;
       }>;
+      screenHealthLoadProfile: () => Promise<{
+        success: boolean;
+        profile?: Record<string, any>;
+        path?: string;
+        canceled?: boolean;
+        error?: string;
+      }>;
       screenHealthGetSettings: () => Promise<{ success: boolean; settings?: ScreenHealthSettings; error?: string }>;
       screenHealthSetSettings: (settings: Partial<ScreenHealthSettings>) => Promise<{
         success: boolean;
@@ -804,6 +811,10 @@ export async function stopEffect(): Promise<{ success: boolean; error?: string }
 
 export async function screenHealthExportProfile(profile: Record<string, any>) {
   return await ensureBridge().screenHealthExportProfile(profile);
+}
+
+export async function screenHealthLoadProfile() {
+  return await ensureBridge().screenHealthLoadProfile();
 }
 
 export async function screenHealthGetSettings() {

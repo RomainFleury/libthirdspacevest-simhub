@@ -110,6 +110,7 @@ contextBridge.exposeInMainWorld("vestBridge", {
 
   // Generic Screen Health Watcher API
   screenHealthExportProfile: (profile) => ipcRenderer.invoke("screenHealth:exportProfile", profile),
+  screenHealthLoadProfile: () => ipcRenderer.invoke("screenHealth:loadProfile"),
   screenHealthGetSettings: () => ipcRenderer.invoke("screenHealth:getSettings"),
   screenHealthSetSettings: (settings) => ipcRenderer.invoke("screenHealth:setSettings", settings),
   screenHealthChooseScreenshotsDir: () => ipcRenderer.invoke("screenHealth:chooseScreenshotsDir"),

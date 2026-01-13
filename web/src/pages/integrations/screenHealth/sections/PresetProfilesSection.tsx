@@ -7,6 +7,7 @@ export function PresetProfilesSection(props: {
   const { presets } = props;
   const state = useScreenHealthProfileDraft();
   const { setSelectedPresetId } = useScreenHealthProfileDraftControls();
+  const isCustom = state.selectedPresetId === "__custom__" || !presets.some((p) => p.preset_id === state.selectedPresetId);
   const selected = presets.find((p) => p.preset_id === state.selectedPresetId) || null;
   const meta = (selected?.profile as any)?.meta;
   const presetId = typeof meta?.preset_id === "string" ? meta.preset_id : null;
@@ -21,6 +22,7 @@ export function PresetProfilesSection(props: {
           onChange={(e) => setSelectedPresetId(e.target.value)}
           className="rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
         >
+          {isCustom && <option value="__custom__">Custom (loaded)</option>}
           {presets.map((p) => (
             <option key={p.preset_id} value={p.preset_id}>
               {p.display_name}

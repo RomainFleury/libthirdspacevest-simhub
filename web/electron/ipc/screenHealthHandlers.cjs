@@ -3,6 +3,7 @@
  *
  * Handles:
  * - screenHealth:exportProfile
+ * - screenHealth:loadProfile
  * - screenHealth:getSettings / setSettings / chooseScreenshotsDir
  * - screenHealth:listScreenshots / deleteScreenshot / clearScreenshots
  * - screenHealth:captureCalibrationScreenshot / captureRoiDebugImages
@@ -87,6 +88,26 @@ function registerScreenHealthHandlers(getDaemonBridge, getMainWindow) {
 
       fs.writeFileSync(result.filePath, JSON.stringify(profile, null, 2), "utf8");
       return { success: true, path: result.filePath };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle("screenHealth:loadProfile", async () => {
+    try {
+      const mainWindow = getMainWindow();
+      const result = await dialog.showOpenDialog(mainWindow, {
+        title: "Load Screen Health Profile",
+        properties: ["openFile"],
+        filters: [{ name: "JSON", extensions: ["json"] }],
+      });
+      if (result.canceled || result.filePaths.length === 0) {
+        return { success: false, canceled: true };
+      }
+      const p = result.filePaths[0];
+      const raw = fs.readFileSync(p, "utf8");
+      const parsed = JSON.parse(raw);
+      return { success: true, profile: parsed, path: p };
     } catch (e) {
       return { success: false, error: e.message };
     }
