@@ -29,19 +29,19 @@ const preset: ScreenHealthPreset = {
       {
         type: "redness_rois",
         cooldown_ms: 200,
-        threshold: { min_score: 0.35 },
+        threshold: { min_score: 0.20 },
         rois: [
           // Placeholder: left edge vignette-ish area
           {
             name: "left_vignette",
             direction: "left",
-            rect: { x: 0.0, y: 0.25, w: 0.06, h: 0.5 },
+            rect: { x: 0.0, y: 0.15, w: 0.03, h: 0.4 },
           },
           // Placeholder: right edge vignette-ish area
           {
             name: "right_vignette",
             direction: "right",
-            rect: { x: 0.94, y: 0.25, w: 0.06, h: 0.5 },
+            rect: { x: 0.97, y: 0.15, w: 0.03, h: 0.4 },
           },
         ],
       },
