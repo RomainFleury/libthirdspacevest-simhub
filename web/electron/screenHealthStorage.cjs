@@ -22,6 +22,8 @@ const DEFAULT_SETTINGS = {
   retentionMaxAgeDays: 7,
 };
 
+const DEFAULT_SCREENSHOTS_INDEX = [];
+
 function _getStatePath() {
   const userDataPath = app.getPath("userData");
   return path.join(userDataPath, STATE_FILE);
@@ -46,6 +48,7 @@ function loadState() {
         profiles: [],
         activeProfileId: null,
         settings: { ...DEFAULT_SETTINGS },
+        screenshotsIndex: [...DEFAULT_SCREENSHOTS_INDEX],
       };
     }
     const raw = fs.readFileSync(p, "utf8");
@@ -54,6 +57,7 @@ function loadState() {
       profiles: Array.isArray(parsed.profiles) ? parsed.profiles : [],
       activeProfileId: parsed.activeProfileId ?? null,
       settings: { ...DEFAULT_SETTINGS, ...(parsed.settings || {}) },
+      screenshotsIndex: Array.isArray(parsed.screenshotsIndex) ? parsed.screenshotsIndex : [...DEFAULT_SCREENSHOTS_INDEX],
     };
   } catch (e) {
     console.error("Failed to load screen health state:", e.message);
@@ -61,6 +65,7 @@ function loadState() {
       profiles: [],
       activeProfileId: null,
       settings: { ...DEFAULT_SETTINGS },
+      screenshotsIndex: [...DEFAULT_SCREENSHOTS_INDEX],
     };
   }
 }
@@ -71,6 +76,7 @@ function saveState(state) {
     profiles: state.profiles || [],
     activeProfileId: state.activeProfileId ?? null,
     settings: { ...DEFAULT_SETTINGS, ...(state.settings || {}) },
+    screenshotsIndex: Array.isArray(state.screenshotsIndex) ? state.screenshotsIndex : [...DEFAULT_SCREENSHOTS_INDEX],
     last_updated: new Date().toISOString(),
   };
   fs.writeFileSync(p, JSON.stringify(data, null, 2), "utf8");
@@ -165,78 +171,119 @@ function getScreenshotsDir() {
 }
 
 function listScreenshots() {
-  const dir = getScreenshotsDir();
-  _ensureDir(dir);
-  const files = fs
-    .readdirSync(dir)
-    .filter((f) => f.toLowerCase().endsWith(".png"))
-    .map((f) => {
-      const p = path.join(dir, f);
-      const st = fs.statSync(p);
-      return {
-        filename: f,
-        path: p,
-        size: st.size,
-        mtimeMs: st.mtimeMs,
-      };
-    })
-    .sort((a, b) => b.mtimeMs - a.mtimeMs);
-  return files;
+  // IMPORTANT: avoid directory scans (`readdirSync/statSync`) which can be very slow.
+  // We return the tracked index, which is updated when screenshots are created/deleted.
+  const state = loadState();
+  const idx = Array.isArray(state.screenshotsIndex) ? state.screenshotsIndex : [];
+  return [...idx].sort((a, b) => (b.mtimeMs || 0) - (a.mtimeMs || 0));
 }
 
 function deleteScreenshot(filename) {
-  const dir = getScreenshotsDir();
-  const p = path.join(dir, filename);
-  if (fs.existsSync(p)) {
+  const state = loadState();
+  const idx = Array.isArray(state.screenshotsIndex) ? state.screenshotsIndex : [];
+  const entry = idx.find((x) => x && x.filename === filename);
+  const p = entry?.path;
+  if (p && fs.existsSync(p)) {
     fs.unlinkSync(p);
   }
+  state.screenshotsIndex = idx.filter((x) => x && x.filename !== filename);
+  saveState(state);
   return true;
 }
 
 function clearScreenshots() {
-  const files = listScreenshots();
-  for (const f of files) {
+  // Best-effort clear without scanning directories: delete the files we know about.
+  const state = loadState();
+  const idx = Array.isArray(state.screenshotsIndex) ? state.screenshotsIndex : [];
+  for (const f of idx) {
     try {
-      fs.unlinkSync(f.path);
+      if (f?.path && fs.existsSync(f.path)) fs.unlinkSync(f.path);
     } catch (e) {
       // ignore
     }
   }
+  state.screenshotsIndex = [];
+  saveState(state);
   return true;
 }
 
-function enforceRetention() {
-  const settings = getSettings();
+function recordScreenshot(entry) {
+  // entry: { filename, path, size?, mtimeMs? }
+  const state = loadState();
+  const idx = Array.isArray(state.screenshotsIndex) ? state.screenshotsIndex : [];
+  const now = Date.now();
+  const e = {
+    filename: entry?.filename,
+    path: entry?.path,
+    size: Number(entry?.size || 0),
+    mtimeMs: Number(entry?.mtimeMs || now),
+  };
+  if (!e.filename || !e.path) return false;
+  // Replace existing entry with same filename
+  const filtered = idx.filter((x) => x && x.filename !== e.filename);
+  filtered.push(e);
+  state.screenshotsIndex = filtered;
+  saveState(state);
+  return true;
+}
+
+function enforceRetentionIndex() {
+  // IMPORTANT: avoid directory scans. We only operate on tracked files (max count is small).
+  const state = loadState();
+  const settings = state.settings || { ...DEFAULT_SETTINGS };
   const maxCount = settings.retentionMaxCount ?? DEFAULT_SETTINGS.retentionMaxCount;
   const maxAgeDays = settings.retentionMaxAgeDays ?? DEFAULT_SETTINGS.retentionMaxAgeDays;
-
-  const files = listScreenshots();
   const now = Date.now();
+
+  let idx = Array.isArray(state.screenshotsIndex) ? state.screenshotsIndex : [];
+
+  // Drop invalid entries and those whose files disappeared
+  idx = idx.filter((x) => x && x.filename && x.path);
+  idx = idx.filter((x) => {
+    try {
+      return fs.existsSync(x.path);
+    } catch (e) {
+      return false;
+    }
+  });
 
   // Age-based deletion
   const maxAgeMs = maxAgeDays > 0 ? maxAgeDays * 24 * 60 * 60 * 1000 : null;
-  for (const f of files) {
-    if (maxAgeMs != null && now - f.mtimeMs > maxAgeMs) {
+  if (maxAgeMs != null) {
+    const keep = [];
+    for (const f of idx) {
+      const ageOk = now - Number(f.mtimeMs || 0) <= maxAgeMs;
+      if (ageOk) {
+        keep.push(f);
+        continue;
+      }
       try {
-        fs.unlinkSync(f.path);
+        if (f.path && fs.existsSync(f.path)) fs.unlinkSync(f.path);
       } catch (e) {
         // ignore
       }
     }
+    idx = keep;
   }
 
   // Count-based deletion (keep newest)
-  const remaining = listScreenshots();
-  if (maxCount != null && maxCount > 0 && remaining.length > maxCount) {
-    const toDelete = remaining.slice(maxCount);
+  idx.sort((a, b) => (b.mtimeMs || 0) - (a.mtimeMs || 0));
+  if (maxCount != null && maxCount > 0 && idx.length > maxCount) {
+    const keep = idx.slice(0, maxCount);
+    const toDelete = idx.slice(maxCount);
     for (const f of toDelete) {
       try {
-        fs.unlinkSync(f.path);
+        if (f.path && fs.existsSync(f.path)) fs.unlinkSync(f.path);
       } catch (e) {
         // ignore
       }
     }
+    idx = keep;
   }
+
+  state.screenshotsIndex = idx;
+  saveState(state);
+  return true;
 }
 
 module.exports = {
@@ -253,7 +300,8 @@ module.exports = {
   listScreenshots,
   deleteScreenshot,
   clearScreenshots,
-  enforceRetention,
+  recordScreenshot,
+  enforceRetentionIndex,
   DEFAULT_SETTINGS,
 };
 

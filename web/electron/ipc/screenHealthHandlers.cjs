@@ -171,6 +171,7 @@ function registerScreenHealthHandlers(getDaemonBridge, getMainWindow) {
   ipcMain.handle("screenHealth:setSettings", async (_, newSettings) => {
     try {
       const settings = storage.setSettings(newSettings);
+      storage.enforceRetentionIndex();
       return { success: true, settings };
     } catch (e) {
       return { success: false, error: e.message };
@@ -217,7 +218,7 @@ function registerScreenHealthHandlers(getDaemonBridge, getMainWindow) {
 
   ipcMain.handle("screenHealth:listScreenshots", async () => {
     try {
-      storage.enforceRetention();
+      storage.enforceRetentionIndex();
       const files = storage.listScreenshots();
       return { success: true, files };
     } catch (e) {
@@ -251,9 +252,10 @@ function registerScreenHealthHandlers(getDaemonBridge, getMainWindow) {
       const dir = storage.getScreenshotsDir();
       const filename = `calibration_${idx}_${Date.now()}.png`;
       const outPath = path.join(dir, filename);
-      fs.writeFileSync(outPath, image.toPNG());
-
-      storage.enforceRetention();
+      const bytes = image.toPNG();
+      fs.writeFileSync(outPath, bytes);
+      storage.recordScreenshot({ filename, path: outPath, size: bytes.length, mtimeMs: Date.now() });
+      storage.enforceRetentionIndex();
 
       return {
         success: true,
@@ -296,7 +298,9 @@ function registerScreenHealthHandlers(getDaemonBridge, getMainWindow) {
         const cropped = image.crop({ x: px, y: py, width: pw, height: ph });
         const filename = `roi_${idx}_${roi.name || "roi"}_${Date.now()}.png`;
         const outPath = path.join(dir, filename);
-        fs.writeFileSync(outPath, cropped.toPNG());
+        const bytes = cropped.toPNG();
+        fs.writeFileSync(outPath, bytes);
+        storage.recordScreenshot({ filename, path: outPath, size: bytes.length, mtimeMs: Date.now() });
         outputs.push({
           filename,
           path: outPath,
@@ -306,7 +310,7 @@ function registerScreenHealthHandlers(getDaemonBridge, getMainWindow) {
         });
       }
 
-      storage.enforceRetention();
+      storage.enforceRetentionIndex();
 
       return { success: true, outputs };
     } catch (e) {
