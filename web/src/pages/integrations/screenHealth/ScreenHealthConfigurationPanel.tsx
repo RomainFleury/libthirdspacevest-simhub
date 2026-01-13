@@ -29,7 +29,7 @@ import { RednessSettings } from "./sections/RednessSettings";
 import { RoiListSection } from "./sections/RoiListSection";
 import { ScreenshotsSection } from "./sections/ScreenshotsSection";
 import { clamp01, clampInt } from "./utils";
-import { screenHealthExportProfile, screenHealthLoadProfile, screenHealthTest } from "../../../lib/bridgeApi";
+import { screenHealthExportProfile, screenHealthLoadProfile, screenHealthStart, screenHealthTest } from "../../../lib/bridgeApi";
 
 type Props = {
   settings: any;
@@ -253,6 +253,8 @@ function ProfileActionsController(props: { presets: Array<{ preset_id: string; p
   const [testError, setTestError] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
 
   const buildDaemonProfile = () => {
     // Snapshot reads: this controller does not subscribe to draft state updates.
@@ -505,11 +507,27 @@ function ProfileActionsController(props: { presets: Array<{ preset_id: string; p
     }
   };
 
+  const onStart = async () => {
+    setStarting(true);
+    setStartError(null);
+    try {
+      const profile = buildDaemonProfile();
+      const result = await screenHealthStart(profile);
+      if (!result.success) throw new Error(result.error || "Failed to start");
+    } catch (e) {
+      setStartError(e instanceof Error ? e.message : "Failed to start");
+    } finally {
+      setStarting(false);
+    }
+  };
+
   return (
     <div className="space-y-3">
       <ProfileControlsSection
         onLoad={onLoad}
         onExport={onExport}
+        onStart={onStart}
+        starting={starting}
         profileName={profileState.profileName}
         setProfileName={setProfileName}
         onTest={onTest}
@@ -555,6 +573,7 @@ function ProfileActionsController(props: { presets: Array<{ preset_id: string; p
 
       {exportError && <div className="text-xs text-rose-300">{exportError}</div>}
       {loadError && <div className="text-xs text-rose-300">{loadError}</div>}
+      {startError && <div className="text-xs text-rose-300">{startError}</div>}
     </div>
   );
 }

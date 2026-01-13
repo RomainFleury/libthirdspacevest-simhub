@@ -13,13 +13,12 @@ export function useScreenHealthDaemonStatus() {
     setError(s.error || null);
   }, []);
 
-  const start = useCallback(async (profile?: Record<string, any>) => {
+  const startWithProfile = useCallback(async (profile: Record<string, any>) => {
     setLoading(true);
     setError(null);
     try {
-      const p = profile ?? (SCREEN_HEALTH_PRESETS[0]?.profile as any);
-      if (!p) throw new Error("No preset profile available");
-      const result = await screenHealthStart(p);
+      if (!profile || typeof profile !== "object") throw new Error("profile is required");
+      const result = await screenHealthStart(profile);
       if (!result.success) setError(result.error || "Failed to start");
       await refreshStatus();
     } catch (e) {
@@ -28,6 +27,17 @@ export function useScreenHealthDaemonStatus() {
       setLoading(false);
     }
   }, [refreshStatus]);
+
+  // IMPORTANT: keep `start()` as a no-arg callback, because React onClick will pass
+  // an event object as the first argument (which is not cloneable over IPC).
+  const start = useCallback(async () => {
+    const p = SCREEN_HEALTH_PRESETS[0]?.profile as any;
+    if (!p) {
+      setError("No preset profile available");
+      return;
+    }
+    await startWithProfile(p);
+  }, [startWithProfile]);
 
   const stop = useCallback(async () => {
     setLoading(true);
@@ -43,6 +53,6 @@ export function useScreenHealthDaemonStatus() {
     }
   }, [refreshStatus]);
 
-  return { status, setStatus, loading, error, setError, refreshStatus, start, stop };
+  return { status, setStatus, loading, error, setError, refreshStatus, start, startWithProfile, stop };
 }
 

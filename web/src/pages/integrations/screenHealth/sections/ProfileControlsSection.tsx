@@ -1,6 +1,8 @@
 export function ProfileControlsSection(props: {
   onLoad: () => void;
   onExport: () => void;
+  onStart?: () => void;
+  starting?: boolean;
   profileName: string;
   setProfileName: (v: string) => void;
   onTest?: () => void;
@@ -9,6 +11,8 @@ export function ProfileControlsSection(props: {
   const {
     onLoad,
     onExport,
+    onStart,
+    starting,
     profileName,
     setProfileName,
     onTest,
@@ -40,6 +44,16 @@ export function ProfileControlsSection(props: {
           >
             Export JSON
           </button>
+          {onStart && (
+            <button
+              onClick={onStart}
+              disabled={starting}
+              className="rounded-lg bg-emerald-600/80 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-600 disabled:opacity-50"
+              title="Start the daemon watcher using the current draft profile."
+            >
+              {starting ? "Starting..." : "Start watcher"}
+            </button>
+          )}
           {onTest && (
             <button
               onClick={onTest}
