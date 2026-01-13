@@ -130,6 +130,7 @@ contextBridge.exposeInMainWorld("vestBridge", {
   screenHealthStart: () => ipcRenderer.invoke("screenHealth:start"),
   screenHealthStop: () => ipcRenderer.invoke("screenHealth:stop"),
   screenHealthStatus: () => ipcRenderer.invoke("screenHealth:status"),
+  screenHealthTest: (profile, outputDir) => ipcRenderer.invoke("screenHealth:test", profile, outputDir),
 
   // Multi-Vest Management API
   listConnectedDevices: () => ipcRenderer.invoke("multivist:listConnectedDevices"),

@@ -98,6 +98,7 @@ from .protocol import (
     response_screen_health_start,
     response_screen_health_stop,
     response_screen_health_status,
+    response_screen_health_test,
     # Predefined effects
     event_effect_started,
     event_effect_completed,
@@ -420,6 +421,9 @@ class VestDaemon:
 
         if cmd_type == CommandType.SCREEN_HEALTH_STATUS:
             return await self._cmd_screen_health_status(command)
+
+        if cmd_type == CommandType.SCREEN_HEALTH_TEST:
+            return await self._cmd_screen_health_test(command)
         
         # Predefined effects commands
         if cmd_type == CommandType.PLAY_EFFECT:
@@ -1407,6 +1411,24 @@ class VestDaemon:
             last_hit_ts=s.get("last_hit_ts"),
             req_id=command.req_id,
         )
+
+    async def _cmd_screen_health_test(self, command: Command) -> Response:
+        """
+        Test a screen health profile once (validate + capture ROI(s) + evaluate).
+
+        This is intended for calibration/debug and avoids starting the continuous loop.
+        """
+        if not command.profile:
+            return response_screen_health_test(success=False, error="profile is required", req_id=command.req_id)
+
+        try:
+            ok, result, err = self._screen_health_manager.test_profile_once(
+                command.profile,
+                output_dir=command.output_dir,
+            )
+            return response_screen_health_test(success=ok, test_result=result, error=err, req_id=command.req_id)
+        except Exception as e:
+            return response_screen_health_test(success=False, error=str(e), req_id=command.req_id)
 
     # -------------------------------------------------------------------------
     # Generic Screen Health Watcher callbacks

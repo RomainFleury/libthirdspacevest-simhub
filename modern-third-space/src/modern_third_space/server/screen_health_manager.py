@@ -596,6 +596,185 @@ class ScreenHealthManager:
             "debug_save_dir": str(self._debug_save_dir) if self._debug_save_dir else None,
         }
 
+    def test_profile_once(
+        self, profile: Dict[str, Any] | str, *, output_dir: Optional[str] = None
+    ) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
+        """
+        Validate a profile and run a single evaluation pass (no thread, no events).
+
+        Returns:
+        - success: bool
+        - result: dict (timings + evaluations + saved ROI crops)
+        - error: str
+        """
+        try:
+            parsed = self._parse_profile(profile)
+        except Exception as e:
+            return False, None, str(e)
+
+        out_dir: Optional[Path] = None
+        if output_dir:
+            try:
+                out_dir = Path(output_dir).expanduser().resolve()
+                out_dir.mkdir(parents=True, exist_ok=True)
+            except Exception as e:
+                return False, None, f"failed to prepare output_dir: {e}"
+
+        # Best-effort capture backend
+        try:
+            capture = _MSSCaptureBackend(monitor_index=parsed.capture.monitor_index)
+            frame_w, frame_h = capture.get_frame_size()
+        except Exception as e:
+            return False, None, f"capture not available: {e}"
+
+        t0 = time.perf_counter()
+        detectors_out: List[Dict[str, Any]] = []
+        errors: List[str] = []
+
+        def save_crop(kind: str, name: str, raw_bgra: bytes, w: int, h: int) -> Optional[str]:
+            if out_dir is None:
+                return None
+            ts_ms = int(time.time() * 1000.0)
+            fname = f"{ts_ms}_{self._safe_file_part(kind)}_{self._safe_file_part(name)}_{w}x{h}.bmp"
+            try:
+                self._write_bmp_bgra(out_dir / fname, raw_bgra, w, h)
+                return str(out_dir / fname)
+            except Exception as e:
+                errors.append(f"save_crop {kind}:{name}: {e}")
+                return None
+
+        # Redness
+        if parsed.redness_detector is not None:
+            for roi in parsed.redness_rois:
+                left, top, w, h = normalized_rect_to_pixels(roi.rect, frame_w, frame_h)
+                cap0 = time.perf_counter()
+                try:
+                    raw = capture.capture_bgra(left=left, top=top, width=w, height=h)
+                except Exception as e:
+                    errors.append(f"capture redness:{roi.name}: {e}")
+                    continue
+                cap_ms = (time.perf_counter() - cap0) * 1000.0
+
+                eval0 = time.perf_counter()
+                score = float(redness_score_from_bgra(raw, w, h))
+                hit = score >= float(parsed.redness_detector.min_score)
+                eval_ms = (time.perf_counter() - eval0) * 1000.0
+
+                detectors_out.append(
+                    {
+                        "type": "redness_rois",
+                        "name": roi.name,
+                        "rect_px": {"left": left, "top": top, "w": w, "h": h},
+                        "score": score,
+                        "threshold": float(parsed.redness_detector.min_score),
+                        "hit": bool(hit),
+                        "capture_ms": cap_ms,
+                        "eval_ms": eval_ms,
+                        "image_path": save_crop("redness", roi.name, raw, w, h),
+                    }
+                )
+
+        # Health bar
+        for hb in parsed.health_bars:
+            left, top, w, h = normalized_rect_to_pixels(hb.rect, frame_w, frame_h)
+            cap0 = time.perf_counter()
+            try:
+                raw = capture.capture_bgra(left=left, top=top, width=w, height=h)
+            except Exception as e:
+                errors.append(f"capture health_bar:{hb.name}: {e}")
+                continue
+            cap_ms = (time.perf_counter() - cap0) * 1000.0
+
+            eval0 = time.perf_counter()
+            percent_raw: Optional[float] = None
+            mode = None
+            if hb.color_sampling is not None:
+                mode = "color_sampling"
+                percent_raw = health_bar_percent_from_bgra(
+                    raw,
+                    w,
+                    h,
+                    filled_rgb=hb.color_sampling.filled.as_tuple(),
+                    empty_rgb=hb.color_sampling.empty.as_tuple(),
+                    tolerance_l1=hb.color_sampling.tolerance_l1,
+                )
+            elif hb.threshold_fallback is not None:
+                mode = "threshold_fallback"
+                percent_raw = self._health_bar_percent_threshold_fallback(raw, w, h, hb.threshold_fallback)
+            percent = float(max(0.0, min(1.0, float(percent_raw or 0.0))))
+            eval_ms = (time.perf_counter() - eval0) * 1000.0
+
+            detectors_out.append(
+                {
+                    "type": "health_bar",
+                    "name": hb.name,
+                    "rect_px": {"left": left, "top": top, "w": w, "h": h},
+                    "mode": mode,
+                    "percent": percent,
+                    "capture_ms": cap_ms,
+                    "eval_ms": eval_ms,
+                    "image_path": save_crop("health_bar", hb.name, raw, w, h),
+                }
+            )
+
+        # Health number OCR (single read; stability is handled in the continuous loop)
+        for hn in parsed.health_numbers:
+            if hn.templates is None:
+                detectors_out.append(
+                    {
+                        "type": "health_number",
+                        "name": hn.name,
+                        "error": "missing templates",
+                    }
+                )
+                continue
+            left, top, w, h = normalized_rect_to_pixels(hn.rect, frame_w, frame_h)
+            cap0 = time.perf_counter()
+            try:
+                raw = capture.capture_bgra(left=left, top=top, width=w, height=h)
+            except Exception as e:
+                errors.append(f"capture health_number:{hn.name}: {e}")
+                continue
+            cap_ms = (time.perf_counter() - cap0) * 1000.0
+
+            eval0 = time.perf_counter()
+            bits, bw, bh = binarize_bgra_to_bitmap(
+                raw,
+                w,
+                h,
+                threshold=hn.preprocess.threshold,
+                invert=hn.preprocess.invert,
+                scale=hn.preprocess.scale,
+            )
+            value = self._health_number_try_read(bits, bw, bh, hn)
+            eval_ms = (time.perf_counter() - eval0) * 1000.0
+
+            detectors_out.append(
+                {
+                    "type": "health_number",
+                    "name": hn.name,
+                    "rect_px": {"left": left, "top": top, "w": w, "h": h},
+                    "read": int(value) if value is not None else None,
+                    "digits": int(hn.digits),
+                    "hamming_max": int(hn.templates.hamming_max),
+                    "capture_ms": cap_ms,
+                    "eval_ms": eval_ms,
+                    "image_path": save_crop("health_number", hn.name, raw, w, h),
+                }
+            )
+
+        total_ms = (time.perf_counter() - t0) * 1000.0
+        result = {
+            "profile_name": parsed.name,
+            "capture": {"monitor_index": parsed.capture.monitor_index, "tick_ms": parsed.capture.tick_ms},
+            "frame": {"w": frame_w, "h": frame_h},
+            "total_ms": total_ms,
+            "detectors": detectors_out,
+            "output_dir": str(out_dir) if out_dir else None,
+            "errors": errors,
+        }
+        return True, result, None
+
     # ---------------------------------------------------------------------
     # Internal
     # ---------------------------------------------------------------------

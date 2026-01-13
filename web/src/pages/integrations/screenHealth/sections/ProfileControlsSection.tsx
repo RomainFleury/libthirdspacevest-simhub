@@ -12,9 +12,24 @@ export function ProfileControlsSection(props: {
   setProfileName: (v: string) => void;
   onSave: () => void;
   saving: boolean;
+  onTest?: () => void;
+  testing?: boolean;
 }) {
-  const { profiles, activeProfileId, setActive, onNew, onExport, onImport, onDelete, profileName, setProfileName, onSave, saving } =
-    props;
+  const {
+    profiles,
+    activeProfileId,
+    setActive,
+    onNew,
+    onExport,
+    onImport,
+    onDelete,
+    profileName,
+    setProfileName,
+    onSave,
+    saving,
+    onTest,
+    testing,
+  } = props;
 
   return (
     <div className="space-y-3">
@@ -77,6 +92,16 @@ export function ProfileControlsSection(props: {
           >
             {saving ? "Saving..." : "Save profile"}
           </button>
+          {onTest && (
+            <button
+              onClick={onTest}
+              disabled={testing}
+              className="rounded-lg bg-slate-600/80 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-600 disabled:opacity-50"
+              title="Ask the daemon to validate and run one evaluation pass (captures ROI crops and returns timings)."
+            >
+              {testing ? "Testing..." : "Test config"}
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -69,6 +69,7 @@ class CommandType(Enum):
     SCREEN_HEALTH_START = "screen_health_start"
     SCREEN_HEALTH_STOP = "screen_health_stop"
     SCREEN_HEALTH_STATUS = "screen_health_status"
+    SCREEN_HEALTH_TEST = "screen_health_test"
     # Predefined effects
     PLAY_EFFECT = "play_effect"
     LIST_EFFECTS = "list_effects"
@@ -164,6 +165,7 @@ class Command:
     player_num: Optional[int] = None  # Player number (1, 2, 3...) for game-specific mapping
     # Generic screen health watcher params
     profile: Optional[Dict[str, Any]] = None  # Screen health profile JSON
+    output_dir: Optional[str] = None  # Optional output dir for test/debug artifacts
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Command":
@@ -192,6 +194,7 @@ class Command:
             game_id=data.get("game_id"),
             player_num=data.get("player_num"),
             profile=data.get("profile"),
+            output_dir=data.get("output_dir"),
         )
     
     @classmethod
@@ -300,6 +303,7 @@ class Response:
     # Generic screen health watcher response
     profile_name: Optional[str] = None
     last_hit_ts: Optional[float] = None
+    test_result: Optional[Dict[str, Any]] = None
     # Predefined effects response
     effects: Optional[List[Dict[str, Any]]] = None
     categories: Optional[List[str]] = None
@@ -939,6 +943,21 @@ def response_screen_health_status(
         events_received=events_received,
         last_event_ts=last_event_ts,
         last_hit_ts=last_hit_ts,
+    )
+
+
+def response_screen_health_test(
+    success: bool,
+    test_result: Optional[Dict[str, Any]] = None,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    return Response(
+        response="screen_health_test",
+        req_id=req_id,
+        success=success,
+        test_result=test_result,
+        message=error,
     )
 
 

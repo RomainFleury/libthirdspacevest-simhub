@@ -30,6 +30,7 @@ import { RednessSettings } from "./sections/RednessSettings";
 import { RoiListSection } from "./sections/RoiListSection";
 import { ScreenshotsSection } from "./sections/ScreenshotsSection";
 import { clamp01, clampInt } from "./utils";
+import { screenHealthTest } from "../../../lib/bridgeApi";
 
 type Props = {
   profiles: ScreenHealthStoredProfile[];
@@ -345,6 +346,9 @@ function ProfileControlsController(props: {
   const { readDraft: readHealthNumberDraft } = useScreenHealthHealthNumberDraftControls();
 
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<Record<string, any> | null>(null);
+  const [testError, setTestError] = useState<string | null>(null);
 
   const buildDaemonProfile = () => {
     // Snapshot reads: this controller does not subscribe to draft state updates.
@@ -476,20 +480,81 @@ function ProfileControlsController(props: {
     await setActive(saved.id);
   };
 
+  const onTest = async () => {
+    setTesting(true);
+    setTestError(null);
+    try {
+      const profile = buildDaemonProfile();
+      const result = await screenHealthTest(profile);
+      if (!result.success) {
+        setTestError(result.error || "Test failed");
+        setTestResult(null);
+      } else {
+        setTestResult(result.test_result || null);
+      }
+    } catch (e) {
+      setTestError(e instanceof Error ? e.message : "Test failed");
+      setTestResult(null);
+    } finally {
+      setTesting(false);
+    }
+  };
+
   return (
-    <ProfileControlsSection
-      profiles={profiles}
-      activeProfileId={activeProfileId}
-      setActive={(id) => setActive(id)}
-      onNew={onNew}
-      onExport={() => activeProfileId && exportProfile(activeProfileId)}
-      onImport={importProfile}
-      onDelete={() => activeProfileId && deleteProfile(activeProfileId)}
-      profileName={profileState.profileName}
-      setProfileName={setProfileName}
-      onSave={onSave}
-      saving={saving}
-    />
+    <div className="space-y-3">
+      <ProfileControlsSection
+        profiles={profiles}
+        activeProfileId={activeProfileId}
+        setActive={(id) => setActive(id)}
+        onNew={onNew}
+        onExport={() => activeProfileId && exportProfile(activeProfileId)}
+        onImport={importProfile}
+        onDelete={() => activeProfileId && deleteProfile(activeProfileId)}
+        profileName={profileState.profileName}
+        setProfileName={setProfileName}
+        onSave={onSave}
+        saving={saving}
+        onTest={onTest}
+        testing={testing}
+      />
+
+      {(testError || testResult) && (
+        <div className="rounded-xl bg-slate-900/40 p-3 ring-1 ring-white/5 text-sm">
+          <div className="text-white font-medium mb-1">Daemon test result</div>
+          {testError && <div className="text-rose-300 text-xs">{testError}</div>}
+          {testResult && (
+            <div className="text-xs text-slate-300 space-y-1">
+              <div className="font-mono text-slate-400">
+                total_ms={typeof testResult.total_ms === "number" ? testResult.total_ms.toFixed(2) : "?"} output_dir=
+                {typeof testResult.output_dir === "string" ? testResult.output_dir : "(none)"}
+              </div>
+              {Array.isArray(testResult.detectors) && (
+                <div className="space-y-1">
+                  {testResult.detectors.slice(0, 8).map((d: any, idx: number) => (
+                    <div key={idx} className="font-mono text-slate-400">
+                      {d.type}:{d.name}{" "}
+                      {typeof d.score === "number" ? `score=${d.score.toFixed(3)}` : ""}
+                      {typeof d.percent === "number" ? ` percent=${(d.percent * 100).toFixed(1)}%` : ""}
+                      {typeof d.read === "number" ? ` read=${d.read}` : d.read === null ? " read=null" : ""}
+                      {typeof d.image_path === "string" ? ` file=${d.image_path}` : ""}
+                      {typeof d.capture_ms === "number" ? ` cap=${d.capture_ms.toFixed(2)}ms` : ""}
+                      {typeof d.eval_ms === "number" ? ` eval=${d.eval_ms.toFixed(2)}ms` : ""}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {Array.isArray(testResult.errors) && testResult.errors.length > 0 && (
+                <div className="text-amber-200/80">
+                  {testResult.errors.slice(0, 3).map((e: string, i: number) => (
+                    <div key={i}>{e}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

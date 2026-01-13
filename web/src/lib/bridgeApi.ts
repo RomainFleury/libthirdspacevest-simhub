@@ -196,6 +196,12 @@ export type ScreenHealthStartResult = {
   error?: string;
 };
 
+export type ScreenHealthTestResult = {
+  success: boolean;
+  test_result?: Record<string, any> | null;
+  error?: string;
+};
+
 export type ScreenHealthStopResult = {
   success: boolean;
   error?: string;
@@ -474,6 +480,7 @@ declare global {
       screenHealthStart: () => Promise<ScreenHealthStartResult>;
       screenHealthStop: () => Promise<ScreenHealthStopResult>;
       screenHealthStatus: () => Promise<ScreenHealthStatus>;
+      screenHealthTest: (profile: Record<string, any>, outputDir?: string | null) => Promise<ScreenHealthTestResult>;
       // Multi-Vest Management API
       listConnectedDevices: () => Promise<{
         success: boolean;
@@ -903,4 +910,8 @@ export async function screenHealthStop(): Promise<ScreenHealthStopResult> {
 
 export async function screenHealthStatus(): Promise<ScreenHealthStatus> {
   return await ensureBridge().screenHealthStatus();
+}
+
+export async function screenHealthTest(profile: Record<string, any>, outputDir?: string | null): Promise<ScreenHealthTestResult> {
+  return await ensureBridge().screenHealthTest(profile, outputDir ?? null);
 }

@@ -357,6 +357,21 @@ function registerScreenHealthHandlers(getDaemonBridge, getMainWindow) {
       return { running: false, error: e.message };
     }
   });
+
+  ipcMain.handle("screenHealth:test", async (_, profile, outputDir) => {
+    try {
+      const daemonBridge = getDaemonBridge();
+      if (!daemonBridge?.connected) {
+        return { success: false, error: "Not connected to daemon" };
+      }
+      if (!profile || typeof profile !== "object") {
+        return { success: false, error: "profile is required" };
+      }
+      return await daemonBridge.screenHealthTest(profile, outputDir);
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  });
 }
 
 module.exports = { registerScreenHealthHandlers };
