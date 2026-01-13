@@ -18,6 +18,9 @@ modern-third-space/.venv
 *.so
 .Python
 
+# Windows local python override
+windows/.env.bat
+
 # Yarn
 *.gz
 .yarn/install-state.gz

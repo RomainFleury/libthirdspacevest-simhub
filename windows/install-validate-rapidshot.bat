@@ -14,6 +14,7 @@ setlocal EnableDelayedExpansion
 ::: Exits with error code 1 on failure
 
 ::: Get Python command
+if exist "%~dp0.env.bat" call "%~dp0.env.bat"
 set "PYTHON_CMD="
 
 :: Prefer Windows Python Launcher with a known-good version (3.11)
@@ -39,6 +40,9 @@ if not defined PYTHON_CMD (
         set "PYTHON_CMD=python3"
     )
 )
+
+:: Explicit override after auto-detect (so local .env.bat always wins)
+if defined TSV_PYTHON set "PYTHON_CMD=%TSV_PYTHON%"
 
 :: Verify Python version (RapidShot ecosystem may not support 3.14+ yet)
 set "PY_MAJOR="

@@ -1,29 +1,31 @@
 @echo off
-REM Helper script to run other batch files with correct Python path
-REM This ensures Python is found even if Windows Store alias interferes
+REM Helper script to run another batch file with the configured Python.
+REM Prefer setting TSV_PYTHON in windows\.env.bat to pin the Python version.
 
 setlocal EnableDelayedExpansion
 
-REM Set Python executable path
-set "PYTHON_EXE=%USERPROFILE%\AppData\Local\Programs\Python\Python313\python.exe"
+if exist "%~dp0.env.bat" call "%~dp0.env.bat"
 
-REM Add Python directory to PATH for this session (before WindowsApps)
-set "PYTHON_DIR=%USERPROFILE%\AppData\Local\Programs\Python\Python313"
-set "PYTHON_SCRIPTS=%PYTHON_DIR%\Scripts"
-set "PATH=%PYTHON_DIR%;%PYTHON_SCRIPTS%;%PATH%"
-
-REM Set PYTHON_CMD for batch files that check it
-set "PYTHON_CMD=python"
-
-REM If a script name was provided, run it
-if "%~1" neq "" (
-    call "%~1" %*
-    exit /b %ERRORLEVEL%
+set "PYTHON_CMD="
+if defined TSV_PYTHON (
+  set "PYTHON_CMD=%TSV_PYTHON%"
+) else (
+  where py >nul 2>&1
+  if %ERRORLEVEL% equ 0 (
+    py -3.11 -c "import sys" >nul 2>&1
+    if %ERRORLEVEL% equ 0 set "PYTHON_CMD=py -3.11"
+  )
+  if not defined PYTHON_CMD set "PYTHON_CMD=python"
 )
 
-REM Otherwise, show usage
-echo Usage: run-with-python.bat [script.bat] [args...]
-echo.
-echo This script ensures Python is found correctly.
-echo Example: run-with-python.bat install-validate-libusb.bat
-exit /b 1
+REM Export PYTHON_CMD for scripts that use it
+endlocal & (
+  set "PYTHON_CMD=%PYTHON_CMD%"
+  if "%~1"=="" (
+    echo Usage: run-with-python.bat ^<script.bat^> [args...]
+    exit /b 1
+  )
+  call "%~1" %*
+  exit /b %ERRORLEVEL%
+)
+

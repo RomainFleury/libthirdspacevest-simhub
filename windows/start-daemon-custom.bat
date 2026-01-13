@@ -1,18 +1,28 @@
 @echo off
-REM Custom daemon start script for this specific computer
-REM Uses the full path to Python to avoid "python not found" errors
-REM Adds libusb DLL to PATH so USB devices can be detected
-
 setlocal EnableDelayedExpansion
 
-REM Set the Python executable path (update this if Python is installed elsewhere)
-set PYTHON_EXE=%USERPROFILE%\AppData\Local\Programs\Python\Python313\python.exe
+REM Custom daemon start script (local overrides supported)
+REM Prefer using windows\.env.bat instead of hardcoding Python paths.
 
-REM Add libusb DLL to PATH (required for PyUSB to detect USB devices)
-set LIBUSB_DLL_PATH=%USERPROFILE%\AppData\Local\Programs\Python\Python313\Lib\site-packages\libusb\_platform\windows\x86_64
-set PATH=%LIBUSB_DLL_PATH%;%PATH%
+if exist "%~dp0.env.bat" call "%~dp0.env.bat"
 
-cd modern-third-space\src
-%PYTHON_EXE% -u -m modern_third_space.cli daemon start --port 5050 --screen-health-debug --screen-health-debug-save --screen-health-debug-dir debug_logs --screen-health-debug-every-n 10
-cd ..
+REM Resolve Python command
+set "PYTHON_CMD="
+if defined TSV_PYTHON (
+    set "PYTHON_CMD=%TSV_PYTHON%"
+) else (
+    where py >nul 2>&1
+    if %ERRORLEVEL% equ 0 (
+        py -3.11 -c "import sys" >nul 2>&1
+        if %ERRORLEVEL% equ 0 set "PYTHON_CMD=py -3.11"
+    )
+    if not defined PYTHON_CMD set "PYTHON_CMD=python"
+)
+
+REM Ensure libusb is available and add DLL to PATH
+call "%~dp0install-validate-libusb.bat"
+if %ERRORLEVEL% neq 0 exit /b %ERRORLEVEL%
+
+cd /d "%~dp0..\modern-third-space\src"
+%PYTHON_CMD% -u -m modern_third_space.cli daemon start --port 5050 --screen-health-debug --screen-health-debug-save --screen-health-debug-dir debug_logs --screen-health-debug-every-n 10
 

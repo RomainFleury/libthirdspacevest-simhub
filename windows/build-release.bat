@@ -18,11 +18,36 @@ echo   Third Space Vest - Release Builder
 echo ========================================
 echo.
 
-:: Check for Python
-where python >nul 2>&1
-if %ERRORLEVEL% neq 0 (
+:: Load optional local python override (windows\.env.bat)
+if exist "%~dp0.env.bat" call "%~dp0.env.bat"
+
+:: Resolve Python command (TSV_PYTHON -> py -3.11 -> python/python3)
+set "PYTHON_CMD="
+if defined TSV_PYTHON (
+    set "PYTHON_CMD=%TSV_PYTHON%"
+) else (
+    where py >nul 2>&1
+    if %ERRORLEVEL% equ 0 (
+        py -3.11 -c "import sys" >nul 2>&1
+        if %ERRORLEVEL% equ 0 (
+            set "PYTHON_CMD=py -3.11"
+        )
+    )
+    if not defined PYTHON_CMD (
+        where python >nul 2>&1
+        if %ERRORLEVEL% equ 0 (
+            set "PYTHON_CMD=python"
+        ) else (
+            where python3 >nul 2>&1
+            if %ERRORLEVEL% equ 0 (
+                set "PYTHON_CMD=python3"
+            )
+        )
+    )
+)
+if not defined PYTHON_CMD (
     echo [ERROR] Python is not installed or not in PATH!
-    echo Please install Python 3.11+ from https://python.org/
+    echo Install Python 3.11+ (recommended) and re-run.
     pause
     exit /b 1
 )
@@ -37,7 +62,7 @@ if %ERRORLEVEL% neq 0 (
 )
 
 :: Show versions
-for /f "tokens=*" %%i in ('python --version') do echo [OK] %%i
+for /f "tokens=*" %%i in ('%PYTHON_CMD% --version') do echo [OK] %%i
 for /f "tokens=*" %%i in ('node --version') do echo [OK] Node.js %%i
 echo.
 
@@ -47,8 +72,8 @@ cd /d "%~dp0.."
 :: Step 1: Install Python dependencies
 echo [1/5] Installing Python dependencies...
 cd modern-third-space
-pip install -e . >nul 2>&1
-pip install pyinstaller libusb >nul 2>&1
+%PYTHON_CMD% -m pip install -e . >nul 2>&1
+%PYTHON_CMD% -m pip install pyinstaller libusb >nul 2>&1
 cd ..
 
 :: Install and validate libusb DLL
@@ -69,7 +94,7 @@ cd modern-third-space\build
 set SRC_DIR=%CD%\..\src
 
 :: Include libusb DLL in the bundle (extracted to same dir as exe at runtime)
-python -m PyInstaller --onefile --name vest-daemon --console --clean --paths "%SRC_DIR%" --add-binary "%LIBUSB_PATH%\libusb-1.0.dll;." --hidden-import modern_third_space.vest --hidden-import modern_third_space.vest.controller --hidden-import modern_third_space.vest.status --hidden-import modern_third_space.vest.discovery --hidden-import modern_third_space.presets --hidden-import modern_third_space.server --hidden-import modern_third_space.server.daemon --hidden-import modern_third_space.server.protocol --hidden-import modern_third_space.server.client_manager --hidden-import modern_third_space.server.lifecycle --hidden-import modern_third_space.server.cs2_manager --hidden-import modern_third_space.server.alyx_manager --hidden-import modern_third_space.server.superhot_manager --hidden-import modern_third_space.legacy_adapter vest-daemon-entry.py
+%PYTHON_CMD% -m PyInstaller --onefile --name vest-daemon --console --clean --paths "%SRC_DIR%" --add-binary "%LIBUSB_PATH%\libusb-1.0.dll;." --hidden-import modern_third_space.vest --hidden-import modern_third_space.vest.controller --hidden-import modern_third_space.vest.status --hidden-import modern_third_space.vest.discovery --hidden-import modern_third_space.presets --hidden-import modern_third_space.server --hidden-import modern_third_space.server.daemon --hidden-import modern_third_space.server.protocol --hidden-import modern_third_space.server.client_manager --hidden-import modern_third_space.server.lifecycle --hidden-import modern_third_space.server.cs2_manager --hidden-import modern_third_space.server.alyx_manager --hidden-import modern_third_space.server.superhot_manager --hidden-import modern_third_space.legacy_adapter vest-daemon-entry.py
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Failed to build daemon!
     pause
