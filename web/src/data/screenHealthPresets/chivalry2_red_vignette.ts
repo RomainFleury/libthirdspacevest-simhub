@@ -40,7 +40,7 @@ const preset: ScreenHealthPreset = {
           {
             name: "front-center",
             direction: "front",
-            rect: { x: 0.30, y: 0.0, w: 0.1, h: 0.1 },
+            rect: { x: 0.45, y: 0.0, w: 0.1, h: 0.1 },
           },
           {
             name: "front-right",
