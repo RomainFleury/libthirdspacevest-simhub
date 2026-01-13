@@ -2,7 +2,7 @@
  * Generic Screen Health Watcher IPC Handlers.
  *
  * Handles:
- * - screenHealth:listProfiles / saveProfile / deleteProfile / setActiveProfile / getActiveProfile
+ * - screenHealth:exportProfile
  * - screenHealth:getSettings / setSettings / chooseScreenshotsDir
  * - screenHealth:listScreenshots / deleteScreenshot / clearScreenshots
  * - screenHealth:captureCalibrationScreenshot / captureRoiDebugImages
@@ -67,93 +67,26 @@ async function _captureMonitorImage(monitorIndex) {
 
 function registerScreenHealthHandlers(getDaemonBridge, getMainWindow) {
   // -------------------------------------------------------------------------
-  // Profiles & settings
+  // Export & settings
   // -------------------------------------------------------------------------
 
-  ipcMain.handle("screenHealth:listProfiles", async () => {
+  ipcMain.handle("screenHealth:exportProfile", async (_, profile) => {
     try {
-      const { profiles, activeProfileId } = storage.listProfiles();
-      return { success: true, profiles, activeProfileId };
-    } catch (e) {
-      return { success: false, error: e.message };
-    }
-  });
+      if (!profile || typeof profile !== "object") return { success: false, error: "profile is required" };
 
-  ipcMain.handle("screenHealth:getActiveProfile", async () => {
-    try {
-      const profile = storage.getActiveProfile();
-      return { success: true, profile };
-    } catch (e) {
-      return { success: false, error: e.message };
-    }
-  });
-
-  ipcMain.handle("screenHealth:saveProfile", async (_, profile) => {
-    try {
-      const saved = storage.upsertProfile(profile);
-      return { success: true, profile: saved };
-    } catch (e) {
-      return { success: false, error: e.message };
-    }
-  });
-
-  ipcMain.handle("screenHealth:deleteProfile", async (_, profileId) => {
-    try {
-      storage.deleteProfile(profileId);
-      return { success: true };
-    } catch (e) {
-      return { success: false, error: e.message };
-    }
-  });
-
-  ipcMain.handle("screenHealth:setActiveProfile", async (_, profileId) => {
-    try {
-      storage.setActiveProfile(profileId);
-      return { success: true };
-    } catch (e) {
-      return { success: false, error: e.message };
-    }
-  });
-
-  ipcMain.handle("screenHealth:exportProfile", async (_, profileId) => {
-    try {
-      const { profiles } = storage.listProfiles();
-      const p = profiles.find((x) => x.id === profileId);
-      if (!p) return { success: false, error: "Profile not found" };
-
+      const name = typeof profile.name === "string" ? profile.name : "screen-health-profile";
       const mainWindow = getMainWindow();
       const result = await dialog.showSaveDialog(mainWindow, {
         title: "Export Screen Health Profile",
-        defaultPath: `${p.name || "screen-health-profile"}.json`,
+        defaultPath: `${name}.json`,
         filters: [{ name: "JSON", extensions: ["json"] }],
       });
       if (result.canceled || !result.filePath) {
         return { success: false, canceled: true };
       }
 
-      fs.writeFileSync(result.filePath, JSON.stringify(p, null, 2), "utf8");
+      fs.writeFileSync(result.filePath, JSON.stringify(profile, null, 2), "utf8");
       return { success: true, path: result.filePath };
-    } catch (e) {
-      return { success: false, error: e.message };
-    }
-  });
-
-  ipcMain.handle("screenHealth:importProfile", async () => {
-    try {
-      const mainWindow = getMainWindow();
-      const result = await dialog.showOpenDialog(mainWindow, {
-        title: "Import Screen Health Profile",
-        properties: ["openFile"],
-        filters: [{ name: "JSON", extensions: ["json"] }],
-      });
-      if (result.canceled || result.filePaths.length === 0) {
-        return { success: false, canceled: true };
-      }
-      const p = result.filePaths[0];
-      const raw = fs.readFileSync(p, "utf8");
-      const imported = JSON.parse(raw);
-      const saved = storage.upsertProfile(imported);
-      return { success: true, profile: saved };
     } catch (e) {
       return { success: false, error: e.message };
     }
@@ -337,17 +270,16 @@ function registerScreenHealthHandlers(getDaemonBridge, getMainWindow) {
   // Daemon control
   // -------------------------------------------------------------------------
 
-  ipcMain.handle("screenHealth:start", async () => {
+  ipcMain.handle("screenHealth:start", async (_, profile) => {
     try {
       const daemonBridge = getDaemonBridge();
       if (!daemonBridge?.connected) {
         return { success: false, error: "Not connected to daemon" };
       }
-      const profile = storage.getActiveProfile();
-      if (!profile || !profile.profile) {
-        return { success: false, error: "No active profile configured" };
+      if (!profile || typeof profile !== "object") {
+        return { success: false, error: "profile is required" };
       }
-      return await daemonBridge.screenHealthStart(profile.profile);
+      return await daemonBridge.screenHealthStart(profile);
     } catch (e) {
       return { success: false, error: e.message };
     }

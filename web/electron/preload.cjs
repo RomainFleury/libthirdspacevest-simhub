@@ -109,13 +109,7 @@ contextBridge.exposeInMainWorld("vestBridge", {
   bf2WriteConfigFile: () => ipcRenderer.invoke("bf2:writeConfigFile"),
 
   // Generic Screen Health Watcher API
-  screenHealthListProfiles: () => ipcRenderer.invoke("screenHealth:listProfiles"),
-  screenHealthGetActiveProfile: () => ipcRenderer.invoke("screenHealth:getActiveProfile"),
-  screenHealthSaveProfile: (profile) => ipcRenderer.invoke("screenHealth:saveProfile", profile),
-  screenHealthDeleteProfile: (profileId) => ipcRenderer.invoke("screenHealth:deleteProfile", profileId),
-  screenHealthSetActiveProfile: (profileId) => ipcRenderer.invoke("screenHealth:setActiveProfile", profileId),
-  screenHealthExportProfile: (profileId) => ipcRenderer.invoke("screenHealth:exportProfile", profileId),
-  screenHealthImportProfile: () => ipcRenderer.invoke("screenHealth:importProfile"),
+  screenHealthExportProfile: (profile) => ipcRenderer.invoke("screenHealth:exportProfile", profile),
   screenHealthGetSettings: () => ipcRenderer.invoke("screenHealth:getSettings"),
   screenHealthSetSettings: (settings) => ipcRenderer.invoke("screenHealth:setSettings", settings),
   screenHealthChooseScreenshotsDir: () => ipcRenderer.invoke("screenHealth:chooseScreenshotsDir"),
@@ -128,7 +122,7 @@ contextBridge.exposeInMainWorld("vestBridge", {
     ipcRenderer.invoke("screenHealth:captureCalibrationScreenshot", monitorIndex),
   screenHealthCaptureRoiDebugImages: (monitorIndex, rois) =>
     ipcRenderer.invoke("screenHealth:captureRoiDebugImages", monitorIndex, rois),
-  screenHealthStart: () => ipcRenderer.invoke("screenHealth:start"),
+  screenHealthStart: (profile) => ipcRenderer.invoke("screenHealth:start", profile),
   screenHealthStop: () => ipcRenderer.invoke("screenHealth:stop"),
   screenHealthStatus: () => ipcRenderer.invoke("screenHealth:status"),
   screenHealthTest: (profile, outputDir) => ipcRenderer.invoke("screenHealth:test", profile, outputDir),

@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SCREEN_HEALTH_PRESETS } from "../../../data/screenHealthPresets";
-import type { ScreenHealthStoredProfile } from "../../../lib/bridgeApi";
 import { ScreenHealthCalibrationProvider } from "./draft/CalibrationContext";
 import {
   ScreenHealthHealthBarDraftProvider,
@@ -30,19 +29,9 @@ import { RednessSettings } from "./sections/RednessSettings";
 import { RoiListSection } from "./sections/RoiListSection";
 import { ScreenshotsSection } from "./sections/ScreenshotsSection";
 import { clamp01, clampInt } from "./utils";
-import { screenHealthTest } from "../../../lib/bridgeApi";
+import { screenHealthExportProfile, screenHealthTest } from "../../../lib/bridgeApi";
 
 type Props = {
-  profiles: ScreenHealthStoredProfile[];
-  activeProfileId: string | null;
-  activeProfile: ScreenHealthStoredProfile | null;
-
-  saveProfile: (profile: Partial<ScreenHealthStoredProfile> | Record<string, any>) => Promise<ScreenHealthStoredProfile>;
-  deleteProfile: (profileId: string) => Promise<void>;
-  setActive: (profileId: string) => Promise<void>;
-  exportProfile: (profileId: string) => Promise<any>;
-  importProfile: () => Promise<ScreenHealthStoredProfile | null>;
-
   settings: any;
   updateSettings: (patch: any) => Promise<void>;
   chooseScreenshotsDir: () => Promise<void>;
@@ -66,7 +55,7 @@ export function ScreenHealthConfigurationPanel(props: Props) {
         <ScreenHealthHealthBarDraftProvider>
           <ScreenHealthHealthNumberDraftProvider>
             <ScreenHealthCalibrationProvider dataUrl={dataUrl}>
-              <DraftFromActiveProfileSync activeProfile={props.activeProfile} />
+              <DraftFromSelectedPresetSync presets={SCREEN_HEALTH_PRESETS as any} />
               <ScreenHealthConfigurationPanelInner {...props} />
             </ScreenHealthCalibrationProvider>
           </ScreenHealthHealthNumberDraftProvider>
@@ -78,14 +67,6 @@ export function ScreenHealthConfigurationPanel(props: Props) {
 
 function ScreenHealthConfigurationPanelInner(props: Props) {
   const {
-    profiles,
-    activeProfileId,
-    activeProfile,
-    saveProfile,
-    deleteProfile,
-    setActive,
-    exportProfile,
-    importProfile,
     settings,
     updateSettings,
     chooseScreenshotsDir,
@@ -98,26 +79,9 @@ function ScreenHealthConfigurationPanelInner(props: Props) {
 
   return (
     <div className="space-y-6">
-      <PresetProfilesController
-        presets={SCREEN_HEALTH_PRESETS}
-        profiles={profiles}
-        activeProfileId={activeProfileId}
-        activeProfile={activeProfile}
-        saveProfile={saveProfile}
-        setActive={setActive}
-        captureCalibrationScreenshot={captureCalibrationScreenshot}
-      />
+      <PresetProfilesSection presets={SCREEN_HEALTH_PRESETS as any} />
 
-      <ProfileControlsController
-        profiles={profiles}
-        activeProfileId={activeProfileId}
-        activeProfile={activeProfile}
-        saveProfile={saveProfile}
-        deleteProfile={deleteProfile}
-        setActive={setActive}
-        exportProfile={exportProfile}
-        importProfile={importProfile}
-      />
+      <ProfileActionsController presets={SCREEN_HEALTH_PRESETS as any} />
 
       <CaptureSettingsSection onCapture={captureCalibrationScreenshot} />
 
@@ -147,22 +111,32 @@ function DetectorSettingsSwitch() {
   return <HealthNumberSettings />;
 }
 
-function DraftFromActiveProfileSync(props: { activeProfile: ScreenHealthStoredProfile | null }) {
-  const { activeProfile } = props;
+function DraftFromSelectedPresetSync(props: { presets: Array<{ preset_id: string; display_name: string; profile: any }> }) {
+  const { presets } = props;
+  const profileState = useScreenHealthProfileDraft();
   const { replaceAll: replaceProfileDraft, setDetectorType } = useScreenHealthProfileDraftControls();
   const { replaceAll: replaceRednessDraft } = useScreenHealthRednessDraftControls();
   const { replaceAll: replaceHealthBarDraft, setColorPickMode } = useScreenHealthHealthBarDraftControls();
   const { replaceAll: replaceHealthNumberDraft } = useScreenHealthHealthNumberDraftControls();
+  const lastAppliedPresetIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!activeProfile?.profile) return;
-    const p: any = activeProfile.profile;
+    const presetId = profileState.selectedPresetId;
+    if (!presetId) return;
+    if (lastAppliedPresetIdRef.current === presetId) return;
+
+    const preset = presets.find((p) => p.preset_id === presetId);
+    if (!preset) return;
+
+    const p: any = preset.profile;
 
     replaceProfileDraft({
-      profileName: activeProfile.name || p.name || "Unnamed Profile",
+      profileName: preset.display_name || p.name || "Unnamed Profile",
       monitorIndex: Number(p.capture?.monitor_index || 1),
       tickMs: Number(p.capture?.tick_ms || 50),
     });
+    // Mark applied early to avoid loops (even if we return in a branch below).
+    lastAppliedPresetIdRef.current = presetId;
 
     const detectors: any[] = Array.isArray(p.detectors) ? p.detectors : [];
     const hbD = detectors.find((d: any) => d.type === "health_bar");
@@ -250,96 +224,32 @@ function DraftFromActiveProfileSync(props: { activeProfile: ScreenHealthStoredPr
       })),
     });
     setColorPickMode(null);
-  }, [activeProfile]);
+  }, [
+    presets,
+    profileState.selectedPresetId,
+    replaceProfileDraft,
+    setDetectorType,
+    replaceRednessDraft,
+    replaceHealthBarDraft,
+    setColorPickMode,
+    replaceHealthNumberDraft,
+  ]);
 
   return null;
 }
 
-function PresetProfilesController(props: {
-  presets: any[];
-  profiles: ScreenHealthStoredProfile[];
-  activeProfileId: string | null;
-  activeProfile: ScreenHealthStoredProfile | null;
-  saveProfile: (profile: Partial<ScreenHealthStoredProfile> | Record<string, any>) => Promise<ScreenHealthStoredProfile>;
-  setActive: (profileId: string) => Promise<void>;
-  captureCalibrationScreenshot: (monitorIndex: number) => Promise<any>;
-}) {
-  const { presets, profiles, activeProfileId, activeProfile, saveProfile, setActive, captureCalibrationScreenshot } = props;
-  const state = useScreenHealthProfileDraft();
-
-  const findInstalledPresetProfileId = (presetId: string): string | null => {
-    for (const p of profiles) {
-      const pid = (p.profile as any)?.meta?.preset_id;
-      if (pid === presetId) return p.id;
-    }
-    return null;
-  };
-
-  const onInstall = async () => {
-    const preset = presets.find((p: any) => p.preset_id === state.selectedPresetId);
-    if (!preset) return;
-
-    const existingId = findInstalledPresetProfileId(preset.preset_id);
-    if (existingId) {
-      await setActive(existingId);
-      await captureCalibrationScreenshot(
-        Number((profiles.find((p) => p.id === existingId)?.profile as any)?.capture?.monitor_index || 1)
-      );
-      return;
-    }
-
-    const saved = await saveProfile({ name: preset.display_name, profile: preset.profile } as any);
-    await setActive(saved.id);
-    await captureCalibrationScreenshot(Number((preset.profile as any)?.capture?.monitor_index || 1));
-  };
-
-  const onResetToDefaults = async () => {
-    if (!activeProfileId || !activeProfile?.profile) return;
-    const presetId = (activeProfile.profile as any)?.meta?.preset_id;
-    if (!presetId) return;
-    const preset = presets.find((p: any) => p.preset_id === presetId);
-    if (!preset) return;
-
-    await saveProfile({
-      id: activeProfileId,
-      name: activeProfile.name,
-      profile: preset.profile,
-      createdAt: activeProfile.createdAt,
-    } as any);
-    await captureCalibrationScreenshot(Number((preset.profile as any)?.capture?.monitor_index || 1));
-  };
-
-  return (
-    <PresetProfilesSection
-      presets={presets as any}
-      onInstall={onInstall}
-      onResetToDefaults={onResetToDefaults}
-      activeProfileMeta={(activeProfile?.profile as any)?.meta}
-    />
-  );
-}
-
-function ProfileControlsController(props: {
-  profiles: ScreenHealthStoredProfile[];
-  activeProfileId: string | null;
-  activeProfile: ScreenHealthStoredProfile | null;
-  saveProfile: (profile: Partial<ScreenHealthStoredProfile> | Record<string, any>) => Promise<ScreenHealthStoredProfile>;
-  deleteProfile: (profileId: string) => Promise<void>;
-  setActive: (profileId: string) => Promise<void>;
-  exportProfile: (profileId: string) => Promise<any>;
-  importProfile: () => Promise<ScreenHealthStoredProfile | null>;
-}) {
-  const { profiles, activeProfileId, activeProfile, saveProfile, deleteProfile, setActive, exportProfile, importProfile } = props;
+function ProfileActionsController(props: { presets: Array<{ preset_id: string; profile: any }> }) {
+  const { presets } = props;
   const profileState = useScreenHealthProfileDraft();
   const { setProfileName, readDraft: readProfileDraft } = useScreenHealthProfileDraftControls();
   const { readDraft: readRednessDraft } = useScreenHealthRednessDraftControls();
   const { readDraft: readHealthBarDraft } = useScreenHealthHealthBarDraftControls();
   const { readDraft: readHealthNumberDraft } = useScreenHealthHealthNumberDraftControls();
 
-  const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<Record<string, any> | null>(null);
   const [testError, setTestError] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const buildDaemonProfile = () => {
     // Snapshot reads: this controller does not subscribe to draft state updates.
@@ -347,13 +257,14 @@ function ProfileControlsController(props: {
     const redness = readRednessDraft();
     const hb = readHealthBarDraft();
     const hn = readHealthNumberDraft();
+    const presetMeta = (presets.find((p) => p.preset_id === profileDraft.selectedPresetId)?.profile as any)?.meta;
 
     if (profileDraft.detectorType === "health_bar") {
       const roi = hb.roi ?? { x: 0.1, y: 0.9, w: 0.3, h: 0.03 };
       return {
         schema_version: 0,
         name: profileDraft.profileName,
-        meta: (activeProfile?.profile as any)?.meta,
+        meta: presetMeta,
         capture: { source: "monitor", monitor_index: profileDraft.monitorIndex, tick_ms: profileDraft.tickMs },
         detectors: [
           {
@@ -389,7 +300,7 @@ function ProfileControlsController(props: {
       return {
         schema_version: 0,
         name: profileDraft.profileName,
-        meta: (activeProfile?.profile as any)?.meta,
+        meta: presetMeta,
         capture: { source: "monitor", monitor_index: profileDraft.monitorIndex, tick_ms: profileDraft.tickMs },
         detectors: [
           {
@@ -426,7 +337,7 @@ function ProfileControlsController(props: {
     return {
       schema_version: 0,
       name: profileDraft.profileName,
-      meta: (activeProfile?.profile as any)?.meta,
+      meta: presetMeta,
       capture: { source: "monitor", monitor_index: profileDraft.monitorIndex, tick_ms: profileDraft.tickMs },
       detectors: [
         {
@@ -448,27 +359,15 @@ function ProfileControlsController(props: {
     };
   };
 
-  const onSave = async () => {
-    if (!activeProfileId) return;
-    setSaving(true);
+  const onExport = async () => {
+    setExportError(null);
     try {
-      await saveProfile({
-        id: activeProfileId,
-        name: profileState.profileName,
-        profile: buildDaemonProfile(),
-        createdAt: activeProfile?.createdAt,
-      } as any);
-    } finally {
-      setSaving(false);
+      const profile = buildDaemonProfile();
+      const result = await screenHealthExportProfile(profile);
+      if (!result.success && !result.canceled) throw new Error(result.error || "Failed to export profile");
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : "Failed to export profile");
     }
-  };
-
-  const onNew = async () => {
-    const saved = await saveProfile({
-      name: `Profile ${profiles.length + 1}`,
-      profile: buildDaemonProfile(),
-    } as any);
-    await setActive(saved.id);
   };
 
   const onTest = async () => {
@@ -494,17 +393,9 @@ function ProfileControlsController(props: {
   return (
     <div className="space-y-3">
       <ProfileControlsSection
-        profiles={profiles}
-        activeProfileId={activeProfileId}
-        setActive={(id) => setActive(id)}
-        onNew={onNew}
-        onExport={() => activeProfileId && exportProfile(activeProfileId)}
-        onImport={importProfile}
-        onDelete={() => activeProfileId && deleteProfile(activeProfileId)}
+        onExport={onExport}
         profileName={profileState.profileName}
         setProfileName={setProfileName}
-        onSave={onSave}
-        saving={saving}
         onTest={onTest}
         testing={testing}
       />
@@ -545,6 +436,8 @@ function ProfileControlsController(props: {
           )}
         </div>
       )}
+
+      {exportError && <div className="text-xs text-rose-300">{exportError}</div>}
     </div>
   );
 }

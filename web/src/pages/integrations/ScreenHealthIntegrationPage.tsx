@@ -37,7 +37,7 @@ export function ScreenHealthIntegrationPage() {
         <li>Run your game in borderless/windowed mode (recommended for capture reliability).</li>
         <li>Open “Calibration & settings”.</li>
         <li>Capture a screenshot and draw ROIs for your detector.</li>
-        <li>Tune settings and click “Save profile”.</li>
+        <li>Tune settings and export the JSON (developer workflow).</li>
         <li>Click “Start” to enable the watcher in the daemon.</li>
       </ol>
       <p className="text-slate-500 text-xs">Tip: Use “Capture ROI crop(s)” to verify you’re sampling the right pixels.</p>

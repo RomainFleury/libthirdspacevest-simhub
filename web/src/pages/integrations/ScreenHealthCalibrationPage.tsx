@@ -1,45 +1,39 @@
 import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { useScreenHealthDaemonStatus } from "../../hooks/screenHealth/useScreenHealthDaemonStatus";
-import { useScreenHealthProfiles } from "../../hooks/screenHealth/useScreenHealthProfiles";
 import { useScreenHealthScreenshots } from "../../hooks/screenHealth/useScreenHealthScreenshots";
 import { ScreenHealthConfigurationPanel } from "./screenHealth/ScreenHealthConfigurationPanel";
 
 export function ScreenHealthCalibrationPage() {
   const daemon = useScreenHealthDaemonStatus();
-  const profiles = useScreenHealthProfiles({ onError: (msg) => daemon.setError(msg) });
   const screenshots = useScreenHealthScreenshots();
-  const [perf, setPerf] = useState<{ profilesMs?: number; statusMs?: number; settingsMs?: number } | null>(null);
+  const [perf, setPerf] = useState<{ statusMs?: number; settingsMs?: number } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const t0 = performance.now();
-      await profiles.refreshProfiles();
-      const t1 = performance.now();
       await daemon.refreshStatus();
-      const t2 = performance.now();
+      const t1 = performance.now();
       await screenshots.refreshSettings();
-      const t3 = performance.now();
+      const t2 = performance.now();
       // NOTE: we intentionally do NOT call screenshots.refreshScreenshots() on mount
       // because listing large screenshot directories can freeze/slow the UI.
       if (!cancelled) {
         setPerf({
-          profilesMs: t1 - t0,
-          statusMs: t2 - t1,
-          settingsMs: t3 - t2,
+          statusMs: t1 - t0,
+          settingsMs: t2 - t1,
         });
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [profiles.refreshProfiles, daemon.refreshStatus, screenshots.refreshSettings]);
+  }, [daemon.refreshStatus, screenshots.refreshSettings]);
 
   const perfLine = useMemo(() => {
     if (!perf) return null;
     const parts = [];
-    if (typeof perf.profilesMs === "number") parts.push(`profiles=${perf.profilesMs.toFixed(0)}ms`);
     if (typeof perf.statusMs === "number") parts.push(`status=${perf.statusMs.toFixed(0)}ms`);
     if (typeof perf.settingsMs === "number") parts.push(`settings=${perf.settingsMs.toFixed(0)}ms`);
     return parts.join(" ");
@@ -64,14 +58,6 @@ export function ScreenHealthCalibrationPage() {
       </div>
 
       <ScreenHealthConfigurationPanel
-        profiles={profiles.profiles}
-        activeProfileId={profiles.activeProfileId}
-        activeProfile={profiles.activeProfile}
-        saveProfile={profiles.saveProfile}
-        deleteProfile={profiles.deleteProfile}
-        setActive={profiles.setActive}
-        exportProfile={profiles.exportProfile}
-        importProfile={profiles.importProfile}
         settings={screenshots.settings}
         updateSettings={screenshots.updateSettings}
         chooseScreenshotsDir={screenshots.chooseScreenshotsDir}

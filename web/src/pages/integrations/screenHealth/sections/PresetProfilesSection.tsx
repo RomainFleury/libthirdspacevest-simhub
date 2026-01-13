@@ -3,15 +3,14 @@ import { useScreenHealthProfileDraft, useScreenHealthProfileDraftControls } from
 
 export function PresetProfilesSection(props: {
   presets: ScreenHealthPreset[];
-  onInstall: () => void;
-  onResetToDefaults: () => void;
-  activeProfileMeta?: any;
 }) {
-  const { presets, onInstall, onResetToDefaults, activeProfileMeta } = props;
+  const { presets } = props;
   const state = useScreenHealthProfileDraft();
   const { setSelectedPresetId } = useScreenHealthProfileDraftControls();
-  const presetId = activeProfileMeta?.preset_id;
-  const hints: string[] = Array.isArray(activeProfileMeta?.hints) ? activeProfileMeta.hints : [];
+  const selected = presets.find((p) => p.preset_id === state.selectedPresetId) || null;
+  const meta = (selected?.profile as any)?.meta;
+  const presetId = typeof meta?.preset_id === "string" ? meta.preset_id : null;
+  const hints: string[] = Array.isArray(meta?.hints) ? meta.hints : [];
 
   return (
     <div className="space-y-3">
@@ -28,20 +27,6 @@ export function PresetProfilesSection(props: {
             </option>
           ))}
         </select>
-        <button
-          onClick={onInstall}
-          className="rounded-lg bg-emerald-600/80 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-600"
-        >
-          Install preset
-        </button>
-        <button
-          onClick={onResetToDefaults}
-          disabled={!presetId}
-          className="rounded-lg bg-slate-600/80 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-600 disabled:opacity-50"
-          title={presetId ? "Reset this profile to its preset defaults" : "This profile is not from a preset"}
-        >
-          Reset to preset defaults
-        </button>
       </div>
 
       {presetId && (

@@ -207,14 +207,6 @@ export type ScreenHealthStopResult = {
   error?: string;
 };
 
-export type ScreenHealthStoredProfile = {
-  id: string;
-  name: string;
-  profile: Record<string, any>;
-  createdAt?: string;
-  updatedAt?: string;
-};
-
 export type ScreenHealthSettings = {
   screenshotsDir: string | null;
   retentionMaxCount: number;
@@ -406,33 +398,9 @@ declare global {
       }>;
 
       // Generic Screen Health Watcher API
-      screenHealthListProfiles: () => Promise<{
-        success: boolean;
-        profiles?: ScreenHealthStoredProfile[];
-        activeProfileId?: string | null;
-        error?: string;
-      }>;
-      screenHealthGetActiveProfile: () => Promise<{
-        success: boolean;
-        profile?: ScreenHealthStoredProfile | null;
-        error?: string;
-      }>;
-      screenHealthSaveProfile: (profile: Partial<ScreenHealthStoredProfile> | Record<string, any>) => Promise<{
-        success: boolean;
-        profile?: ScreenHealthStoredProfile;
-        error?: string;
-      }>;
-      screenHealthDeleteProfile: (profileId: string) => Promise<{ success: boolean; error?: string }>;
-      screenHealthSetActiveProfile: (profileId: string) => Promise<{ success: boolean; error?: string }>;
-      screenHealthExportProfile: (profileId: string) => Promise<{
+      screenHealthExportProfile: (profile: Record<string, any>) => Promise<{
         success: boolean;
         path?: string;
-        canceled?: boolean;
-        error?: string;
-      }>;
-      screenHealthImportProfile: () => Promise<{
-        success: boolean;
-        profile?: ScreenHealthStoredProfile;
         canceled?: boolean;
         error?: string;
       }>;
@@ -478,7 +446,7 @@ declare global {
         outputs?: ScreenHealthCapturedImage[];
         error?: string;
       }>;
-      screenHealthStart: () => Promise<ScreenHealthStartResult>;
+      screenHealthStart: (profile: Record<string, any>) => Promise<ScreenHealthStartResult>;
       screenHealthStop: () => Promise<ScreenHealthStopResult>;
       screenHealthStatus: () => Promise<ScreenHealthStatus>;
       screenHealthTest: (profile: Record<string, any>, outputDir?: string | null) => Promise<ScreenHealthTestResult>;
@@ -834,32 +802,8 @@ export async function stopEffect(): Promise<{ success: boolean; error?: string }
 // Generic Screen Health Watcher
 // -------------------------------------------------------------------------
 
-export async function screenHealthListProfiles() {
-  return await ensureBridge().screenHealthListProfiles();
-}
-
-export async function screenHealthGetActiveProfile() {
-  return await ensureBridge().screenHealthGetActiveProfile();
-}
-
-export async function screenHealthSaveProfile(profile: Partial<ScreenHealthStoredProfile> | Record<string, any>) {
-  return await ensureBridge().screenHealthSaveProfile(profile);
-}
-
-export async function screenHealthDeleteProfile(profileId: string) {
-  return await ensureBridge().screenHealthDeleteProfile(profileId);
-}
-
-export async function screenHealthSetActiveProfile(profileId: string) {
-  return await ensureBridge().screenHealthSetActiveProfile(profileId);
-}
-
-export async function screenHealthExportProfile(profileId: string) {
-  return await ensureBridge().screenHealthExportProfile(profileId);
-}
-
-export async function screenHealthImportProfile() {
-  return await ensureBridge().screenHealthImportProfile();
+export async function screenHealthExportProfile(profile: Record<string, any>) {
+  return await ensureBridge().screenHealthExportProfile(profile);
 }
 
 export async function screenHealthGetSettings() {
@@ -905,8 +849,8 @@ export async function screenHealthCaptureRoiDebugImages(
   return await ensureBridge().screenHealthCaptureRoiDebugImages(monitorIndex, rois);
 }
 
-export async function screenHealthStart(): Promise<ScreenHealthStartResult> {
-  return await ensureBridge().screenHealthStart();
+export async function screenHealthStart(profile: Record<string, any>): Promise<ScreenHealthStartResult> {
+  return await ensureBridge().screenHealthStart(profile);
 }
 
 export async function screenHealthStop(): Promise<ScreenHealthStopResult> {

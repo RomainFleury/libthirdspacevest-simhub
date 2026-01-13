@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { ScreenHealthStatus, screenHealthStart, screenHealthStatus, screenHealthStop } from "../../lib/bridgeApi";
+import { SCREEN_HEALTH_PRESETS } from "../../data/screenHealthPresets";
 
 export function useScreenHealthDaemonStatus() {
   const [status, setStatus] = useState<ScreenHealthStatus>({ running: false });
@@ -12,11 +13,13 @@ export function useScreenHealthDaemonStatus() {
     setError(s.error || null);
   }, []);
 
-  const start = useCallback(async () => {
+  const start = useCallback(async (profile?: Record<string, any>) => {
     setLoading(true);
     setError(null);
     try {
-      const result = await screenHealthStart();
+      const p = profile ?? (SCREEN_HEALTH_PRESETS[0]?.profile as any);
+      if (!p) throw new Error("No preset profile available");
+      const result = await screenHealthStart(p);
       if (!result.success) setError(result.error || "Failed to start");
       await refreshStatus();
     } catch (e) {
