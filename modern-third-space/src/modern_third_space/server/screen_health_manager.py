@@ -622,7 +622,7 @@ class ScreenHealthManager:
 
         # Best-effort capture backend
         try:
-            capture = _MSSCaptureBackend(monitor_index=parsed.capture.monitor_index)
+            capture = _create_capture_backend(monitor_index=parsed.capture.monitor_index)
             frame_w, frame_h = capture.get_frame_size()
         except Exception as e:
             return False, None, f"capture not available: {e}"
@@ -974,7 +974,7 @@ class ScreenHealthManager:
         profile = self._profile
 
         # Lazily create capture backend so imports do not break tests.
-        capture = _MSSCaptureBackend(monitor_index=profile.capture.monitor_index)
+        capture = _create_capture_backend(monitor_index=profile.capture.monitor_index)
 
         tick_s = max(0.01, profile.capture.tick_ms / 1000.0)
 
@@ -1762,3 +1762,84 @@ class _MSSCaptureBackend:
         img = self._sct.grab(region)
         return img.raw  # BGRA bytes
 
+
+class _DXCamCaptureBackend:
+    """
+    Optional dxcam-based capture backend (Windows, DXGI).
+
+    Faster than mss/GDI on many systems. Optional-import to keep tests/dev
+    environments working even without dxcam installed.
+    """
+
+    def __init__(self, monitor_index: int) -> None:
+        self._monitor_index = monitor_index
+        self._cam = None
+        self._output_left = 0
+        self._output_top = 0
+        self._output_w = 0
+        self._output_h = 0
+
+    def _ensure(self) -> None:
+        if self._cam is not None:
+            return
+        try:
+            import dxcam  # type: ignore
+        except Exception as e:  # pragma: no cover
+            raise RuntimeError("dxcam is required for dxcam capture backend") from e
+
+        # dxcam uses 0-based output index; our UI/daemon config is 1-based.
+        out_idx = int(self._monitor_index) - 1
+        if out_idx < 0:
+            raise ValueError(f"Invalid monitor_index={self._monitor_index}. Must be >= 1")
+
+        # output_color="BGRA" gives uint8 (H, W, 4) compatible with existing code.
+        cam = dxcam.create(output_idx=out_idx, output_color="BGRA")
+        if cam is None:  # pragma: no cover
+            raise RuntimeError("dxcam.create returned None")
+        self._cam = cam
+
+        # Determine output geometry from the first full-frame grab.
+        frame = self._cam.grab()
+        if frame is None:
+            raise RuntimeError("dxcam.grab returned None (capture not available)")
+        self._output_h = int(frame.shape[0])
+        self._output_w = int(frame.shape[1])
+        # Region coordinates are relative to the selected output.
+        self._output_left = 0
+        self._output_top = 0
+
+    def get_frame_size(self) -> Tuple[int, int]:
+        self._ensure()
+        return self._output_w, self._output_h
+
+    def capture_bgra(self, left: int, top: int, width: int, height: int) -> bytes:
+        self._ensure()
+        assert self._cam is not None
+
+        l = self._output_left + int(left)
+        t = self._output_top + int(top)
+        r = l + int(width)
+        b = t + int(height)
+        frame = self._cam.grab(region=(l, t, r, b))
+        if frame is None:
+            raise RuntimeError("dxcam.grab returned None")
+        # Ensure contiguous bytes in row-major order.
+        try:
+            return frame.tobytes(order="C")
+        except TypeError:  # pragma: no cover (older numpy)
+            return frame.tobytes()
+
+
+def _create_capture_backend(*, monitor_index: int):
+    """
+    Create the best available capture backend.
+
+    Prefer dxcam on Windows (DXGI), fallback to mss (GDI).
+    """
+    if os.name == "nt":
+        try:
+            return _DXCamCaptureBackend(monitor_index=monitor_index)
+        except Exception:
+            # Fall back to mss below.
+            pass
+    return _MSSCaptureBackend(monitor_index=monitor_index)
