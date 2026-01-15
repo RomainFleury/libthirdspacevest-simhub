@@ -79,8 +79,8 @@ win:
     - target: nsis
       arch:
         - x64
-  # Icon is optional - remove line if icon.ico doesn't exist
-  # icon: build/icon.ico
+  # Icon for Windows executable and installer
+  icon: build/icon.png
   # Request admin rights if needed for USB access
   requestedExecutionLevel: asInvoker
   # Disable code signing completely (avoids symlink permission errors)
@@ -94,10 +94,10 @@ nsis:
   perMachine: false
   allowToChangeInstallationDirectory: true
   allowElevation: true
-  # Icons are optional - uncomment when icon.ico exists
-  # installerIcon: build/icon.ico
-  # uninstallerIcon: build/icon.ico
-  # installerHeaderIcon: build/icon.ico
+  # Icons for NSIS installer
+  installerIcon: public/icon.ico
+  uninstallerIcon: public/icon.ico
+  installerHeaderIcon: public/icon.ico
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: Third Space Vest
@@ -107,25 +107,6 @@ nsis:
 # Portable version (no installer, just zip)
 portable:
   artifactName: "${productName}-${version}-portable.zip"
-
-# macOS configuration (for future)
-mac:
-  target:
-    - target: dmg
-      arch:
-        - x64
-        - arm64
-  icon: build/icon.icns
-  category: public.app-category.utilities
-
-# Linux configuration (for future)
-linux:
-  target:
-    - target: AppImage
-      arch:
-        - x64
-  icon: build/icons
-  category: Utility
 
 # Publish configuration (for auto-updates)
 # Uncomment and configure when ready for releases
