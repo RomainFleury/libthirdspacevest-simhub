@@ -38,11 +38,6 @@ export function ScreenshotsSection(props: {
         >
           Clear all
         </button>
-        {settings && (
-          <div className="text-xs text-slate-500">
-            retention: {settings.retentionMaxCount} files / {settings.retentionMaxAgeDays} days
-          </div>
-        )}
       </div>
 
       <div className="rounded-xl bg-slate-900/50 p-3 text-sm text-slate-400">
