@@ -18,7 +18,7 @@ pushd "%~dp0..\.."
 set "ROOT_DIR=%CD%"
 popd
 
-set "ENTRY_FILE=%ROOT_DIR%\modern-third-space\buildvest-daemon-entry.py"
+set "ENTRY_FILE=%ROOT_DIR%\modern-third-space\build\vest-daemon-entry.py"
 set "BUILD_DIR=%ROOT_DIR%\modern-third-space\build"
 
 :: Check if build directory exists, create if not
@@ -48,30 +48,19 @@ if exist "%ENTRY_FILE%" (
 :: Create the entry file
 echo   [INFO] Creating vest-daemon-entry.py...
 
-:: Write the file content directly using batch echo (most reliable for batch files)
-(
-echo #!/usr/bin/env python3
-echo """
-echo Entry point for PyInstaller-built vest-daemon executable.
-echo.
-echo This script is used as the entry point when building the daemon executable
-echo with PyInstaller. It parses command line arguments and starts the daemon.
-echo.
-echo Usage:
-echo     vest-daemon.exe daemon --port 5050
-echo     vest-daemon.exe daemon start --port 5050
-echo     vest-daemon.exe daemon stop
-echo     vest-daemon.exe daemon status
-echo """
-echo.
-echo import sys
-echo from modern_third_space.cli import main
-echo.
-echo if __name__ == "__main__":
-echo     # The CLI's main function handles all argument parsing
-echo     # It will route "daemon" commands to the appropriate handler
-echo     sys.exit(main^())
-) > "%ENTRY_FILE%"
+:: Get Python command
+if not defined TSV_PYTHON (
+    set "PYTHON_CMD=python"
+) else (
+    set "PYTHON_CMD=%TSV_PYTHON%"
+)
+
+:: Use Python with a here-string approach via stdin
+echo import sys > "%TEMP%\create_entry.py" && echo content = """#!/usr/bin/env python3 >> "%TEMP%\create_entry.py" && echo """Entry point for PyInstaller-built vest-daemon executable. >> "%TEMP%\create_entry.py" && echo. >> "%TEMP%\create_entry.py" && echo This script is used as the entry point when building the daemon executable >> "%TEMP%\create_entry.py" && echo with PyInstaller. It parses command line arguments and starts the daemon. >> "%TEMP%\create_entry.py" && echo. >> "%TEMP%\create_entry.py" && echo Usage: >> "%TEMP%\create_entry.py" && echo     vest-daemon.exe daemon --port 5050 >> "%TEMP%\create_entry.py" && echo     vest-daemon.exe daemon start --port 5050 >> "%TEMP%\create_entry.py" && echo     vest-daemon.exe daemon stop >> "%TEMP%\create_entry.py" && echo     vest-daemon.exe daemon status >> "%TEMP%\create_entry.py" && echo """ >> "%TEMP%\create_entry.py" && echo. >> "%TEMP%\create_entry.py" && echo import sys >> "%TEMP%\create_entry.py" && echo from modern_third_space.cli import main >> "%TEMP%\create_entry.py" && echo. >> "%TEMP%\create_entry.py" && echo if __name__ == "__main__": >> "%TEMP%\create_entry.py" && echo     # The CLI's main function handles all argument parsing >> "%TEMP%\create_entry.py" && echo     # It will route "daemon" commands to the appropriate handler >> "%TEMP%\create_entry.py" && echo     sys.exit(main()) >> "%TEMP%\create_entry.py" && echo """ >> "%TEMP%\create_entry.py" && echo with open(r'%ENTRY_FILE%', 'w', encoding='utf-8') as f: >> "%TEMP%\create_entry.py" && echo     f.write(content) >> "%TEMP%\create_entry.py"
+
+:: This approach is too complex, use a simpler method - write directly with proper escaping
+:: Write file using Python with raw string to avoid quote issues
+%PYTHON_CMD% -c "import sys; content = '''#!/usr/bin/env python3\n\"\"\"\nEntry point for PyInstaller-built vest-daemon executable.\n\nThis script is used as the entry point when building the daemon executable\nwith PyInstaller. It parses command line arguments and starts the daemon.\n\nUsage:\n    vest-daemon.exe daemon --port 5050\n    vest-daemon.exe daemon start --port 5050\n    vest-daemon.exe daemon stop\n    vest-daemon.exe daemon status\n\"\"\"\n\nimport sys\nfrom modern_third_space.cli import main\n\nif __name__ == \"__main__\":\n    # The CLI'\''s main function handles all argument parsing\n    # It will route \"daemon\" commands to the appropriate handler\n    sys.exit(main())\n'''; f = open(r'%ENTRY_FILE%', 'w', encoding='utf-8'); f.write(content); f.close()"
 
 if !ERRORLEVEL! neq 0 (
     echo   [FAIL] Failed to create vest-daemon-entry.py!
