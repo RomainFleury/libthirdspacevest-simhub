@@ -4,3 +4,4 @@ export { L4D2IntegrationPage } from "./L4D2IntegrationPage";
 export { ScreenHealthIntegrationPage } from "./ScreenHealthIntegrationPage";
 export { ScreenHealthCalibrationPage } from "./ScreenHealthCalibrationPage";
 export { ScreenHealthSettingsPage } from "./ScreenHealthSettingsPage";
+export { ScreenHealthPreviewPage } from "./ScreenHealthPreviewPage";

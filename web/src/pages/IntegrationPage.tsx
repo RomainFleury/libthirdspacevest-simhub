@@ -6,6 +6,7 @@ import {
   ScreenHealthIntegrationPage,
   ScreenHealthCalibrationPage,
   ScreenHealthSettingsPage,
+  ScreenHealthPreviewPage,
 } from "./integrations";
 
 /**
@@ -27,8 +28,8 @@ const INTEGRATION_SUBPAGES: Record<string, {
   screen_health: { 
     calibration: ScreenHealthCalibrationPage,
     settings: ScreenHealthSettingsPage,
-    builder: ScreenHealthCalibrationPage, // Will be renamed later
-    preview: null, // Will be created
+    builder: ScreenHealthCalibrationPage,
+    preview: ScreenHealthPreviewPage,
   },
 };
 
