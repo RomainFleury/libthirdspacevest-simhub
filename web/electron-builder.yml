@@ -79,6 +79,9 @@ win:
     - target: nsis
       arch:
         - x64
+    - target: portable
+      arch:
+        - x64
   # Icon for Windows executable and installer
   icon: build/icon.png
   # Request admin rights if needed for USB access
