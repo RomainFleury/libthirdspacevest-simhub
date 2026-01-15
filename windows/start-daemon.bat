@@ -15,28 +15,8 @@ if exist "%~dp0.env.bat" call "%~dp0.env.bat"
 
 ::: Resolve Python command (TSV_PYTHON -> py -3.14 -> python/python3)
 set "PYTHON_CMD="
-if defined TSV_PYTHON (
-    set "PYTHON_CMD=%TSV_PYTHON%"
-) else (
-    where py >nul 2>&1
-    if %ERRORLEVEL% equ 0 (
-        py -3.14 -c "import sys" >nul 2>&1
-        if %ERRORLEVEL% equ 0 (
-            set "PYTHON_CMD=py -3.14"
-        )
-    )
-    if not defined PYTHON_CMD (
-        where python >nul 2>&1
-        if %ERRORLEVEL% equ 0 (
-            set "PYTHON_CMD=python"
-        ) else (
-            where python3 >nul 2>&1
-            if %ERRORLEVEL% equ 0 (
-                set "PYTHON_CMD=python3"
-            )
-        )
-    )
-)
+set "PYTHON_CMD=%TSV_PYTHON%"
+
 if not defined PYTHON_CMD (
     echo [ERROR] Python is not installed!
     echo.

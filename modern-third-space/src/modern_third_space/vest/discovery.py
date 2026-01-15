@@ -7,14 +7,73 @@ It provides functions to find all connected vest hardware.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+import sys
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 try:
     import usb.core
+    import usb.util
+    import usb.backend.libusb1
+    _usb_available = True
 except ImportError:
     usb = None  # type: ignore
+    _usb_available = False
 
 from ..legacy_adapter import load_vest_class
+
+
+def _find_libusb_dll() -> Optional[str]:
+    """Find the libusb-1.0.dll path from the libusb package."""
+    try:
+        import libusb
+        # Get the libusb package location
+        libusb_path = Path(libusb.__file__).parent
+        # Try common DLL locations
+        for dll_path in [
+            libusb_path / "_platform" / "windows" / "x86_64" / "libusb-1.0.dll",
+            libusb_path / "_platform" / "_windows" / "x64" / "libusb-1.0.dll",
+            libusb_path / "_platform" / "windows" / "x86" / "libusb-1.0.dll",
+            libusb_path / "_platform" / "_windows" / "x86" / "libusb-1.0.dll",
+        ]:
+            if dll_path.exists():
+                return str(dll_path)
+    except ImportError:
+        pass
+    
+    # Fallback: search in site-packages
+    for site_packages in sys.path:
+        if "site-packages" in site_packages:
+            for dll_path in [
+                Path(site_packages) / "libusb" / "_platform" / "windows" / "x86_64" / "libusb-1.0.dll",
+                Path(site_packages) / "libusb" / "_platform" / "_windows" / "x64" / "libusb-1.0.dll",
+            ]:
+                if dll_path.exists():
+                    return str(dll_path)
+    
+    return None
+
+
+def _get_usb_backend():
+    """Get or create a libusb backend, explicitly loading the DLL if needed."""
+    if not _usb_available:
+        return None
+    
+    # Try to get existing backend
+    backend = usb.backend.libusb1.get_backend()
+    if backend is not None:
+        return backend
+    
+    # If no backend found, try to load it explicitly
+    dll_path = _find_libusb_dll()
+    if dll_path:
+        try:
+            backend = usb.backend.libusb1.get_backend(find_library=lambda x: dll_path)
+            return backend
+        except Exception:
+            pass
+    
+    return None
 
 
 def list_devices() -> List[Dict[str, Any]]:
@@ -51,7 +110,10 @@ def list_devices() -> List[Dict[str, Any]]:
         if vendor_id is None or product_id is None:
             return []
         
+        # Get backend explicitly to ensure libusb DLL is loaded
+        backend = _get_usb_backend()
         devices = usb.core.find(
+            backend=backend,
             find_all=True,
             idVendor=vendor_id,
             idProduct=product_id

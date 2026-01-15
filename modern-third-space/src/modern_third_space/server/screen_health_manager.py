@@ -643,19 +643,63 @@ class ScreenHealthManager:
                 errors.append(f"save_crop {kind}:{name}: {e}")
                 return None
 
+        # Collect all regions to capture in a single batch
+        # Format: (detector_type, detector_obj, name, left, top, width, height)
+        all_regions: List[Tuple[str, Any, str, int, int, int, int]] = []
+
         # Redness
         if parsed.redness_detector is not None:
             for roi in parsed.redness_rois:
                 left, top, w, h = normalized_rect_to_pixels(roi.rect, frame_w, frame_h)
-                cap0 = time.perf_counter()
-                try:
-                    raw = capture.capture_bgra(left=left, top=top, width=w, height=h)
-                except Exception as e:
-                    errors.append(f"capture redness:{roi.name}: {e}")
-                    continue
-                cap_ms = (time.perf_counter() - cap0) * 1000.0
+                all_regions.append(("redness", roi, roi.name, left, top, w, h))
 
-                eval0 = time.perf_counter()
+        # Health bar
+        for hb in parsed.health_bars:
+            left, top, w, h = normalized_rect_to_pixels(hb.rect, frame_w, frame_h)
+            all_regions.append(("health_bar", hb, hb.name, left, top, w, h))
+
+        # Health number OCR (single read; stability is handled in the continuous loop)
+        for hn in parsed.health_numbers:
+            if hn.templates is None:
+                detectors_out.append(
+                    {
+                        "type": "health_number",
+                        "name": hn.name,
+                        "error": "missing templates",
+                    }
+                )
+                continue
+            left, top, w, h = normalized_rect_to_pixels(hn.rect, frame_w, frame_h)
+            all_regions.append(("health_number", hn, hn.name, left, top, w, h))
+
+        # Single batch capture for all regions
+        if not all_regions:
+            total_ms = (time.perf_counter() - t0) * 1000.0
+            result = {
+                "profile_name": parsed.name,
+                "capture": {"monitor_index": parsed.capture.monitor_index, "tick_ms": parsed.capture.tick_ms},
+                "frame": {"w": frame_w, "h": frame_h},
+                "total_ms": total_ms,
+                "detectors": detectors_out,
+                "output_dir": str(out_dir) if out_dir else None,
+                "errors": errors,
+            }
+            return True, result, None
+
+        cap0 = time.perf_counter()
+        try:
+            regions_only = [(l, t, w, h) for _, _, _, l, t, w, h in all_regions]
+            captured_data = capture.capture_multiple_bgra(regions_only)
+        except Exception as e:
+            return False, None, f"batch capture failed: {e}"
+        cap_ms = (time.perf_counter() - cap0) * 1000.0
+
+        # Process all captured regions
+        for (detector_type, detector_obj, name, left, top, w, h), raw in zip(all_regions, captured_data):
+            eval0 = time.perf_counter()
+
+            if detector_type == "redness":
+                roi = detector_obj
                 score = float(redness_score_from_bgra(raw, w, h))
                 hit = score >= float(parsed.redness_detector.min_score)
                 eval_ms = (time.perf_counter() - eval0) * 1000.0
@@ -674,94 +718,65 @@ class ScreenHealthManager:
                     }
                 )
 
-        # Health bar
-        for hb in parsed.health_bars:
-            left, top, w, h = normalized_rect_to_pixels(hb.rect, frame_w, frame_h)
-            cap0 = time.perf_counter()
-            try:
-                raw = capture.capture_bgra(left=left, top=top, width=w, height=h)
-            except Exception as e:
-                errors.append(f"capture health_bar:{hb.name}: {e}")
-                continue
-            cap_ms = (time.perf_counter() - cap0) * 1000.0
+            elif detector_type == "health_bar":
+                hb = detector_obj
+                percent_raw: Optional[float] = None
+                mode = None
+                if hb.color_sampling is not None:
+                    mode = "color_sampling"
+                    percent_raw = health_bar_percent_from_bgra(
+                        raw,
+                        w,
+                        h,
+                        filled_rgb=hb.color_sampling.filled.as_tuple(),
+                        empty_rgb=hb.color_sampling.empty.as_tuple(),
+                        tolerance_l1=hb.color_sampling.tolerance_l1,
+                    )
+                elif hb.threshold_fallback is not None:
+                    mode = "threshold_fallback"
+                    percent_raw = self._health_bar_percent_threshold_fallback(raw, w, h, hb.threshold_fallback)
+                percent = float(max(0.0, min(1.0, float(percent_raw or 0.0))))
+                eval_ms = (time.perf_counter() - eval0) * 1000.0
 
-            eval0 = time.perf_counter()
-            percent_raw: Optional[float] = None
-            mode = None
-            if hb.color_sampling is not None:
-                mode = "color_sampling"
-                percent_raw = health_bar_percent_from_bgra(
+                detectors_out.append(
+                    {
+                        "type": "health_bar",
+                        "name": hb.name,
+                        "rect_px": {"left": left, "top": top, "w": w, "h": h},
+                        "mode": mode,
+                        "percent": percent,
+                        "capture_ms": cap_ms,
+                        "eval_ms": eval_ms,
+                        "image_path": save_crop("health_bar", hb.name, raw, w, h),
+                    }
+                )
+
+            elif detector_type == "health_number":
+                hn = detector_obj
+                bits, bw, bh = binarize_bgra_to_bitmap(
                     raw,
                     w,
                     h,
-                    filled_rgb=hb.color_sampling.filled.as_tuple(),
-                    empty_rgb=hb.color_sampling.empty.as_tuple(),
-                    tolerance_l1=hb.color_sampling.tolerance_l1,
+                    threshold=hn.preprocess.threshold,
+                    invert=hn.preprocess.invert,
+                    scale=hn.preprocess.scale,
                 )
-            elif hb.threshold_fallback is not None:
-                mode = "threshold_fallback"
-                percent_raw = self._health_bar_percent_threshold_fallback(raw, w, h, hb.threshold_fallback)
-            percent = float(max(0.0, min(1.0, float(percent_raw or 0.0))))
-            eval_ms = (time.perf_counter() - eval0) * 1000.0
+                value = self._health_number_try_read(bits, bw, bh, hn)
+                eval_ms = (time.perf_counter() - eval0) * 1000.0
 
-            detectors_out.append(
-                {
-                    "type": "health_bar",
-                    "name": hb.name,
-                    "rect_px": {"left": left, "top": top, "w": w, "h": h},
-                    "mode": mode,
-                    "percent": percent,
-                    "capture_ms": cap_ms,
-                    "eval_ms": eval_ms,
-                    "image_path": save_crop("health_bar", hb.name, raw, w, h),
-                }
-            )
-
-        # Health number OCR (single read; stability is handled in the continuous loop)
-        for hn in parsed.health_numbers:
-            if hn.templates is None:
                 detectors_out.append(
                     {
                         "type": "health_number",
                         "name": hn.name,
-                        "error": "missing templates",
+                        "rect_px": {"left": left, "top": top, "w": w, "h": h},
+                        "read": int(value) if value is not None else None,
+                        "digits": int(hn.digits),
+                        "hamming_max": int(hn.templates.hamming_max),
+                        "capture_ms": cap_ms,
+                        "eval_ms": eval_ms,
+                        "image_path": save_crop("health_number", hn.name, raw, w, h),
                     }
                 )
-                continue
-            left, top, w, h = normalized_rect_to_pixels(hn.rect, frame_w, frame_h)
-            cap0 = time.perf_counter()
-            try:
-                raw = capture.capture_bgra(left=left, top=top, width=w, height=h)
-            except Exception as e:
-                errors.append(f"capture health_number:{hn.name}: {e}")
-                continue
-            cap_ms = (time.perf_counter() - cap0) * 1000.0
-
-            eval0 = time.perf_counter()
-            bits, bw, bh = binarize_bgra_to_bitmap(
-                raw,
-                w,
-                h,
-                threshold=hn.preprocess.threshold,
-                invert=hn.preprocess.invert,
-                scale=hn.preprocess.scale,
-            )
-            value = self._health_number_try_read(bits, bw, bh, hn)
-            eval_ms = (time.perf_counter() - eval0) * 1000.0
-
-            detectors_out.append(
-                {
-                    "type": "health_number",
-                    "name": hn.name,
-                    "rect_px": {"left": left, "top": top, "w": w, "h": h},
-                    "read": int(value) if value is not None else None,
-                    "digits": int(hn.digits),
-                    "hamming_max": int(hn.templates.hamming_max),
-                    "capture_ms": cap_ms,
-                    "eval_ms": eval_ms,
-                    "image_path": save_crop("health_number", hn.name, raw, w, h),
-                }
-            )
 
         total_ms = (time.perf_counter() - t0) * 1000.0
         result = {
@@ -990,19 +1005,61 @@ class ScreenHealthManager:
                 time.sleep(0.5)
                 continue
 
+            # Collect all regions to capture in a single batch
+            # Format: (detector_type, detector_obj, name, left, top, width, height)
+            all_regions: List[Tuple[str, Any, str, int, int, int, int]] = []
+
             # Redness ROIs (Phase A)
             if profile.redness_detector is not None:
                 for roi in profile.redness_rois:
                     if self._stop_evt.is_set():
                         break
-
                     left, top, w, h = normalized_rect_to_pixels(roi.rect, frame_w, frame_h)
+                    all_regions.append(("redness", roi, roi.name, left, top, w, h))
 
-                    try:
-                        raw_bgra = capture.capture_bgra(left=left, top=top, width=w, height=h)
-                    except Exception:
-                        continue
+            # Health bars (Phase C)
+            for hb in profile.health_bars:
+                if self._stop_evt.is_set():
+                    break
+                left, top, w, h = normalized_rect_to_pixels(hb.rect, frame_w, frame_h)
+                all_regions.append(("health_bar", hb, hb.name, left, top, w, h))
 
+            # Health numbers (Phase D)
+            for hn in profile.health_numbers:
+                if self._stop_evt.is_set():
+                    break
+                if hn.templates is None:
+                    continue  # Can't run OCR without templates
+                left, top, w, h = normalized_rect_to_pixels(hn.rect, frame_w, frame_h)
+                all_regions.append(("health_number", hn, hn.name, left, top, w, h))
+
+            # Single batch capture for all regions
+            if not all_regions:
+                elapsed = time.time() - loop_start
+                sleep_for = tick_s - elapsed
+                if sleep_for > 0:
+                    time.sleep(sleep_for)
+                continue
+
+            try:
+                regions_only = [(l, t, w, h) for _, _, _, l, t, w, h in all_regions]
+                captured_data = capture.capture_multiple_bgra(regions_only)
+            except Exception as e:
+                logger.error(f"[screen_health] Batch capture failed: {e}")
+                elapsed = time.time() - loop_start
+                sleep_for = tick_s - elapsed
+                if sleep_for > 0:
+                    time.sleep(sleep_for)
+                continue
+
+            # Process all captured regions
+            for (detector_type, detector_obj, name, left, top, w, h), raw_bgra in zip(all_regions, captured_data):
+                if self._stop_evt.is_set():
+                    break
+
+                # Redness ROIs (Phase A)
+                if detector_type == "redness":
+                    roi = detector_obj
                     score = redness_score_from_bgra(raw_bgra, w, h)
                     if should_periodic_log:
                         logger.info(
@@ -1075,283 +1132,264 @@ class ScreenHealthManager:
                     )
                     self._trigger_hit(intensity=score)
 
-            # Health bar (Phase C)
-            for hb in profile.health_bars:
-                if self._stop_evt.is_set():
-                    break
+                # Health bar (Phase C)
+                elif detector_type == "health_bar":
+                    hb = detector_obj
+                    percent_raw: Optional[float] = None
+                    if hb.color_sampling is not None:
+                        percent_raw = health_bar_percent_from_bgra(
+                            raw_bgra,
+                            w,
+                            h,
+                            filled_rgb=hb.color_sampling.filled.as_tuple(),
+                            empty_rgb=hb.color_sampling.empty.as_tuple(),
+                            tolerance_l1=hb.color_sampling.tolerance_l1,
+                        )
+                    elif hb.threshold_fallback is not None:
+                        percent_raw = self._health_bar_percent_threshold_fallback(
+                            raw_bgra, w, h, hb.threshold_fallback
+                        )
 
-                left, top, w, h = normalized_rect_to_pixels(hb.rect, frame_w, frame_h)
-                try:
-                    raw_bgra = capture.capture_bgra(left=left, top=top, width=w, height=h)
-                except Exception:
-                    continue
+                    if percent_raw is None:
+                        continue
 
-                percent_raw: Optional[float] = None
-                if hb.color_sampling is not None:
-                    percent_raw = health_bar_percent_from_bgra(
+                    # Clamp for safety
+                    percent = max(0.0, min(1.0, float(percent_raw)))
+                    if should_periodic_log:
+                        logger.info("[screen_health] health_bar detector=%s percent=%.4f", hb.name, float(percent))
+                        if self._debug_emit_events:
+                            self._emit_game_event(
+                                "debug",
+                                {
+                                    "kind": "health_bar_percent",
+                                    "detector": hb.name,
+                                    "percent": float(percent),
+                                },
+                            )
+
+                    # Save one example crop per detector to ease calibration.
+                    self._debug_maybe_save_roi(
+                        key=f"health_bar_once:{hb.name}",
+                        kind="health_bar",
+                        name=hb.name,
+                        raw_bgra=raw_bgra,
+                        width=w,
+                        height=h,
+                        extra={"percent": float(percent)},
+                        force=False,
+                    )
+
+                    # Emit health_percent (throttled)
+                    now = time.time()
+                    last_emit = self._last_health_emit_by_detector.get(hb.name, 0.0)
+                    last_val = self._last_health_percent_emitted.get(hb.name)
+                    should_emit = False
+                    if last_val is None:
+                        should_emit = True
+                    elif abs(percent - last_val) >= 0.005:
+                        should_emit = True
+                    elif (now - last_emit) * 1000.0 >= 500.0:
+                        should_emit = True
+
+                    if should_emit:
+                        self._last_health_emit_by_detector[hb.name] = now
+                        self._last_health_percent_emitted[hb.name] = percent
+                        self._emit_game_event(
+                            "health_percent",
+                            {
+                                "detector": hb.name,
+                                "percent": percent,
+                            },
+                        )
+
+                    # Hit on decrease
+                    prev = self._prev_health_percent_by_detector.get(hb.name)
+                    self._prev_health_percent_by_detector[hb.name] = percent
+                    if prev is None:
+                        continue
+
+                    drop = float(prev) - float(percent)
+                    if drop < hb.hit_on_decrease.min_drop:
+                        continue
+
+                    key = f"health_bar:{hb.name}"
+                    last_hit = self._last_hit_by_roi.get(key, 0.0)
+                    if (now - last_hit) * 1000.0 < hb.hit_on_decrease.cooldown_ms:
+                        continue
+
+                    self._last_hit_by_roi[key] = now
+                    self.last_hit_ts = now
+
+                    saved = self._debug_maybe_save_roi(
+                        key=f"health_bar_hit:{hb.name}",
+                        kind="health_bar_hit",
+                        name=hb.name,
+                        raw_bgra=raw_bgra,
+                        width=w,
+                        height=h,
+                        extra={"percent": float(percent), "prev_percent": float(prev), "drop": float(drop)},
+                        force=True,
+                    )
+                    if self._debug_log_values:
+                        logger.info(
+                            "[screen_health] HIT health_bar detector=%s prev=%.4f now=%.4f drop=%.4f saved=%s",
+                            hb.name,
+                            float(prev),
+                            float(percent),
+                            float(drop),
+                            saved,
+                        )
+
+                    self._emit_game_event(
+                        "hit_recorded",
+                        {
+                            "roi": hb.name,
+                            "direction": None,
+                            "score": max(0.0, min(1.0, drop)),
+                            "source": "health_bar",
+                            "percent": percent,
+                            "prev_percent": float(prev),
+                            "drop": drop,
+                        },
+                    )
+                    # Map intensity to drop, but keep within [0,1]
+                    self._trigger_hit(intensity=max(0.0, min(1.0, drop)))
+
+                # Health number OCR (Phase D)
+                elif detector_type == "health_number":
+                    hn = detector_obj
+                    bits, bw, bh = binarize_bgra_to_bitmap(
                         raw_bgra,
                         w,
                         h,
-                        filled_rgb=hb.color_sampling.filled.as_tuple(),
-                        empty_rgb=hb.color_sampling.empty.as_tuple(),
-                        tolerance_l1=hb.color_sampling.tolerance_l1,
-                    )
-                elif hb.threshold_fallback is not None:
-                    percent_raw = self._health_bar_percent_threshold_fallback(
-                        raw_bgra, w, h, hb.threshold_fallback
+                        threshold=hn.preprocess.threshold,
+                        invert=hn.preprocess.invert,
+                        scale=hn.preprocess.scale,
                     )
 
-                if percent_raw is None:
-                    continue
-
-                # Clamp for safety
-                percent = max(0.0, min(1.0, float(percent_raw)))
-                if should_periodic_log:
-                    logger.info("[screen_health] health_bar detector=%s percent=%.4f", hb.name, float(percent))
-                    if self._debug_emit_events:
-                        self._emit_game_event(
-                            "debug",
-                            {
-                                "kind": "health_bar_percent",
-                                "detector": hb.name,
-                                "percent": float(percent),
-                            },
+                    value = self._health_number_try_read(bits, bw, bh, hn)
+                    if should_periodic_log:
+                        logger.info(
+                            "[screen_health] health_number detector=%s read=%s stable_reads=%s",
+                            hn.name,
+                            value,
+                            int(hn.readout.stable_reads),
                         )
+                        if self._debug_emit_events:
+                            self._emit_game_event(
+                                "debug",
+                                {
+                                    "kind": "health_number_read",
+                                    "detector": hn.name,
+                                    "read": int(value) if value is not None else None,
+                                    "stable_reads": int(hn.readout.stable_reads),
+                                },
+                            )
 
-                # Save one example crop per detector to ease calibration.
-                self._debug_maybe_save_roi(
-                    key=f"health_bar_once:{hb.name}",
-                    kind="health_bar",
-                    name=hb.name,
-                    raw_bgra=raw_bgra,
-                    width=w,
-                    height=h,
-                    extra={"percent": float(percent)},
-                    force=False,
-                )
-
-                # Emit health_percent (throttled)
-                now = time.time()
-                last_emit = self._last_health_emit_by_detector.get(hb.name, 0.0)
-                last_val = self._last_health_percent_emitted.get(hb.name)
-                should_emit = False
-                if last_val is None:
-                    should_emit = True
-                elif abs(percent - last_val) >= 0.005:
-                    should_emit = True
-                elif (now - last_emit) * 1000.0 >= 500.0:
-                    should_emit = True
-
-                if should_emit:
-                    self._last_health_emit_by_detector[hb.name] = now
-                    self._last_health_percent_emitted[hb.name] = percent
-                    self._emit_game_event(
-                        "health_percent",
-                        {
-                            "detector": hb.name,
-                            "percent": percent,
-                        },
+                    # Save one example crop per detector to ease calibration.
+                    self._debug_maybe_save_roi(
+                        key=f"health_number_once:{hn.name}",
+                        kind="health_number",
+                        name=hn.name,
+                        raw_bgra=raw_bgra,
+                        width=w,
+                        height=h,
+                        extra={"read": value},
+                        force=False,
                     )
+                    if value is None:
+                        continue
 
-                # Hit on decrease
-                prev = self._prev_health_percent_by_detector.get(hb.name)
-                self._prev_health_percent_by_detector[hb.name] = percent
-                if prev is None:
-                    continue
+                    # Stability filtering: require stable_reads consecutive identical reads.
+                    cand = self._health_number_candidate_value.get(hn.name)
+                    if cand is None or cand != value:
+                        self._health_number_candidate_value[hn.name] = value
+                        self._health_number_candidate_count[hn.name] = 1
+                        if should_periodic_log:
+                            logger.info(
+                                "[screen_health] health_number detector=%s candidate=%s count=1/%s",
+                                hn.name,
+                                value,
+                                int(hn.readout.stable_reads),
+                            )
+                        continue
 
-                drop = float(prev) - float(percent)
-                if drop < hb.hit_on_decrease.min_drop:
-                    continue
+                    self._health_number_candidate_count[hn.name] = self._health_number_candidate_count.get(hn.name, 1) + 1
+                    if self._health_number_candidate_count[hn.name] < hn.readout.stable_reads:
+                        if should_periodic_log:
+                            logger.info(
+                                "[screen_health] health_number detector=%s candidate=%s count=%s/%s",
+                                hn.name,
+                                value,
+                                int(self._health_number_candidate_count[hn.name]),
+                                int(hn.readout.stable_reads),
+                            )
+                        continue
 
-                key = f"health_bar:{hb.name}"
-                last_hit = self._last_hit_by_roi.get(key, 0.0)
-                if (now - last_hit) * 1000.0 < hb.hit_on_decrease.cooldown_ms:
-                    continue
-
-                self._last_hit_by_roi[key] = now
-                self.last_hit_ts = now
-
-                saved = self._debug_maybe_save_roi(
-                    key=f"health_bar_hit:{hb.name}",
-                    kind="health_bar_hit",
-                    name=hb.name,
-                    raw_bgra=raw_bgra,
-                    width=w,
-                    height=h,
-                    extra={"percent": float(percent), "prev_percent": float(prev), "drop": float(drop)},
-                    force=True,
-                )
-                if self._debug_log_values:
-                    logger.info(
-                        "[screen_health] HIT health_bar detector=%s prev=%.4f now=%.4f drop=%.4f saved=%s",
-                        hb.name,
-                        float(prev),
-                        float(percent),
-                        float(drop),
-                        saved,
-                    )
-
-                self._emit_game_event(
-                    "hit_recorded",
-                    {
-                        "roi": hb.name,
-                        "direction": None,
-                        "score": max(0.0, min(1.0, drop)),
-                        "source": "health_bar",
-                        "percent": percent,
-                        "prev_percent": float(prev),
-                        "drop": drop,
-                    },
-                )
-                # Map intensity to drop, but keep within [0,1]
-                self._trigger_hit(intensity=max(0.0, min(1.0, drop)))
-
-            # Health number OCR (Phase D)
-            for hn in profile.health_numbers:
-                if self._stop_evt.is_set():
-                    break
-
-                if hn.templates is None:
-                    continue  # Can't run OCR without templates
-
-                left, top, w, h = normalized_rect_to_pixels(hn.rect, frame_w, frame_h)
-                try:
-                    raw_bgra = capture.capture_bgra(left=left, top=top, width=w, height=h)
-                except Exception:
-                    continue
-
-                bits, bw, bh = binarize_bgra_to_bitmap(
-                    raw_bgra,
-                    w,
-                    h,
-                    threshold=hn.preprocess.threshold,
-                    invert=hn.preprocess.invert,
-                    scale=hn.preprocess.scale,
-                )
-
-                value = self._health_number_try_read(bits, bw, bh, hn)
-                if should_periodic_log:
-                    logger.info(
-                        "[screen_health] health_number detector=%s read=%s stable_reads=%s",
-                        hn.name,
-                        value,
-                        int(hn.readout.stable_reads),
-                    )
-                    if self._debug_emit_events:
+                    # Only emit if it changed (or hasn't been emitted yet)
+                    last_emitted = self._last_health_value_emitted.get(hn.name)
+                    if last_emitted is None or last_emitted != value:
+                        self._last_health_value_emitted[hn.name] = value
                         self._emit_game_event(
-                            "debug",
+                            "health_value",
                             {
-                                "kind": "health_number_read",
                                 "detector": hn.name,
-                                "read": int(value) if value is not None else None,
-                                "stable_reads": int(hn.readout.stable_reads),
+                                "value": value,
                             },
                         )
 
-                # Save one example crop per detector to ease calibration.
-                self._debug_maybe_save_roi(
-                    key=f"health_number_once:{hn.name}",
-                    kind="health_number",
-                    name=hn.name,
-                    raw_bgra=raw_bgra,
-                    width=w,
-                    height=h,
-                    extra={"read": value},
-                    force=False,
-                )
-                if value is None:
-                    continue
+                    # Hit on decrease (integer)
+                    prev_val = self._prev_health_value_by_detector.get(hn.name)
+                    self._prev_health_value_by_detector[hn.name] = value
+                    if prev_val is None:
+                        continue
 
-                # Stability filtering: require stable_reads consecutive identical reads.
-                cand = self._health_number_candidate_value.get(hn.name)
-                if cand is None or cand != value:
-                    self._health_number_candidate_value[hn.name] = value
-                    self._health_number_candidate_count[hn.name] = 1
-                    if should_periodic_log:
+                    drop_i = int(prev_val) - int(value)
+                    if drop_i < hn.hit_on_decrease.min_drop:
+                        continue
+
+                    now = time.time()
+                    key = f"health_number:{hn.name}"
+                    last_hit = self._last_hit_by_roi.get(key, 0.0)
+                    if (now - last_hit) * 1000.0 < hn.hit_on_decrease.cooldown_ms:
+                        continue
+
+                    self._last_hit_by_roi[key] = now
+                    self.last_hit_ts = now
+
+                    saved = self._debug_maybe_save_roi(
+                        key=f"health_number_hit:{hn.name}",
+                        kind="health_number_hit",
+                        name=hn.name,
+                        raw_bgra=raw_bgra,
+                        width=w,
+                        height=h,
+                        extra={"value": int(value), "prev_value": int(prev_val), "drop": int(drop_i)},
+                        force=True,
+                    )
+                    if self._debug_log_values:
                         logger.info(
-                            "[screen_health] health_number detector=%s candidate=%s count=1/%s",
+                            "[screen_health] HIT health_number detector=%s prev=%s now=%s drop=%s saved=%s",
                             hn.name,
-                            value,
-                            int(hn.readout.stable_reads),
+                            int(prev_val),
+                            int(value),
+                            int(drop_i),
+                            saved,
                         )
-                    continue
 
-                self._health_number_candidate_count[hn.name] = self._health_number_candidate_count.get(hn.name, 1) + 1
-                if self._health_number_candidate_count[hn.name] < hn.readout.stable_reads:
-                    if should_periodic_log:
-                        logger.info(
-                            "[screen_health] health_number detector=%s candidate=%s count=%s/%s",
-                            hn.name,
-                            value,
-                            int(self._health_number_candidate_count[hn.name]),
-                            int(hn.readout.stable_reads),
-                        )
-                    continue
-
-                # Only emit if it changed (or hasn't been emitted yet)
-                last_emitted = self._last_health_value_emitted.get(hn.name)
-                if last_emitted is None or last_emitted != value:
-                    self._last_health_value_emitted[hn.name] = value
                     self._emit_game_event(
-                        "health_value",
+                        "hit_recorded",
                         {
-                            "detector": hn.name,
+                            "roi": hn.name,
+                            "direction": None,
+                            "score": max(0.0, min(1.0, float(drop_i) / 25.0)),
+                            "source": "health_number",
                             "value": value,
+                            "prev_value": int(prev_val),
+                            "drop": drop_i,
                         },
                     )
-
-                # Hit on decrease (integer)
-                prev_val = self._prev_health_value_by_detector.get(hn.name)
-                self._prev_health_value_by_detector[hn.name] = value
-                if prev_val is None:
-                    continue
-
-                drop_i = int(prev_val) - int(value)
-                if drop_i < hn.hit_on_decrease.min_drop:
-                    continue
-
-                now = time.time()
-                key = f"health_number:{hn.name}"
-                last_hit = self._last_hit_by_roi.get(key, 0.0)
-                if (now - last_hit) * 1000.0 < hn.hit_on_decrease.cooldown_ms:
-                    continue
-
-                self._last_hit_by_roi[key] = now
-                self.last_hit_ts = now
-
-                saved = self._debug_maybe_save_roi(
-                    key=f"health_number_hit:{hn.name}",
-                    kind="health_number_hit",
-                    name=hn.name,
-                    raw_bgra=raw_bgra,
-                    width=w,
-                    height=h,
-                    extra={"value": int(value), "prev_value": int(prev_val), "drop": int(drop_i)},
-                    force=True,
-                )
-                if self._debug_log_values:
-                    logger.info(
-                        "[screen_health] HIT health_number detector=%s prev=%s now=%s drop=%s saved=%s",
-                        hn.name,
-                        int(prev_val),
-                        int(value),
-                        int(drop_i),
-                        saved,
-                    )
-
-                self._emit_game_event(
-                    "hit_recorded",
-                    {
-                        "roi": hn.name,
-                        "direction": None,
-                        "score": max(0.0, min(1.0, float(drop_i) / 25.0)),
-                        "source": "health_number",
-                        "value": value,
-                        "prev_value": int(prev_val),
-                        "drop": drop_i,
-                    },
-                )
-                self._trigger_hit(intensity=max(0.0, min(1.0, float(drop_i) / 25.0)))
+                    self._trigger_hit(intensity=max(0.0, min(1.0, float(drop_i) / 25.0)))
 
             elapsed = time.time() - loop_start
             sleep_for = tick_s - elapsed
@@ -1709,68 +1747,11 @@ class ScreenHealthManager:
         return 1.0
 
 
-class _MSSCaptureBackend:
-    """
-    Minimal mss-based capture backend.
-
-    This is intentionally optional-import so the manager remains importable
-    without `mss` installed.
-    """
-
-    def __init__(self, monitor_index: int) -> None:
-        self._monitor_index = monitor_index
-        self._sct = None
-        self._monitor = None
-        # Cache monitor origin to avoid dict lookups each tick
-        self._base_left = 0
-        self._base_top = 0
-        # Reuse a single region dict to avoid per-tick allocations
-        self._region = {"left": 0, "top": 0, "width": 1, "height": 1}
-
-    def _ensure(self) -> None:
-        if self._sct is not None and self._monitor is not None:
-            return
-        try:
-            import mss  # type: ignore
-        except Exception as e:  # pragma: no cover
-            raise RuntimeError("mss is required for screen capture") from e
-
-        self._sct = mss.mss()
-        monitors = self._sct.monitors
-        if not (1 <= self._monitor_index < len(monitors)):
-            raise ValueError(f"Invalid monitor_index={self._monitor_index}. Available: 1..{len(monitors) - 1}")
-        self._monitor = monitors[self._monitor_index]
-        self._base_left = int(self._monitor["left"])
-        self._base_top = int(self._monitor["top"])
-
-    def get_frame_size(self) -> Tuple[int, int]:
-        self._ensure()
-        assert self._monitor is not None
-        return int(self._monitor["width"]), int(self._monitor["height"])
-
-    def capture_bgra(self, left: int, top: int, width: int, height: int) -> bytes:
-        self._ensure()
-        assert self._sct is not None
-        assert self._monitor is not None
-
-        # ROI is relative to monitor; convert to global coordinates.
-        region = self._region
-        region["left"] = self._base_left + int(left)
-        region["top"] = self._base_top + int(top)
-        region["width"] = int(width)
-        region["height"] = int(height)
-        img = self._sct.grab(region)
-        return img.raw  # BGRA bytes
-
-
 class _BetterCamCaptureBackend:
     """
-    Optional BetterCam-based capture backend (Windows, DXGI).
+    BetterCam-based capture backend (Windows, DXGI).
 
     BetterCam is a high-performance screen capture library using Desktop Duplication API.
-    It's compatible with Python 3.14+ and works reliably unlike rapidshot.
-
-    Optional-import to keep tests/dev environments working even without bettercam installed.
     """
 
     def __init__(self, monitor_index: int) -> None:
@@ -1789,8 +1770,7 @@ class _BetterCamCaptureBackend:
                 "bettercam is required for BetterCam capture backend "
                 "(pip install bettercam)"
             ) from e
-        except Exception as e:  # pragma: no cover
-            # bettercam can fail during import/init on some systems (e.g. RDP, missing DXGI adapters).
+        except Exception as e:  # pragma: no cover\
             # Preserve the original error so users know what to fix.
             raise RuntimeError(f"bettercam import failed: {e}") from e
 
@@ -1811,7 +1791,8 @@ class _BetterCamCaptureBackend:
             self._output_w = int(res[0])
             self._output_h = int(res[1])
         else:
-            # BetterCam may need a moment to initialize - try a few times
+            # BetterCam may need a moment to initialize during startup - retry a few times
+            # This retry is only for initialization, not for runtime captures
             frame = None
             for attempt in range(3):
                 frame = self._cap.grab()
@@ -1828,51 +1809,57 @@ class _BetterCamCaptureBackend:
         self._ensure()
         return self._output_w, self._output_h
 
-    def capture_bgra(self, left: int, top: int, width: int, height: int) -> bytes:
+    def capture_multiple_bgra(self, regions: List[Tuple[int, int, int, int]]) -> List[bytes]:
+        """
+        Capture multiple regions from a single full frame grab.
+        
+        Args:
+            regions: List of (left, top, width, height) tuples
+            
+        Returns:
+            List of BGRA byte arrays, one per region (same order as input)
+            
+        Raises:
+            RuntimeError: If bettercam.grab() returns None (no retry - fails immediately)
+        """
         self._ensure()
         assert self._cap is not None
-
-        l = int(left)
-        t = int(top)
-        w = int(width)
-        h = int(height)
+        
+        if not regions:
+            return []
         
         # BetterCam doesn't support region parameter in grab()
-        # Grab full frame and crop manually
-        # BetterCam may occasionally return None - retry a few times
-        frame = None
-        for attempt in range(3):
-            frame = self._cap.grab()
-            if frame is not None:
-                break
-            if attempt < 2:  # Don't sleep on last attempt
-                time.sleep(0.05)
-        
+        # Grab full frame once and extract all regions from it
+        frame = self._cap.grab()
         if frame is None:
             raise RuntimeError("bettercam grab returned None")
         
-        # Crop to requested region (frame is HxWx4, so [top:top+h, left:left+w])
-        cropped = frame[t:t+h, l:l+w]
+        results: List[bytes] = []
+        for left, top, width, height in regions:
+            l = int(left)
+            t = int(top)
+            w = int(width)
+            h = int(height)
+            
+            # Crop to requested region (frame is HxWx4, so [top:top+h, left:left+w])
+            cropped = frame[t:t+h, l:l+w]
+            
+            # Ensure contiguous bytes in row-major order.
+            try:
+                results.append(cropped.tobytes(order="C"))
+            except TypeError:  # pragma: no cover (older numpy)
+                results.append(cropped.tobytes())
         
-        # Ensure contiguous bytes in row-major order.
-        try:
-            return cropped.tobytes(order="C")
-        except TypeError:  # pragma: no cover (older numpy)
-            return cropped.tobytes()
+        return results
 
 
 def _create_capture_backend(*, monitor_index: int):
     """
-    Create the best available capture backend.
+    Create the capture backend using BetterCam.
 
-    Prefer BetterCam on Windows (DXGI, high performance), fallback to mss (GDI).
+    BetterCam on Windows (DXGI, high performance) is required.
     BetterCam is compatible with Python 3.14+ and more reliable than rapidshot.
     """
     if os.name == "nt":
-        try:
-            return _BetterCamCaptureBackend(monitor_index=monitor_index)
-        except Exception:
-            # Fall back to mss below.
-            logger.debug("BetterCam not available, falling back to mss", exc_info=True)
-            pass
-    return _MSSCaptureBackend(monitor_index=monitor_index)
+        return _BetterCamCaptureBackend(monitor_index=monitor_index)
+    raise RuntimeError("Screen health capture is only supported on Windows with BetterCam")
