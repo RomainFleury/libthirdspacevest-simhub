@@ -108,6 +108,26 @@ contextBridge.exposeInMainWorld("vestBridge", {
   bf2GetConfigFilePath: () => ipcRenderer.invoke("bf2:getConfigFilePath"),
   bf2WriteConfigFile: () => ipcRenderer.invoke("bf2:writeConfigFile"),
 
+  // Generic Screen Health Watcher API
+  screenHealthExportProfile: (profile) => ipcRenderer.invoke("screenHealth:exportProfile", profile),
+  screenHealthLoadProfile: () => ipcRenderer.invoke("screenHealth:loadProfile"),
+  screenHealthGetSettings: () => ipcRenderer.invoke("screenHealth:getSettings"),
+  screenHealthSetSettings: (settings) => ipcRenderer.invoke("screenHealth:setSettings", settings),
+  screenHealthChooseScreenshotsDir: () => ipcRenderer.invoke("screenHealth:chooseScreenshotsDir"),
+  screenHealthOpenScreenshotsDir: () => ipcRenderer.invoke("screenHealth:openScreenshotsDir"),
+  screenHealthListScreenshots: () => ipcRenderer.invoke("screenHealth:listScreenshots"),
+  screenHealthGetScreenshotDataUrl: (filename) => ipcRenderer.invoke("screenHealth:getScreenshotDataUrl", filename),
+  screenHealthDeleteScreenshot: (filename) => ipcRenderer.invoke("screenHealth:deleteScreenshot", filename),
+  screenHealthClearScreenshots: () => ipcRenderer.invoke("screenHealth:clearScreenshots"),
+  screenHealthCaptureCalibrationScreenshot: (monitorIndex) =>
+    ipcRenderer.invoke("screenHealth:captureCalibrationScreenshot", monitorIndex),
+  screenHealthCaptureRoiDebugImages: (monitorIndex, rois) =>
+    ipcRenderer.invoke("screenHealth:captureRoiDebugImages", monitorIndex, rois),
+  screenHealthStart: (profile) => ipcRenderer.invoke("screenHealth:start", profile),
+  screenHealthStop: () => ipcRenderer.invoke("screenHealth:stop"),
+  screenHealthStatus: () => ipcRenderer.invoke("screenHealth:status"),
+  screenHealthTest: (profile, outputDir) => ipcRenderer.invoke("screenHealth:test", profile, outputDir),
+
   // Multi-Vest Management API
   listConnectedDevices: () => ipcRenderer.invoke("multivist:listConnectedDevices"),
   setMainDevice: (deviceId) => ipcRenderer.invoke("multivist:setMainDevice", deviceId),

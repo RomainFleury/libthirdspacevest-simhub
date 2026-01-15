@@ -14,7 +14,7 @@ function App() {
         <Route path="/" element={<AppLayout />}>
           <Route index element={<Navigate to="/games" replace />} />
           <Route path="games" element={<GamesPage />} />
-          <Route path="games/:gameId" element={<IntegrationPage />} />
+          <Route path="games/:gameId/*" element={<IntegrationPage />} />
           <Route path="debug" element={<DebugPage />} />
           <Route path="vests" element={<VestsPage />} />
           <Route path="mini-games" element={<MiniGamesPage />} />

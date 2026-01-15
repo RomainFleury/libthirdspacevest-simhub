@@ -35,6 +35,14 @@ export type DaemonEvent = {
   // Half-Life: Alyx events
   log_path?: string;
   params?: Record<string, unknown>; // For alyx_game_event params
+  // Generic Screen Health Watcher events
+  direction?: string | null;
+  score?: number;
+  profile_name?: string | null;
+  health_percent?: number;
+  detector?: string | null;
+  health_value?: number;
+  // Screen health debug events (extra payload is in params)
 };
 
 export type DaemonStatus = {
@@ -167,6 +175,57 @@ export type EffectsListResult = {
 export type PlayEffectResult = {
   success: boolean;
   error?: string;
+};
+
+// -------------------------------------------------------------------------
+// Generic Screen Health Watcher types
+// -------------------------------------------------------------------------
+
+export type ScreenHealthStatus = {
+  running: boolean;
+  profile_name?: string | null;
+  events_received?: number;
+  last_event_ts?: number | null;
+  last_hit_ts?: number | null;
+  error?: string;
+};
+
+export type ScreenHealthStartResult = {
+  success: boolean;
+  profile_name?: string | null;
+  error?: string;
+};
+
+export type ScreenHealthTestResult = {
+  success: boolean;
+  test_result?: Record<string, any> | null;
+  error?: string;
+};
+
+export type ScreenHealthStopResult = {
+  success: boolean;
+  error?: string;
+};
+
+export type ScreenHealthSettings = {
+  screenshotsDir: string | null;
+  retentionMaxCount: number;
+  retentionMaxAgeDays: number;
+};
+
+export type ScreenHealthScreenshotFile = {
+  filename: string;
+  path: string;
+  size: number;
+  mtimeMs: number;
+};
+
+export type ScreenHealthCapturedImage = {
+  filename: string;
+  path: string;
+  width: number;
+  height: number;
+  dataUrl: string;
 };
 
 // Type definition for the Electron bridge API
@@ -337,6 +396,67 @@ declare global {
         path?: string;
         error?: string;
       }>;
+
+      // Generic Screen Health Watcher API
+      screenHealthExportProfile: (profile: Record<string, any>) => Promise<{
+        success: boolean;
+        path?: string;
+        canceled?: boolean;
+        error?: string;
+      }>;
+      screenHealthLoadProfile: () => Promise<{
+        success: boolean;
+        profile?: Record<string, any>;
+        path?: string;
+        canceled?: boolean;
+        error?: string;
+      }>;
+      screenHealthGetSettings: () => Promise<{ success: boolean; settings?: ScreenHealthSettings; error?: string }>;
+      screenHealthSetSettings: (settings: Partial<ScreenHealthSettings>) => Promise<{
+        success: boolean;
+        settings?: ScreenHealthSettings;
+        error?: string;
+      }>;
+      screenHealthChooseScreenshotsDir: () => Promise<{
+        success: boolean;
+        settings?: ScreenHealthSettings;
+        canceled?: boolean;
+        error?: string;
+      }>;
+      screenHealthOpenScreenshotsDir: () => Promise<{ success: boolean; error?: string }>;
+      screenHealthListScreenshots: () => Promise<{
+        success: boolean;
+        files?: ScreenHealthScreenshotFile[];
+        error?: string;
+      }>;
+      screenHealthGetScreenshotDataUrl: (filename: string) => Promise<{
+        success: boolean;
+        dataUrl?: string;
+        error?: string;
+      }>;
+      screenHealthDeleteScreenshot: (filename: string) => Promise<{ success: boolean; error?: string }>;
+      screenHealthClearScreenshots: () => Promise<{ success: boolean; error?: string }>;
+      screenHealthCaptureCalibrationScreenshot: (monitorIndex?: number) => Promise<{
+        success: boolean;
+        filename?: string;
+        path?: string;
+        width?: number;
+        height?: number;
+        dataUrl?: string;
+        error?: string;
+      }>;
+      screenHealthCaptureRoiDebugImages: (
+        monitorIndex: number,
+        rois: Array<{ name: string; rect: { x: number; y: number; w: number; h: number } }>
+      ) => Promise<{
+        success: boolean;
+        outputs?: ScreenHealthCapturedImage[];
+        error?: string;
+      }>;
+      screenHealthStart: (profile: Record<string, any>) => Promise<ScreenHealthStartResult>;
+      screenHealthStop: () => Promise<ScreenHealthStopResult>;
+      screenHealthStatus: () => Promise<ScreenHealthStatus>;
+      screenHealthTest: (profile: Record<string, any>, outputDir?: string | null) => Promise<ScreenHealthTestResult>;
       // Multi-Vest Management API
       listConnectedDevices: () => Promise<{
         success: boolean;
@@ -683,4 +803,75 @@ export async function listEffectsLibrary(): Promise<EffectsListResult> {
  */
 export async function stopEffect(): Promise<{ success: boolean; error?: string }> {
   return await ensureBridge().stopEffect();
+}
+
+// -------------------------------------------------------------------------
+// Generic Screen Health Watcher
+// -------------------------------------------------------------------------
+
+export async function screenHealthExportProfile(profile: Record<string, any>) {
+  return await ensureBridge().screenHealthExportProfile(profile);
+}
+
+export async function screenHealthLoadProfile() {
+  return await ensureBridge().screenHealthLoadProfile();
+}
+
+export async function screenHealthGetSettings() {
+  return await ensureBridge().screenHealthGetSettings();
+}
+
+export async function screenHealthSetSettings(settings: Partial<ScreenHealthSettings>) {
+  return await ensureBridge().screenHealthSetSettings(settings);
+}
+
+export async function screenHealthChooseScreenshotsDir() {
+  return await ensureBridge().screenHealthChooseScreenshotsDir();
+}
+
+export async function screenHealthOpenScreenshotsDir() {
+  return await ensureBridge().screenHealthOpenScreenshotsDir();
+}
+
+export async function screenHealthListScreenshots() {
+  return await ensureBridge().screenHealthListScreenshots();
+}
+
+export async function screenHealthGetScreenshotDataUrl(filename: string) {
+  return await ensureBridge().screenHealthGetScreenshotDataUrl(filename);
+}
+
+export async function screenHealthDeleteScreenshot(filename: string) {
+  return await ensureBridge().screenHealthDeleteScreenshot(filename);
+}
+
+export async function screenHealthClearScreenshots() {
+  return await ensureBridge().screenHealthClearScreenshots();
+}
+
+export async function screenHealthCaptureCalibrationScreenshot(monitorIndex = 1) {
+  return await ensureBridge().screenHealthCaptureCalibrationScreenshot(monitorIndex);
+}
+
+export async function screenHealthCaptureRoiDebugImages(
+  monitorIndex: number,
+  rois: Array<{ name: string; rect: { x: number; y: number; w: number; h: number } }>
+) {
+  return await ensureBridge().screenHealthCaptureRoiDebugImages(monitorIndex, rois);
+}
+
+export async function screenHealthStart(profile: Record<string, any>): Promise<ScreenHealthStartResult> {
+  return await ensureBridge().screenHealthStart(profile);
+}
+
+export async function screenHealthStop(): Promise<ScreenHealthStopResult> {
+  return await ensureBridge().screenHealthStop();
+}
+
+export async function screenHealthStatus(): Promise<ScreenHealthStatus> {
+  return await ensureBridge().screenHealthStatus();
+}
+
+export async function screenHealthTest(profile: Record<string, any>, outputDir?: string | null): Promise<ScreenHealthTestResult> {
+  return await ensureBridge().screenHealthTest(profile, outputDir ?? null);
 }

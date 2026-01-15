@@ -16,7 +16,8 @@
     "build:electron:dir": "yarn build && electron-builder --win --dir --config electron-builder.yml",
     "build:all": "node scripts/build-release.mjs",
     "repomix": "repomix .. --config repomix.config.json",
-    "check:python": "node scripts/check-python-setup.mjs"
+    "check:python": "node scripts/check-python-setup.mjs",
+    "stop:daemon": "node scripts/stop-daemon.mjs"
   },
   "repository": {
     "type": "git",

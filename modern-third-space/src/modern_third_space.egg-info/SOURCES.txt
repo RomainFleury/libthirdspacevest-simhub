@@ -26,6 +26,7 @@ src/modern_third_space/server/l4d2_manager.py
 src/modern_third_space/server/lifecycle.py
 src/modern_third_space/server/player_manager.py
 src/modern_third_space/server/protocol.py
+src/modern_third_space/server/screen_health_manager.py
 src/modern_third_space/server/vest_registry.py
 src/modern_third_space/vest/__init__.py
 src/modern_third_space/vest/cell_layout.py
@@ -43,5 +44,6 @@ tests/test_game_player_mapping.py
 tests/test_game_player_mapping_manual.py
 tests/test_player_manager.py
 tests/test_player_manager_manual.py
+tests/test_screen_health_manager.py
 tests/test_vest_registry.py
 tests/test_vest_registry_manual.py
