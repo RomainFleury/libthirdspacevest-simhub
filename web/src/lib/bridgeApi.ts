@@ -228,6 +228,37 @@ export type ScreenHealthCapturedImage = {
   dataUrl: string;
 };
 
+export type ScreenHealthLocalProfile = {
+  id: string;
+  name: string;
+  profile: Record<string, any>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ScreenHealthListProfilesResult = {
+  success: boolean;
+  profiles?: ScreenHealthLocalProfile[];
+  error?: string;
+};
+
+export type ScreenHealthSaveProfileResult = {
+  success: boolean;
+  profile?: ScreenHealthLocalProfile;
+  error?: string;
+};
+
+export type ScreenHealthDeleteProfileResult = {
+  success: boolean;
+  error?: string;
+};
+
+export type ScreenHealthGetProfileResult = {
+  success: boolean;
+  profile?: ScreenHealthLocalProfile;
+  error?: string;
+};
+
 // Type definition for the Electron bridge API
 declare global {
   interface Window {
@@ -372,6 +403,11 @@ declare global {
       screenHealthStop: () => Promise<ScreenHealthStopResult>;
       screenHealthStatus: () => Promise<ScreenHealthStatus>;
       screenHealthTest: (profile: Record<string, any>, outputDir?: string | null) => Promise<ScreenHealthTestResult>;
+      // Profile management
+      screenHealthListProfiles: () => Promise<ScreenHealthListProfilesResult>;
+      screenHealthSaveProfile: (profileData: { name: string; profile: Record<string, any> }) => Promise<ScreenHealthSaveProfileResult>;
+      screenHealthDeleteProfile: (profileId: string) => Promise<ScreenHealthDeleteProfileResult>;
+      screenHealthGetProfile: (profileId: string) => Promise<ScreenHealthGetProfileResult>;
       // Multi-Vest Management API
       listConnectedDevices: () => Promise<{
         success: boolean;

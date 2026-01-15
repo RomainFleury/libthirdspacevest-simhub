@@ -3,11 +3,11 @@
  *
  * Persists:
  * - Profiles (JSON blobs)
- * - Active profile id
  * - Screenshot/debug image settings (folder + retention)
  *
  * Notes:
  * - This is Phase A storage; schema may evolve.
+ * - activeProfileId removed - profile selection is UI state only
  */
 
 const fs = require("fs");
@@ -46,7 +46,6 @@ function loadState() {
     if (!fs.existsSync(p)) {
       return {
         profiles: [],
-        activeProfileId: null,
         settings: { ...DEFAULT_SETTINGS },
         screenshotsIndex: [...DEFAULT_SCREENSHOTS_INDEX],
       };
@@ -55,7 +54,6 @@ function loadState() {
     const parsed = JSON.parse(raw);
     return {
       profiles: Array.isArray(parsed.profiles) ? parsed.profiles : [],
-      activeProfileId: parsed.activeProfileId ?? null,
       settings: { ...DEFAULT_SETTINGS, ...(parsed.settings || {}) },
       screenshotsIndex: Array.isArray(parsed.screenshotsIndex) ? parsed.screenshotsIndex : [...DEFAULT_SCREENSHOTS_INDEX],
     };
@@ -63,7 +61,6 @@ function loadState() {
     console.error("Failed to load screen health state:", e.message);
     return {
       profiles: [],
-      activeProfileId: null,
       settings: { ...DEFAULT_SETTINGS },
       screenshotsIndex: [...DEFAULT_SCREENSHOTS_INDEX],
     };
@@ -74,7 +71,6 @@ function saveState(state) {
   const p = _getStatePath();
   const data = {
     profiles: state.profiles || [],
-    activeProfileId: state.activeProfileId ?? null,
     settings: { ...DEFAULT_SETTINGS, ...(state.settings || {}) },
     screenshotsIndex: Array.isArray(state.screenshotsIndex) ? state.screenshotsIndex : [...DEFAULT_SCREENSHOTS_INDEX],
     last_updated: new Date().toISOString(),
@@ -88,24 +84,7 @@ function _makeId() {
 
 function listProfiles() {
   const state = loadState();
-  return { profiles: state.profiles, activeProfileId: state.activeProfileId };
-}
-
-function getActiveProfile() {
-  const state = loadState();
-  const p = state.profiles.find((x) => x.id === state.activeProfileId);
-  return p || null;
-}
-
-function setActiveProfile(profileId) {
-  const state = loadState();
-  const exists = state.profiles.some((p) => p.id === profileId);
-  if (!exists) {
-    throw new Error("Profile not found");
-  }
-  state.activeProfileId = profileId;
-  saveState(state);
-  return true;
+  return { profiles: state.profiles };
 }
 
 function upsertProfile(profile) {
@@ -120,23 +99,17 @@ function upsertProfile(profile) {
   // }
   const daemonProfile = profile.profile ? profile.profile : profile;
   const name = profile.name || daemonProfile.name || "Unnamed Profile";
+  
+  // Always create new profile (never update existing, even if id provided)
   const p = {
-    id: profile.id || _makeId(),
+    id: _makeId(), // Always generate new ID
     name,
     profile: daemonProfile,
     updatedAt: nowIso,
-    createdAt: profile.createdAt || nowIso,
+    createdAt: nowIso,
   };
 
-  const idx = state.profiles.findIndex((x) => x.id === p.id);
-  if (idx >= 0) {
-    state.profiles[idx] = p;
-  } else {
-    state.profiles.push(p);
-    if (!state.activeProfileId) {
-      state.activeProfileId = p.id;
-    }
-  }
+  state.profiles.push(p);
   saveState(state);
   return p;
 }
@@ -144,9 +117,6 @@ function upsertProfile(profile) {
 function deleteProfile(profileId) {
   const state = loadState();
   state.profiles = state.profiles.filter((p) => p.id !== profileId);
-  if (state.activeProfileId === profileId) {
-    state.activeProfileId = state.profiles.length ? state.profiles[0].id : null;
-  }
   saveState(state);
   return true;
 }
@@ -290,8 +260,6 @@ module.exports = {
   loadState,
   saveState,
   listProfiles,
-  getActiveProfile,
-  setActiveProfile,
   upsertProfile,
   deleteProfile,
   getSettings,

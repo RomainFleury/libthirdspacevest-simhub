@@ -288,6 +288,69 @@ function registerScreenHealthHandlers(getDaemonBridge, getMainWindow) {
   });
 
   // -------------------------------------------------------------------------
+  // Profile management
+  // -------------------------------------------------------------------------
+
+  ipcMain.handle("screenHealth:listProfiles", async () => {
+    try {
+      const result = storage.listProfiles();
+      return { success: true, profiles: result.profiles || [] };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle("screenHealth:saveProfile", async (_, profileData) => {
+    try {
+      if (!profileData || typeof profileData !== "object") {
+        return { success: false, error: "profileData is required" };
+      }
+      if (typeof profileData.name !== "string" || !profileData.name.trim()) {
+        return { success: false, error: "profile name is required" };
+      }
+      if (!profileData.profile || typeof profileData.profile !== "object") {
+        return { success: false, error: "profile.profile is required" };
+      }
+      // Always create new profile (never updates existing, even if id provided)
+      const saved = storage.upsertProfile({
+        name: profileData.name,
+        profile: profileData.profile,
+      });
+      return { success: true, profile: saved };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle("screenHealth:deleteProfile", async (_, profileId) => {
+    try {
+      if (typeof profileId !== "string" || !profileId.trim()) {
+        return { success: false, error: "profileId is required" };
+      }
+      storage.deleteProfile(profileId);
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle("screenHealth:getProfile", async (_, profileId) => {
+    try {
+      if (typeof profileId !== "string" || !profileId.trim()) {
+        return { success: false, error: "profileId is required" };
+      }
+      const result = storage.listProfiles();
+      const profile = result.profiles.find((p) => p.id === profileId);
+      if (!profile) {
+        return { success: false, error: "Profile not found" };
+      }
+      return { success: true, profile };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  });
+
+  // -------------------------------------------------------------------------
   // Daemon control
   // -------------------------------------------------------------------------
 

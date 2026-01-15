@@ -100,6 +100,11 @@ contextBridge.exposeInMainWorld("vestBridge", {
   screenHealthStop: () => ipcRenderer.invoke("screenHealth:stop"),
   screenHealthStatus: () => ipcRenderer.invoke("screenHealth:status"),
   screenHealthTest: (profile, outputDir) => ipcRenderer.invoke("screenHealth:test", profile, outputDir),
+  // Profile management
+  screenHealthListProfiles: () => ipcRenderer.invoke("screenHealth:listProfiles"),
+  screenHealthSaveProfile: (profileData) => ipcRenderer.invoke("screenHealth:saveProfile", profileData),
+  screenHealthDeleteProfile: (profileId) => ipcRenderer.invoke("screenHealth:deleteProfile", profileId),
+  screenHealthGetProfile: (profileId) => ipcRenderer.invoke("screenHealth:getProfile", profileId),
 
   // Multi-Vest Management API
   listConnectedDevices: () => ipcRenderer.invoke("multivist:listConnectedDevices"),
