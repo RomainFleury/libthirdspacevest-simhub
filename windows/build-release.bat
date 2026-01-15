@@ -93,15 +93,7 @@ echo.
 
 :: Step 5: Package with electron-builder
 echo [5/5] Packaging with Electron Builder...
-if exist "release" (
-    echo        Cleaning previous build...
-    :: Kill any running Electron processes that might be locking files
-    taskkill /F /IM electron.exe /T >nul 2>&1
-    taskkill /F /IM "Third Space Vest.exe" /T >nul 2>&1
-    timeout /t 1 /nobreak >nul 2>&1
-    :: Use PowerShell to force remove locked files
-    powershell -Command "if (Test-Path 'release') { Remove-Item -Path 'release' -Recurse -Force -ErrorAction SilentlyContinue }" >nul 2>&1
-)
+
 set CSC_IDENTITY_AUTO_DISCOVERY=false
 call yarn electron-builder --win --config electron-builder.yml
 if %ERRORLEVEL% neq 0 (
