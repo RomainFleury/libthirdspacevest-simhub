@@ -62,25 +62,6 @@ contextBridge.exposeInMainWorld("vestBridge", {
   alyxGetSettings: () => ipcRenderer.invoke("alyx:getSettings"),
   alyxSetLogPath: (logPath) => ipcRenderer.invoke("alyx:setLogPath", logPath),
 
-  // SUPERHOT VR Integration API
-  superhotStart: () => ipcRenderer.invoke("superhot:start"),
-  superhotStop: () => ipcRenderer.invoke("superhot:stop"),
-  superhotStatus: () => ipcRenderer.invoke("superhot:status"),
-
-  // Pistol Whip Integration API
-  pistolwhipStart: () => ipcRenderer.invoke("pistolwhip:start"),
-  pistolwhipStop: () => ipcRenderer.invoke("pistolwhip:stop"),
-  pistolwhipStatus: () => ipcRenderer.invoke("pistolwhip:status"),
-
-  // Star Citizen Integration API
-  starcitizenStart: (logPath, playerName) => ipcRenderer.invoke("starcitizen:start", logPath, playerName),
-  starcitizenStop: () => ipcRenderer.invoke("starcitizen:stop"),
-  starcitizenStatus: () => ipcRenderer.invoke("starcitizen:status"),
-  starcitizenBrowseLogPath: () => ipcRenderer.invoke("starcitizen:browseLogPath"),
-  starcitizenGetSettings: () => ipcRenderer.invoke("starcitizen:getSettings"),
-  starcitizenSetLogPath: (logPath) => ipcRenderer.invoke("starcitizen:setLogPath", logPath),
-  starcitizenSetPlayerName: (playerName) => ipcRenderer.invoke("starcitizen:setPlayerName", playerName),
-
   // Left 4 Dead 2 Integration API
   l4d2Start: (logPath, playerName) => ipcRenderer.invoke("l4d2:start", logPath, playerName),
   l4d2Stop: () => ipcRenderer.invoke("l4d2:stop"),
@@ -100,13 +81,31 @@ contextBridge.exposeInMainWorld("vestBridge", {
   listEffectsLibrary: () => ipcRenderer.invoke("effects:list"),
   stopEffect: () => ipcRenderer.invoke("effects:stop"),
 
-  // EA Battlefront 2 (2017) Settings API
-  bf2GetSettings: () => ipcRenderer.invoke("bf2:getSettings"),
-  bf2SetSettings: (settings) => ipcRenderer.invoke("bf2:setSettings", settings),
-  bf2SetSetting: (key, value) => ipcRenderer.invoke("bf2:setSetting", key, value),
-  bf2ResetSettings: () => ipcRenderer.invoke("bf2:resetSettings"),
-  bf2GetConfigFilePath: () => ipcRenderer.invoke("bf2:getConfigFilePath"),
-  bf2WriteConfigFile: () => ipcRenderer.invoke("bf2:writeConfigFile"),
+  // Generic Screen Health Watcher API
+  screenHealthExportProfile: (profile) => ipcRenderer.invoke("screenHealth:exportProfile", profile),
+  screenHealthLoadProfile: () => ipcRenderer.invoke("screenHealth:loadProfile"),
+  screenHealthGetSettings: () => ipcRenderer.invoke("screenHealth:getSettings"),
+  screenHealthSetSettings: (settings) => ipcRenderer.invoke("screenHealth:setSettings", settings),
+  screenHealthChooseScreenshotsDir: () => ipcRenderer.invoke("screenHealth:chooseScreenshotsDir"),
+  screenHealthOpenScreenshotsDir: () => ipcRenderer.invoke("screenHealth:openScreenshotsDir"),
+  screenHealthListScreenshots: () => ipcRenderer.invoke("screenHealth:listScreenshots"),
+  screenHealthGetScreenshotDataUrl: (filename) => ipcRenderer.invoke("screenHealth:getScreenshotDataUrl", filename),
+  screenHealthDeleteScreenshot: (filename) => ipcRenderer.invoke("screenHealth:deleteScreenshot", filename),
+  screenHealthClearScreenshots: () => ipcRenderer.invoke("screenHealth:clearScreenshots"),
+  screenHealthCaptureCalibrationScreenshot: (monitorIndex) =>
+    ipcRenderer.invoke("screenHealth:captureCalibrationScreenshot", monitorIndex),
+  screenHealthSelectExistingScreenshot: () => ipcRenderer.invoke("screenHealth:selectExistingScreenshot"),
+  screenHealthCaptureRoiDebugImages: (monitorIndex, rois) =>
+    ipcRenderer.invoke("screenHealth:captureRoiDebugImages", monitorIndex, rois),
+  screenHealthStart: (profile) => ipcRenderer.invoke("screenHealth:start", profile),
+  screenHealthStop: () => ipcRenderer.invoke("screenHealth:stop"),
+  screenHealthStatus: () => ipcRenderer.invoke("screenHealth:status"),
+  screenHealthTest: (profile, outputDir) => ipcRenderer.invoke("screenHealth:test", profile, outputDir),
+  // Profile management
+  screenHealthListProfiles: () => ipcRenderer.invoke("screenHealth:listProfiles"),
+  screenHealthSaveProfile: (profileData) => ipcRenderer.invoke("screenHealth:saveProfile", profileData),
+  screenHealthDeleteProfile: (profileId) => ipcRenderer.invoke("screenHealth:deleteProfile", profileId),
+  screenHealthGetProfile: (profileId) => ipcRenderer.invoke("screenHealth:getProfile", profileId),
 
   // Multi-Vest Management API
   listConnectedDevices: () => ipcRenderer.invoke("multivist:listConnectedDevices"),

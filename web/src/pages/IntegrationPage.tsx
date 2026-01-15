@@ -1,8 +1,12 @@
-import { useParams, Navigate } from "react-router-dom";
+import { useParams, Navigate, Routes, Route } from "react-router-dom";
 import { 
   CS2IntegrationPage, 
   AlyxIntegrationPage,
   L4D2IntegrationPage,
+  ScreenHealthIntegrationPage,
+  ScreenHealthBuilderPage,
+  ScreenHealthSettingsPage,
+  ScreenHealthPreviewPage,
 } from "./integrations";
 
 /**
@@ -12,6 +16,21 @@ const INTEGRATION_PAGES: Record<string, React.ComponentType> = {
   cs2: CS2IntegrationPage,
   alyx: AlyxIntegrationPage,
   l4d2: L4D2IntegrationPage,
+  screen_health: ScreenHealthIntegrationPage,
+};
+
+const INTEGRATION_SUBPAGES: Record<string, { 
+  calibration?: React.ComponentType;
+  settings?: React.ComponentType;
+  builder?: React.ComponentType;
+  preview?: React.ComponentType;
+}> = {
+  screen_health: { 
+    calibration: ScreenHealthBuilderPage,
+    settings: ScreenHealthSettingsPage,
+    builder: ScreenHealthBuilderPage,
+    preview: ScreenHealthPreviewPage,
+  },
 };
 
 /**
@@ -25,6 +44,7 @@ export function IntegrationPage() {
   }
 
   const PageComponent = INTEGRATION_PAGES[gameId];
+  const sub = INTEGRATION_SUBPAGES[gameId] || {};
   
   if (!PageComponent) {
     // Game not found or not yet implemented
@@ -47,5 +67,14 @@ export function IntegrationPage() {
     );
   }
 
-  return <PageComponent />;
+  return (
+    <Routes>
+      <Route index element={<PageComponent />} />
+      {sub.calibration && <Route path="calibration" element={<sub.calibration />} />}
+      {sub.settings && <Route path="settings" element={<sub.settings />} />}
+      {sub.builder && <Route path="builder" element={<sub.builder />} />}
+      {sub.preview && <Route path="preview/:id" element={<sub.preview />} />}
+      <Route path="*" element={<Navigate to={`/games/${gameId}`} replace />} />
+    </Routes>
+  );
 }

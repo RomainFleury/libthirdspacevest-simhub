@@ -22,7 +22,7 @@ This document analyzes options for packaging the Third Space Vest project into a
 **Current user experience:**
 1. Install Node.js LTS
 2. Install Python 3.11+
-3. Run `install.bat` (installs yarn dependencies)
+3. Run `check-setup.bat` (checks prerequisites, installs packages)
 4. Run `start-all.bat` (starts daemon + Electron)
 
 **Goal:** One-click installer → Double-click to run

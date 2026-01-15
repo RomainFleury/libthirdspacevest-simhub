@@ -21,8 +21,9 @@ class IntegrationType(Enum):
     """Type of integration method used to receive game events."""
     HTTP_GSI = "http_gsi"           # HTTP POST endpoint (e.g., CS2 GSI)
     LOG_FILE = "log_file"           # Console.log file watching (e.g., Alyx, L4D2)
-    TCP_CLIENT = "tcp_client"       # Game mod connects to daemon as TCP client (e.g., GTAV, SUPERHOT)
+    TCP_CLIENT = "tcp_client"       # Game mod connects to daemon as TCP client (e.g., SimHub plugin)
     PLUGIN = "plugin"               # External plugin (e.g., SimHub)
+    SCREEN_CAPTURE = "screen_capture"  # Visual signal detection via screen capture (generic)
 
 
 class IntegrationStatus(Enum):
@@ -42,7 +43,7 @@ class GameIntegrationSpec:
     and where they are located.
     """
     # Required fields
-    game_id: str                    # Unique identifier (e.g., "cs2", "alyx", "gtav")
+    game_id: str                    # Unique identifier (e.g., "cs2", "alyx", "simhub")
     game_name: str                  # Display name (e.g., "Counter-Strike 2")
     integration_type: IntegrationType
     status: IntegrationStatus
@@ -169,6 +170,20 @@ register_integration(GameIntegrationSpec(
     ],
     has_directional_damage=True,
     launch_options="-condebug",
+))
+
+# Generic Screen Health Watcher (screen capture)
+register_integration(GameIntegrationSpec(
+    game_id="screen_health",
+    game_name="Generic Screen Health (Screen Capture)",
+    integration_type=IntegrationType.SCREEN_CAPTURE,
+    status=IntegrationStatus.BETA,
+    manager_module="screen_health_manager",
+    manager_class="ScreenHealthManager",
+    daemon_commands=["screen_health_start", "screen_health_stop", "screen_health_status"],
+    event_types=["hit_recorded"],
+    has_directional_damage=True,
+    docs_file="docs-feature-ideas/generic-screen-health-watcher/conception/initial-project.md",
 ))
 
 

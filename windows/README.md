@@ -11,13 +11,15 @@ You need **Node.js** and **Python**:
 | Software | How to Install |
 |----------|----------------|
 | **Node.js** | Download from [nodejs.org](https://nodejs.org/) (LTS version) |
-| **Python** | Download from [python.org](https://www.python.org/downloads/) (3.11+) |
+| **Python** | Download from [python.org](https://www.python.org/downloads/) (3.14+) |
 
 > **Important**: During Python installation, check "Add to PATH"
 
-### 2. Install App Dependencies
+### 2. Check Setup & Install Dependencies
 
-**Double-click** `install.bat`
+**Double-click** `check-setup.bat`
+
+This will check all prerequisites, install missing packages, and help you configure Python.
 
 ### 3. Run the App
 
@@ -33,11 +35,44 @@ This opens two windows:
 
 | Script | What it does |
 |--------|--------------|
-| `install.bat` | Installs Node.js dependencies |
-| `start-all.bat` | Starts daemon + app together |
-| `run.bat` | Starts just the Electron app |
+| `check-setup.bat` | Checks all prerequisites, installs packages, configures Python |
+| `start-all.bat` | Starts daemon + app together (recommended) |
 | `start-daemon.bat` | Starts just the Python daemon |
+| `start-ui.bat` | Starts just the Electron app (daemon auto-starts if needed) |
 | `build-release.bat` | Builds a distributable installer (see below) |
+
+### Setup Scripts (in `setup/` folder)
+
+These are called by `check-setup.bat` but can also be run individually:
+
+| Script | What it does |
+|--------|--------------|
+| `setup/check-python.bat` | Checks Python, helps create `.env.bat` |
+| `setup/check-node.bat` | Checks Node.js installation |
+| `setup/check-yarn.bat` | Checks/installs Yarn |
+| `setup/check-python-packages.bat` | Installs `modern_third_space` package |
+| `setup/check-libusb.bat` | Installs libusb for USB communication |
+| `setup/check-bettercam.bat` | Installs bettercam for Screen Health |
+| `setup/check-web-dependencies.bat` | Installs web/node_modules |
+
+---
+
+## Python Version Detection
+
+All scripts automatically detect the best Python to use:
+
+1. **TSV_PYTHON** environment variable (if set in `.env.bat`)
+2. **py -3.14** via the Python Launcher (if available)
+3. **python** or **python3** as fallback
+
+To pin a specific Python version, create `windows\.env.bat`:
+
+```batch
+@echo off
+set TSV_PYTHON=py -3.14
+```
+
+See `.env.bat.example` for more options.
 
 ---
 

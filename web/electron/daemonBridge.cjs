@@ -15,7 +15,7 @@
 
 const net = require("net");
 const { EventEmitter } = require("events");
-const { spawn } = require("child_process");
+const { spawn, execSync } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 const { createWriteStream } = require("fs");
@@ -36,6 +36,46 @@ const PYTHON_SRC_PATH = path.resolve(
   "modern-third-space",
   "src"
 );
+
+/**
+ * Detect the best Python command to use.
+ * 
+ * Resolution order:
+ * 1. TSV_PYTHON environment variable (e.g., "py -3.14" or "C:\Python314\python.exe")
+ * 2. On Windows: py launcher with Python 3.14 (py -3.14)
+ * 3. Fallback: python (Windows) or python3 (Unix)
+ * 
+ * This matches the logic in windows/*.bat scripts for consistency.
+ * 
+ * @returns {{ cmd: string, args: string[] }} Command and initial args to spawn Python
+ */
+function detectPythonCommand() {
+  // 1. Check TSV_PYTHON environment variable
+  const tsvPython = process.env.TSV_PYTHON;
+  if (tsvPython) {
+    const parts = tsvPython.trim().split(/\s+/);
+    console.log(`[daemon] Using TSV_PYTHON: ${tsvPython}`);
+    return { cmd: parts[0], args: parts.slice(1) };
+  }
+
+  // 2. On Windows, try py launcher with Python 3.14
+  if (process.platform === "win32") {
+    try {
+      // Test if py -3.14 works
+      execSync('py -3.14 -c "import sys"', { stdio: "ignore", timeout: 5000 });
+      console.log("[daemon] Using Python: py -3.14 (detected via py launcher)");
+      return { cmd: "py", args: ["-3.14"] };
+    } catch (e) {
+      // py -3.14 not available, fall through
+      console.log("[daemon] py -3.14 not available, falling back to python");
+    }
+  }
+
+  // 3. Fallback to python/python3
+  const fallback = process.platform === "win32" ? "python" : "python3";
+  console.log(`[daemon] Using Python: ${fallback} (default fallback)`);
+  return { cmd: fallback, args: [] };
+}
 
 /**
  * Get the path to the daemon executable.
@@ -196,16 +236,24 @@ class DaemonBridge extends EventEmitter {
         console.log(`[daemon] Spawning: ${cmd} ${args.join(" ")}`);
         console.log(`[daemon] Log file: ${logFile}`);
       } else {
-        // Development: run Python
-        const pythonCmd = process.platform === "win32" ? "python" : "python3";
-        cmd = pythonCmd;
+        // Development: run Python with proper detection
+        const pythonInfo = detectPythonCommand();
+        cmd = pythonInfo.cmd;
         args = [
+          ...pythonInfo.args,  // e.g., ["-3.14"] for py launcher
           "-u",
           "-m",
           "modern_third_space.cli",
           "daemon",
           "--port",
           String(this.port),
+          "start",
+          "--screen-health-debug",
+          "--screen-health-debug-save",
+          "--screen-health-debug-dir",
+          path.join(PYTHON_SRC_PATH, "debug_logs"),
+          "--screen-health-debug-every-n",
+          "10",
         ];
         options = {
           cwd: daemonInfo.path,
@@ -831,158 +879,6 @@ class DaemonBridge extends EventEmitter {
   }
 
   // -------------------------------------------------------------------------
-  // SUPERHOT VR Integration API
-  // -------------------------------------------------------------------------
-
-  /**
-   * Enable SUPERHOT VR integration.
-   */
-  async superhotStart() {
-    try {
-      await this.sendCommand("superhot_start");
-      return { success: true };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  }
-
-  /**
-   * Disable SUPERHOT VR integration.
-   */
-  async superhotStop() {
-    try {
-      await this.sendCommand("superhot_stop");
-      return { success: true };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  }
-
-  /**
-   * Get SUPERHOT VR integration status.
-   */
-  async superhotStatus() {
-    try {
-      const response = await this.sendCommand("superhot_status");
-      return {
-        enabled: response.running ?? false,
-        events_received: response.events_received ?? 0,
-        last_event_ts: response.last_event_ts ?? null,
-      };
-    } catch (error) {
-      return {
-        enabled: false,
-        error: error.message,
-      };
-    }
-  }
-
-  // Pistol Whip Integration API
-  // -------------------------------------------------------------------------
-
-  /**
-   * Enable Pistol Whip integration.
-   */
-  async pistolwhipStart() {
-    try {
-      await this.sendCommand("pistolwhip_start");
-      return { success: true };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  }
-
-  /**
-   * Disable Pistol Whip integration.
-   */
-  async pistolwhipStop() {
-    try {
-      await this.sendCommand("pistolwhip_stop");
-      return { success: true };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  }
-
-  /**
-   * Get Pistol Whip integration status.
-   */
-  async pistolwhipStatus() {
-    try {
-      const response = await this.sendCommand("pistolwhip_status");
-      return {
-        enabled: response.running ?? false,
-        events_received: response.events_received ?? 0,
-        last_event_ts: response.last_event_ts ?? null,
-        last_event_type: response.last_event_type ?? null,
-      };
-    } catch (error) {
-      return {
-        enabled: false,
-        error: error.message,
-      };
-    }
-  }
-
-  // -------------------------------------------------------------------------
-  // Star Citizen Integration API
-  // -------------------------------------------------------------------------
-
-  /**
-   * Start Star Citizen integration (watch Game.log).
-   * @param {string} [logPath] - Optional path to Game.log (auto-detect if not provided)
-   * @param {string} [playerName] - Optional player name to identify player events
-   */
-  async starcitizenStart(logPath, playerName) {
-    try {
-      const response = await this.sendCommand("starcitizen_start", {
-        log_path: logPath,
-        message: playerName, // Using message field for player name
-      });
-      return {
-        success: response.success ?? true,
-        log_path: response.log_path,
-        error: response.message,
-      };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  }
-
-  /**
-   * Stop Star Citizen integration.
-   */
-  async starcitizenStop() {
-    try {
-      await this.sendCommand("starcitizen_stop");
-      return { success: true };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  }
-
-  /**
-   * Get Star Citizen integration status.
-   */
-  async starcitizenStatus() {
-    try {
-      const response = await this.sendCommand("starcitizen_status");
-      return {
-        enabled: response.running ?? false,
-        events_received: response.events_received ?? 0,
-        last_event_ts: response.last_event_ts ?? null,
-        last_event_type: response.last_event_type ?? null,
-        log_path: response.log_path ?? null,
-      };
-    } catch (error) {
-      return {
-        enabled: false,
-        error: error.message,
-      };
-    }
-  }
-
-  // -------------------------------------------------------------------------
   // Left 4 Dead 2 Integration API
   // -------------------------------------------------------------------------
 
@@ -1043,6 +939,83 @@ class DaemonBridge extends EventEmitter {
         running: false,
         error: error.message,
       };
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Generic Screen Health Watcher API
+  // -------------------------------------------------------------------------
+
+  /**
+   * Start the screen health watcher with a profile JSON.
+   * @param {Object} profile - Profile JSON object (schema_version 0)
+   */
+  async screenHealthStart(profile) {
+    try {
+      const response = await this.sendCommand("screen_health_start", { profile });
+      return {
+        success: response.success ?? false,
+        profile_name: response.profile_name ?? null,
+        error: response.message,
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Stop the screen health watcher.
+   */
+  async screenHealthStop() {
+    try {
+      const response = await this.sendCommand("screen_health_stop");
+      return {
+        success: response.success ?? false,
+        error: response.message,
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Get screen health watcher status.
+   */
+  async screenHealthStatus() {
+    try {
+      const response = await this.sendCommand("screen_health_status");
+      return {
+        running: response.running ?? false,
+        profile_name: response.profile_name ?? null,
+        events_received: response.events_received ?? 0,
+        last_event_ts: response.last_event_ts ?? null,
+        last_hit_ts: response.last_hit_ts ?? null,
+      };
+    } catch (error) {
+      return {
+        running: false,
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Test a screen health profile once (validate + capture ROI(s) + evaluate).
+   * @param {Object} profile - Profile JSON object (schema_version 0)
+   * @param {string | null | undefined} outputDir - Optional output dir for ROI crops
+   */
+  async screenHealthTest(profile, outputDir) {
+    try {
+      const payload = { profile };
+      if (outputDir) payload.output_dir = outputDir;
+      const response = await this.sendCommand("screen_health_test", payload);
+      return {
+        success: response.success ?? false,
+        test_result: response.test_result ?? null,
+        error: response.message,
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
     }
   }
 

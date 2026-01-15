@@ -1,4 +1,5 @@
 build
+!modern-third-space/build/vest-daemon-entry.py
 node_modules
 repomix-output.*
 
@@ -17,6 +18,9 @@ modern-third-space/.venv
 *$py.class
 *.so
 .Python
+
+# Windows local python override
+windows/.env.bat
 
 # Yarn
 *.gz
@@ -196,3 +200,6 @@ misc-documentations/bhaptics-svg-24-nov/mordhau/modManager/autoloaderwindowsclie
 /misc-documentations/bhaptics-svg-24-nov/mordhau/Mods
 /misc-documentations/bhaptics-svg-24-nov/star-citizen/citizenmon-main
 /misc-documentations/bhaptics-svg-24-nov/star-citizen/VerseWatcher-main
+/modern-third-space/src/modern_third_space/debug_logs/*
+/web/debug_logs/*
+/modern-third-space/src/debug_logs/*.bmp

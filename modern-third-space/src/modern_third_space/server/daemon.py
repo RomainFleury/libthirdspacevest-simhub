@@ -74,6 +74,7 @@ from .protocol import (
 from .cs2_manager import CS2Manager, generate_cs2_config
 from .alyx_manager import AlyxManager, get_mod_info as get_alyx_mod_info
 from .l4d2_manager import L4D2Manager
+from .screen_health_manager import ScreenHealthManager
 from .protocol import (
     event_alyx_started,
     event_alyx_stopped,
@@ -88,6 +89,16 @@ from .protocol import (
     response_l4d2_start,
     response_l4d2_stop,
     response_l4d2_status,
+    event_screen_health_started,
+    event_screen_health_stopped,
+    event_screen_health_hit,
+    event_screen_health_health,
+    event_screen_health_value,
+    event_screen_health_debug,
+    response_screen_health_start,
+    response_screen_health_stop,
+    response_screen_health_status,
+    response_screen_health_test,
     # Predefined effects
     event_effect_started,
     event_effect_completed,
@@ -144,6 +155,12 @@ class VestDaemon:
         self._l4d2_manager = L4D2Manager(
             on_game_event=self._on_l4d2_game_event,
             on_trigger=self._on_l4d2_trigger,
+        )
+
+        # Generic Screen Health Watcher manager
+        self._screen_health_manager = ScreenHealthManager(
+            on_game_event=self._on_screen_health_game_event,
+            on_trigger=self._on_screen_health_trigger,
         )
         
         self._loop: Optional[asyncio.AbstractEventLoop] = None
@@ -270,7 +287,7 @@ class VestDaemon:
             except Exception as e:
                 logger.debug(f"Error closing client connection: {e}")
             logger.info(f"Client {client.id} disconnected")
-            print(f"📴 Client {client.id} disconnected")
+            print(f"[VEST] Client {client.id} disconnected")
     
     async def _handle_command(self, client: Client, command: Command) -> Optional[Response]:
         """
@@ -394,6 +411,19 @@ class VestDaemon:
         
         if cmd_type == CommandType.L4D2_STATUS:
             return await self._cmd_l4d2_status(command)
+
+        # Generic Screen Health Watcher commands
+        if cmd_type == CommandType.SCREEN_HEALTH_START:
+            return await self._cmd_screen_health_start(command)
+
+        if cmd_type == CommandType.SCREEN_HEALTH_STOP:
+            return await self._cmd_screen_health_stop(command)
+
+        if cmd_type == CommandType.SCREEN_HEALTH_STATUS:
+            return await self._cmd_screen_health_status(command)
+
+        if cmd_type == CommandType.SCREEN_HEALTH_TEST:
+            return await self._cmd_screen_health_test(command)
         
         # Predefined effects commands
         if cmd_type == CommandType.PLAY_EFFECT:
@@ -547,6 +577,7 @@ class VestDaemon:
         return response_set_main_device(
             success=True,
             device_id=command.device_id,
+            device=device_info,
             req_id=command.req_id,
         )
     
@@ -1329,6 +1360,212 @@ class VestDaemon:
         controller.trigger_effect(cell, speed)
         
         # Broadcast event (async)
+        if self._loop is not None:
+            event = event_effect_triggered(cell, speed, device_id=main_device_id)
+            asyncio.run_coroutine_threadsafe(
+                self._clients.broadcast(event),
+                self._loop,
+            )
+
+    # -------------------------------------------------------------------------
+    # Generic Screen Health Watcher commands
+    # -------------------------------------------------------------------------
+
+    async def _cmd_screen_health_start(self, command: Command) -> Response:
+        """Start the generic screen health watcher with a profile JSON."""
+        if not command.profile:
+            return response_screen_health_start(
+                success=False,
+                error="profile is required",
+                req_id=command.req_id,
+            )
+
+        success, error = self._screen_health_manager.start(command.profile)
+        if success:
+            profile_name = self._screen_health_manager.status().get("profile_name") or ""
+            await self._clients.broadcast(event_screen_health_started(profile_name))
+
+        status = self._screen_health_manager.status()
+        return response_screen_health_start(
+            success=success,
+            profile_name=status.get("profile_name"),
+            error=error,
+            req_id=command.req_id,
+        )
+
+    async def _cmd_screen_health_stop(self, command: Command) -> Response:
+        """Stop the generic screen health watcher."""
+        success = self._screen_health_manager.stop()
+        if success:
+            await self._clients.broadcast(event_screen_health_stopped())
+        return response_screen_health_stop(success=success, req_id=command.req_id)
+
+    async def _cmd_screen_health_status(self, command: Command) -> Response:
+        """Get screen health watcher status."""
+        s = self._screen_health_manager.status()
+        return response_screen_health_status(
+            running=bool(s.get("running")),
+            profile_name=s.get("profile_name"),
+            events_received=int(s.get("events_received") or 0),
+            last_event_ts=s.get("last_event_ts"),
+            last_hit_ts=s.get("last_hit_ts"),
+            req_id=command.req_id,
+        )
+
+    async def _cmd_screen_health_test(self, command: Command) -> Response:
+        """
+        Test a screen health profile once (validate + capture ROI(s) + evaluate).
+
+        This is intended for calibration/debug and avoids starting the continuous loop.
+        """
+        if not command.profile:
+            return response_screen_health_test(success=False, error="profile is required", req_id=command.req_id)
+
+        # Always log/print test runs for debugging (even if profile debug mode is off).
+        try:
+            prof_name = None
+            mon_idx = None
+            tick_ms = None
+            if isinstance(command.profile, dict):
+                prof_name = command.profile.get("name")
+                cap = command.profile.get("capture") if isinstance(command.profile.get("capture"), dict) else None
+                if cap:
+                    mon_idx = cap.get("monitor_index")
+                    tick_ms = cap.get("tick_ms")
+        except Exception:
+            prof_name = None
+            mon_idx = None
+            tick_ms = None
+
+        msg0 = (
+            f"[screen_health_test] start req_id={command.req_id} "
+            f"profile={prof_name or '<unnamed>'} monitor_index={mon_idx} tick_ms={tick_ms} "
+            f"output_dir={command.output_dir or '<none>'}"
+        )
+        logger.info(msg0)
+        print(msg0)
+
+        try:
+            ok, result, err = self._screen_health_manager.test_profile_once(
+                command.profile,
+                output_dir=command.output_dir,
+            )
+            if ok and result:
+                msg1 = (
+                    f"[screen_health_test] ok req_id={command.req_id} "
+                    f"total_ms={float(result.get('total_ms') or 0.0):.2f} "
+                    f"frame={result.get('frame')} output_dir={result.get('output_dir')}"
+                )
+                logger.info(msg1)
+                print(msg1)
+
+                detectors = result.get("detectors") if isinstance(result.get("detectors"), list) else []
+                for d in detectors:
+                    if not isinstance(d, dict):
+                        continue
+                    dtype = d.get("type")
+                    name = d.get("name")
+                    cap_ms = d.get("capture_ms")
+                    eval_ms = d.get("eval_ms")
+                    if dtype == "redness_rois":
+                        score = d.get("score")
+                        thr = d.get("threshold")
+                        hit = d.get("hit")
+                        line = (
+                            f"[screen_health_test] redness name={name} score={score} threshold={thr} hit={hit} "
+                            f"cap_ms={cap_ms} eval_ms={eval_ms} image={d.get('image_path')}"
+                        )
+                    elif dtype == "health_bar":
+                        line = (
+                            f"[screen_health_test] health_bar name={name} mode={d.get('mode')} "
+                            f"percent={d.get('percent')} cap_ms={cap_ms} eval_ms={eval_ms} image={d.get('image_path')}"
+                        )
+                    elif dtype == "health_number":
+                        if d.get("error"):
+                            line = f"[screen_health_test] health_number name={name} error={d.get('error')}"
+                        else:
+                            line = (
+                                f"[screen_health_test] health_number name={name} read={d.get('read')} digits={d.get('digits')} "
+                                f"hamming_max={d.get('hamming_max')} cap_ms={cap_ms} eval_ms={eval_ms} image={d.get('image_path')}"
+                            )
+                    else:
+                        line = f"[screen_health_test] detector type={dtype} name={name} cap_ms={cap_ms} eval_ms={eval_ms}"
+                    logger.info(line)
+                    print(line)
+
+                errors = result.get("errors") if isinstance(result.get("errors"), list) else []
+                for e in errors:
+                    if not e:
+                        continue
+                    line = f"[screen_health_test] warning req_id={command.req_id} {e}"
+                    logger.warning(line)
+                    print(line)
+            else:
+                msg1 = f"[screen_health_test] failed req_id={command.req_id} error={err or '<unknown>'}"
+                logger.warning(msg1)
+                print(msg1)
+            return response_screen_health_test(success=ok, test_result=result, error=err, req_id=command.req_id)
+        except Exception as e:
+            msg1 = f"[screen_health_test] exception req_id={command.req_id} error={str(e)}"
+            logger.exception(msg1)
+            print(msg1)
+            return response_screen_health_test(success=False, error=str(e), req_id=command.req_id)
+
+    # -------------------------------------------------------------------------
+    # Generic Screen Health Watcher callbacks
+    # -------------------------------------------------------------------------
+
+    def _on_screen_health_game_event(self, event_type: str, params: dict):
+        """
+        Called when ScreenHealthManager emits a game event.
+
+        Called from the manager thread, so broadcast must be scheduled
+        on the asyncio loop.
+        """
+        if self._loop is None:
+            return
+
+        if event_type == "hit_recorded":
+            direction = params.get("direction")
+            score = float(params.get("score") or 0.0)
+            roi = params.get("roi")
+            event = event_screen_health_hit(direction=direction, score=score, roi=roi)
+        elif event_type == "health_percent":
+            detector = params.get("detector")
+            percent = float(params.get("percent") or 0.0)
+            event = event_screen_health_health(health_percent=percent, detector=detector)
+        elif event_type == "health_value":
+            detector = params.get("detector")
+            value = int(params.get("value") or 0)
+            event = event_screen_health_value(health_value=value, detector=detector)
+        elif event_type == "debug":
+            detector = params.get("detector")
+            event = event_screen_health_debug(params=params, detector=detector)
+        else:
+            event = event_error(f"Unknown screen_health event_type: {event_type}")
+
+        asyncio.run_coroutine_threadsafe(
+            self._clients.broadcast(event),
+            self._loop,
+        )
+
+    def _on_screen_health_trigger(self, cell: int, speed: int):
+        """
+        Called when ScreenHealthManager wants to trigger a haptic effect.
+
+        Triggers the effect on the main device.
+        """
+        main_device_id = self._registry.get_main_device_id()
+        if main_device_id is None:
+            return  # No device available
+
+        controller = self._registry.get_controller(main_device_id)
+        if controller is None or not controller.status().connected:
+            return  # Device not connected
+
+        controller.trigger_effect(cell, speed)
+
+        # Broadcast effect triggered event (async)
         if self._loop is not None:
             event = event_effect_triggered(cell, speed, device_id=main_device_id)
             asyncio.run_coroutine_threadsafe(

@@ -10,12 +10,9 @@ const { registerVestHandlers } = require("./vestHandlers.cjs");
 const { registerDaemonHandlers } = require("./daemonHandlers.cjs");
 const { registerCS2Handlers } = require("./cs2Handlers.cjs");
 const { registerAlyxHandlers } = require("./alyxHandlers.cjs");
-const { registerSuperHotHandlers } = require("./superhotHandlers.cjs");
-const { registerPistolWhipHandlers } = require("./pistolwhipHandlers.cjs");
-const { registerStarCitizenHandlers } = require("./starcitizenHandlers.cjs");
 const { registerL4D2Handlers } = require("./l4d2Handlers.cjs");
 const { registerEffectsHandlers } = require("./effectsHandlers.cjs");
-const { registerBF2Handlers } = require("./bf2Handlers.cjs");
+const { registerScreenHealthHandlers } = require("./screenHealthHandlers.cjs");
 const { registerMultiVestHandlers } = require("./multiVestHandlers.cjs");
 const { registerModsHandlers } = require("./modsHandlers.cjs");
 
@@ -38,23 +35,14 @@ function registerAllHandlers(getDaemonBridge, getMainWindow, reconnectToDaemon) 
   // Half-Life: Alyx integration handlers
   registerAlyxHandlers(getMainWindow);
 
-  // SUPERHOT VR integration handlers
-  registerSuperHotHandlers();
-
-  // Pistol Whip integration handlers
-  registerPistolWhipHandlers();
-
-  // Star Citizen integration handlers
-  registerStarCitizenHandlers(getMainWindow);
-
   // Left 4 Dead 2 integration handlers
   registerL4D2Handlers(getMainWindow);
 
   // Predefined effects library handlers
   registerEffectsHandlers();
 
-  // EA Battlefront 2 (2017) settings handlers
-  registerBF2Handlers();
+  // Generic Screen Health Watcher handlers
+  registerScreenHealthHandlers(getDaemonBridge, getMainWindow);
 
   // Multi-vest management handlers
   registerMultiVestHandlers(getDaemonBridge);
@@ -71,9 +59,7 @@ module.exports = {
   registerDaemonHandlers,
   registerCS2Handlers,
   registerAlyxHandlers,
-  registerSuperHotHandlers,
-  registerPistolWhipHandlers,
   registerEffectsHandlers,
-  registerBF2Handlers,
+  registerScreenHealthHandlers,
 };
 

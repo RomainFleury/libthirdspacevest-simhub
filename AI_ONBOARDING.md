@@ -2,6 +2,8 @@
 
 If you're an AI assistant working on this repository, follow these steps to get oriented.
 
+Python DOES NOT LIKE UNICODE EMOJIS, NEVER USE EMOJI FOR ANY PYTHON RELATED SCRIPT.
+
 ## Cursor IDE Tips
 
 If you're using **Cursor IDE**, these features will help you get context faster:
@@ -66,6 +68,22 @@ Game Mod 2 ───┘
 - `server/lifecycle.py` - Start/stop/status management
 
 ## First Steps Checklist
+
+### Windows Users
+
+On Windows, use the setup scripts in `windows/`:
+
+```cmd
+:: Run the setup checker (checks Python, Node, installs packages)
+windows\check-setup.bat
+
+:: Start everything
+windows\start-all.bat
+```
+
+The setup scripts automatically detect the best Python version (see `windows/README.md` for details).
+
+### macOS / Linux Users
 
 1. **Verify project structure:**
 

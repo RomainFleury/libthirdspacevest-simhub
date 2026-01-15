@@ -121,4 +121,7 @@ export interface GameIntegrationPageProps {
   
   /** Additional stats to show */
   additionalStats?: ReactNode;
+
+  /** Children content */
+  children?: ReactNode;
 }

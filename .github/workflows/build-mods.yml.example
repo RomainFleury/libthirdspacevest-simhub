@@ -18,9 +18,7 @@ on:
   workflow_dispatch:  # Manual trigger
   push:
     paths:
-      - 'superhot-mod/**'
-      - 'pistolwhip-mod/**'
-      - 'gta5-mod/**'
+      - 'simhub-plugin/**'
 
 jobs:
   build-mods:
@@ -59,44 +57,18 @@ jobs:
       #     key: game-dlls-v1
 
       # =====================================================================
-      # Build SUPERHOT VR Mod
+      # Build SimHub Plugin
       # =====================================================================
-      - name: Build SUPERHOT VR Mod
+      - name: Build SimHub Plugin
         if: false  # Enable when dependencies are available
         run: |
-          cd superhot-mod
-          nuget restore ThirdSpace_SuperhotVR.sln
-          msbuild ThirdSpace_SuperhotVR.sln /p:Configuration=Release
+          cd simhub-plugin
+          nuget restore ThirdSpaceSimHub.sln
+          msbuild ThirdSpaceSimHub.sln /p:Configuration=Release
           
           # Copy to mods directory
-          mkdir -p ../mods/superhot-vr
-          cp ThirdSpace_SuperhotVR/bin/Release/ThirdSpace_SuperhotVR.dll ../mods/superhot-vr/
-
-      # =====================================================================
-      # Build Pistol Whip Mod
-      # =====================================================================
-      - name: Build Pistol Whip Mod
-        if: false  # Enable when dependencies are available
-        run: |
-          cd pistolwhip-mod
-          nuget restore ThirdSpace_PistolWhip.sln
-          msbuild ThirdSpace_PistolWhip.sln /p:Configuration=Release
-          
-          mkdir -p ../mods/pistolwhip
-          cp ThirdSpace_PistolWhip/bin/Release/ThirdSpace_PistolWhip.dll ../mods/pistolwhip/
-
-      # =====================================================================
-      # Build GTA V Mod
-      # =====================================================================
-      - name: Build GTA V Mod
-        if: false  # Enable when dependencies are available
-        run: |
-          cd gta5-mod
-          nuget restore ThirdSpaceGTAV.sln
-          msbuild ThirdSpaceGTAV.sln /p:Configuration=Release
-          
-          mkdir -p ../mods/gta5
-          cp ThirdSpaceGTAV/bin/Release/ThirdSpaceGTAV.dll ../mods/gta5/
+          mkdir -p ../mods/simhub
+          cp ThirdSpaceSimHub/bin/Release/ThirdSpaceSimHub.dll ../mods/simhub/
 
       # =====================================================================
       # Upload built mods as artifacts

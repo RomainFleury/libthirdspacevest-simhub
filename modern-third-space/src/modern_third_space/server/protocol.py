@@ -65,6 +65,11 @@ class CommandType(Enum):
     L4D2_START = "l4d2_start"
     L4D2_STOP = "l4d2_stop"
     L4D2_STATUS = "l4d2_status"
+    # Generic Screen Health Watcher (screen capture)
+    SCREEN_HEALTH_START = "screen_health_start"
+    SCREEN_HEALTH_STOP = "screen_health_stop"
+    SCREEN_HEALTH_STATUS = "screen_health_status"
+    SCREEN_HEALTH_TEST = "screen_health_test"
     # Predefined effects
     PLAY_EFFECT = "play_effect"
     LIST_EFFECTS = "list_effects"
@@ -112,6 +117,13 @@ class EventType(Enum):
     L4D2_STARTED = "l4d2_started"
     L4D2_STOPPED = "l4d2_stopped"
     L4D2_GAME_EVENT = "l4d2_game_event"
+    # Generic Screen Health Watcher (screen capture)
+    SCREEN_HEALTH_STARTED = "screen_health_started"
+    SCREEN_HEALTH_STOPPED = "screen_health_stopped"
+    SCREEN_HEALTH_HIT = "screen_health_hit"
+    SCREEN_HEALTH_HEALTH = "screen_health_health"
+    SCREEN_HEALTH_VALUE = "screen_health_value"
+    SCREEN_HEALTH_DEBUG = "screen_health_debug"
     # Predefined effects
     EFFECT_STARTED = "effect_started"
     EFFECT_COMPLETED = "effect_completed"
@@ -133,13 +145,12 @@ class Command:
     gsi_port: Optional[int] = None
     # Half-Life: Alyx params
     log_path: Optional[str] = None
-    # Star Citizen params
-    message: Optional[str] = None  # Used for player name in Star Citizen
-    # SUPERHOT VR params
-    event: Optional[str] = None  # Event name (death, pistol_recoil, etc.)
-    hand: Optional[str] = None   # "left" or "right"
+    # Generic params
+    message: Optional[str] = None  # Used for player name or other messages
+    # Generic game event params (for TCP client integrations)
+    event: Optional[str] = None  # Event name
+    hand: Optional[str] = None   # "left" or "right" for hand-specific events
     priority: Optional[int] = None
-    # GTA V params
     angle: Optional[float] = None  # Damage angle in degrees
     damage: Optional[float] = None  # Damage amount
     health_remaining: Optional[float] = None  # Remaining health
@@ -151,6 +162,9 @@ class Command:
     player_id: Optional[str] = None  # Target global player's device
     game_id: Optional[str] = None  # Game identifier for game-specific mapping
     player_num: Optional[int] = None  # Player number (1, 2, 3...) for game-specific mapping
+    # Generic screen health watcher params
+    profile: Optional[Dict[str, Any]] = None  # Screen health profile JSON
+    output_dir: Optional[str] = None  # Optional output dir for test/debug artifacts
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Command":
@@ -178,6 +192,8 @@ class Command:
             player_id=data.get("player_id"),
             game_id=data.get("game_id"),
             player_num=data.get("player_num"),
+            profile=data.get("profile"),
+            output_dir=data.get("output_dir"),
         )
     
     @classmethod
@@ -219,7 +235,7 @@ class Event:
     # Half-Life: Alyx info
     log_path: Optional[str] = None
     params: Optional[Dict[str, Any]] = None  # For alyx_game_event params
-    # SUPERHOT VR info
+    # Generic game event info
     hand: Optional[str] = None  # "left" or "right" for hand-specific events
     # Predefined effects info
     effect_name: Optional[str] = None  # Name of effect being played/completed
@@ -228,6 +244,13 @@ class Event:
     player_id: Optional[str] = None  # Player ID that triggered the event
     player_num: Optional[int] = None  # Player number for game-specific events
     game_id: Optional[str] = None  # Game ID for game-specific events
+    # Generic screen health watcher
+    profile_name: Optional[str] = None
+    score: Optional[float] = None
+    direction: Optional[str] = None
+    health_percent: Optional[float] = None
+    detector: Optional[str] = None
+    health_value: Optional[int] = None
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary, excluding None values."""
@@ -247,6 +270,8 @@ class Response:
     """A response to a specific client."""
     response: str
     req_id: Optional[str] = None
+    # Multi-vest support
+    device_id: Optional[str] = None
     # Status response
     connected: Optional[bool] = None
     device: Optional[Dict[str, Any]] = None
@@ -274,6 +299,10 @@ class Response:
     # Half-Life: Alyx response
     log_path: Optional[str] = None
     mod_info: Optional[Dict[str, Any]] = None
+    # Generic screen health watcher response
+    profile_name: Optional[str] = None
+    last_hit_ts: Optional[float] = None
+    test_result: Optional[Dict[str, Any]] = None
     # Predefined effects response
     effects: Optional[List[Dict[str, Any]]] = None
     categories: Optional[List[str]] = None
@@ -424,13 +453,23 @@ def response_list_connected_devices(devices: List[Dict[str, Any]], req_id: Optio
     """Response for list_connected_devices command."""
     return Response(response="list_connected_devices", req_id=req_id, success=True, devices=devices)
 
-def response_set_main_device(success: bool, device_id: Optional[str] = None, error: Optional[str] = None, req_id: Optional[str] = None) -> Response:
+def response_set_main_device(
+    success: bool,
+    device_id: Optional[str] = None,
+    device: Optional[Dict[str, Any]] = None,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
     """Response for set_main_device command."""
+    device_dict = device.copy() if device else None
+    if device_id and device_dict is not None and "device_id" not in device_dict:
+        device_dict["device_id"] = device_id
     return Response(
         response="set_main_device",
         req_id=req_id,
         success=success,
         device_id=device_id,
+        device=device_dict,
         message=error,
     )
 
@@ -803,6 +842,121 @@ def response_l4d2_status(
         events_received=events_received,
         last_event_ts=last_event_ts,
         last_event_type=last_event_type,
+    )
+
+
+# =============================================================================
+# Generic Screen Health Watcher Protocol
+# =============================================================================
+
+def event_screen_health_started(profile_name: str) -> Event:
+    return Event(event=EventType.SCREEN_HEALTH_STARTED.value, profile_name=profile_name)
+
+
+def event_screen_health_stopped() -> Event:
+    return Event(event=EventType.SCREEN_HEALTH_STOPPED.value)
+
+
+def event_screen_health_hit(
+    direction: Optional[str],
+    score: float,
+    roi: Optional[str] = None,
+) -> Event:
+    return Event(
+        event=EventType.SCREEN_HEALTH_HIT.value,
+        event_type="hit_recorded",
+        params={"roi": roi} if roi else None,
+        direction=direction,
+        score=score,
+    )
+
+
+def event_screen_health_health(health_percent: float, detector: Optional[str] = None) -> Event:
+    return Event(
+        event=EventType.SCREEN_HEALTH_HEALTH.value,
+        event_type="health_percent",
+        health_percent=float(health_percent),
+        detector=detector,
+    )
+
+
+def event_screen_health_value(health_value: int, detector: Optional[str] = None) -> Event:
+    return Event(
+        event=EventType.SCREEN_HEALTH_VALUE.value,
+        event_type="health_value",
+        health_value=int(health_value),
+        detector=detector,
+    )
+
+
+def event_screen_health_debug(params: Dict[str, Any], detector: Optional[str] = None) -> Event:
+    """
+    Debug event for calibration: emits evaluated detector values and (optionally)
+    saved ROI crop filenames.
+    """
+    return Event(
+        event=EventType.SCREEN_HEALTH_DEBUG.value,
+        event_type="debug",
+        detector=detector,
+        params=params,
+    )
+
+
+def response_screen_health_start(
+    success: bool,
+    profile_name: Optional[str] = None,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    return Response(
+        response="screen_health_start",
+        req_id=req_id,
+        success=success,
+        profile_name=profile_name,
+        message=error,
+    )
+
+
+def response_screen_health_stop(success: bool, error: Optional[str] = None, req_id: Optional[str] = None) -> Response:
+    return Response(
+        response="screen_health_stop",
+        req_id=req_id,
+        success=success,
+        message=error,
+    )
+
+
+def response_screen_health_status(
+    running: bool,
+    profile_name: Optional[str],
+    events_received: int = 0,
+    last_event_ts: Optional[float] = None,
+    last_hit_ts: Optional[float] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    return Response(
+        response="screen_health_status",
+        req_id=req_id,
+        running=running,
+        profile_name=profile_name,
+        events_received=events_received,
+        last_event_ts=last_event_ts,
+        last_hit_ts=last_hit_ts,
+    )
+
+
+def response_screen_health_test(
+    success: bool,
+    test_result: Optional[Dict[str, Any]] = None,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    return Response(
+        response="screen_health_test",
+        req_id=req_id,
+        success=success,
+        test_result=test_result,
+        message=error,
     )
 
 

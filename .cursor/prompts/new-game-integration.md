@@ -81,7 +81,7 @@ Based on research, identify how to connect to the game:
 |--------|-------------|---------|
 | **Official API (GSI)** | Game has telemetry API | CS2 (HTTP JSON posts) |
 | **Log File Watching** | Game/mod writes to console.log | HL:Alyx (`-condebug` flag) |
-| **MelonLoader Mod** | Unity game, no official API | SUPERHOT VR, Pistol Whip |
+| **MelonLoader Mod** | Unity game, no official API | (See archived mods in `misc-documentations/archived-untested-mods/`) |
 | **BepInEx Mod** | Unity game (alternative to MelonLoader) | Various VR games |
 | **TCP/UDP Client** | Game exposes telemetry port | SimHub (telemetry relay) |
 
@@ -123,7 +123,7 @@ Following the existing patterns:
 |------|---------|-----------------|-------------|
 | **HTTP Push (GSI)** | CS2 | `integrations/cs2_gsi.py` | HTTP server receives JSON posts |
 | **Log File Watching** | HL:Alyx | `server/alyx_manager.py` | Poll console.log for `[Tactsuit]` events |
-| **MelonLoader Mod** | Superhot VR | See `MELONLOADER_INTEGRATION_STRATEGY.md` | Mod logs events → Python watches |
+| **MelonLoader Mod** | Unity games | See `MELONLOADER_INTEGRATION_STRATEGY.md` | Mod logs events → Python watches |
 | **TCP Client** | Custom | `integrations/base.py` | Connect to game's telemetry server |
 
 ### Files to Create
@@ -211,9 +211,7 @@ Use constants from `vest/cell_layout.py`:
 |------|---------|------|--------|
 | CS2 | `server/cs2_manager.py` | `CS2_INTEGRATION.md` | ✅ Done |
 | HL:Alyx | `server/alyx_manager.py` | `ALYX_INTEGRATION.md` | ✅ Done |
-| SUPERHOT VR | `server/superhot_manager.py` | `SUPERHOTVR_INTEGRATION.md` | ✅ Done |
 | SimHub | `simhub-plugin/` (C#) | `SIMHUB_IRACING_INTEGRATION.md` | ✅ Done |
-| Pistol Whip | - | `PISTOLWHIP_INTEGRATION.md` | 📋 Planned |
 
 ### bHaptics/OWO Research Sources
 

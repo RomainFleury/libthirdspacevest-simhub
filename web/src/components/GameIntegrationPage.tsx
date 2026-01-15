@@ -32,6 +32,7 @@ export function GameIntegrationPage({
   configurationPanel,
   modInfo,
   additionalStats,
+  children,
 }: GameIntegrationPageProps) {
   const steamLaunchUrl = game.steamAppId
     ? `steam://run/${game.steamAppId}${game.steamLaunchOptions ? `//${game.steamLaunchOptions}` : ""}`
@@ -175,6 +176,8 @@ export function GameIntegrationPage({
           </div>
         )}
       </section>
+
+      {children}
 
       {/* Configuration (if provided) */}
       {configurationPanel && (
