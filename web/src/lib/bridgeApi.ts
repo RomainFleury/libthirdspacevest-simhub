@@ -826,3 +826,37 @@ export async function screenHealthStatus(): Promise<ScreenHealthStatus> {
 export async function screenHealthTest(profile: Record<string, any>, outputDir?: string | null): Promise<ScreenHealthTestResult> {
   return await ensureBridge().screenHealthTest(profile, outputDir ?? null);
 }
+
+/**
+ * List all local profiles stored in storage.
+ */
+export async function screenHealthListProfiles(): Promise<ScreenHealthListProfilesResult> {
+  return await ensureBridge().screenHealthListProfiles();
+}
+
+/**
+ * Save a profile to local storage. Always creates a new profile (never updates existing).
+ * @param profileData Profile data with name and profile JSON
+ */
+export async function screenHealthSaveProfile(profileData: {
+  name: string;
+  profile: Record<string, any>;
+}): Promise<ScreenHealthSaveProfileResult> {
+  return await ensureBridge().screenHealthSaveProfile(profileData);
+}
+
+/**
+ * Delete a profile from local storage.
+ * @param profileId Profile ID to delete
+ */
+export async function screenHealthDeleteProfile(profileId: string): Promise<ScreenHealthDeleteProfileResult> {
+  return await ensureBridge().screenHealthDeleteProfile(profileId);
+}
+
+/**
+ * Get a specific profile by ID from local storage.
+ * @param profileId Profile ID to retrieve
+ */
+export async function screenHealthGetProfile(profileId: string): Promise<ScreenHealthGetProfileResult> {
+  return await ensureBridge().screenHealthGetProfile(profileId);
+}
