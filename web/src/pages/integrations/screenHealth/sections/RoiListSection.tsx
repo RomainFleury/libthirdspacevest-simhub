@@ -4,6 +4,29 @@ import { useScreenHealthRednessDraft, useScreenHealthRednessDraftControls } from
 import { useScreenHealthHealthBarDraft, useScreenHealthHealthBarDraftControls } from "../draft/HealthBarDraftContext";
 import { useScreenHealthHealthNumberDraft, useScreenHealthHealthNumberDraftControls } from "../draft/HealthNumberDraftContext";
 import { clamp01 } from "../utils";
+import type { RoiRect } from "../draft/types";
+
+// Reference resolution for pixel calculations (1920x1080)
+const REF_WIDTH = 1920;
+const REF_HEIGHT = 1080;
+
+function RoiPreviewInfo({ rect }: { rect: RoiRect }) {
+  const percentage = (rect.w * rect.h * 100).toFixed(2);
+  const pixelWidth = Math.round(rect.w * REF_WIDTH);
+  const pixelHeight = Math.round(rect.h * REF_HEIGHT);
+  
+  return (
+    <div className="text-xs text-slate-400 mt-2 p-2 rounded bg-slate-800/30">
+      <div className="font-medium text-slate-300 mb-1">Capture Preview</div>
+      <div>
+        <span className="text-slate-300">{percentage}%</span> of screen
+      </div>
+      <div className="text-slate-500">
+        For {REF_WIDTH}x{REF_HEIGHT}px screens: {pixelWidth}×{pixelHeight}px
+      </div>
+    </div>
+  );
+}
 
 export function RoiListSection(props: {
   captureRoiDebugImages: (monitorIndex: number, rois: Array<{ name: string; rect: { x: number; y: number; w: number; h: number } }>) => void;
@@ -124,6 +147,7 @@ export function RoiListSection(props: {
                 />
               </div>
             </div>
+            <RoiPreviewInfo rect={healthBarRoi} />
             <div className="flex items-center justify-end gap-2">
               <button
                 onClick={() => setHealthBarRoi(null)}
@@ -201,6 +225,7 @@ export function RoiListSection(props: {
                 />
               </div>
             </div>
+            <RoiPreviewInfo rect={healthNumberRoi} />
             <div className="flex items-center justify-end gap-2">
               <button
                 onClick={() => setHealthNumberRoi(null)}
@@ -303,6 +328,7 @@ export function RoiListSection(props: {
                   />
                 </div>
               </div>
+              <RoiPreviewInfo rect={r.rect} />
               <div className="flex items-center justify-end gap-2">
                 <button
                   onClick={() => removeRoi(idx)}
