@@ -9,7 +9,6 @@ export function useScreenHealthIntegration() {
   const daemon = useScreenHealthDaemonStatus();
   const events = useScreenHealthDaemonEvents({ setStatus: daemon.setStatus });
   const profiles = useScreenHealthProfiles();
-  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
 
   useEffect(() => {
     daemon.refreshStatus();
@@ -18,14 +17,7 @@ export function useScreenHealthIntegration() {
     return () => clearInterval(interval);
   }, [daemon.refreshStatus]);
 
-  // Auto-select first profile if none selected and profiles are loaded
-  useEffect(() => {
-    if (selectedProfileId === null && profiles.profiles.length > 0) {
-      setSelectedProfileId(profiles.profiles[0].id);
-    }
-  }, [selectedProfileId, profiles.profiles]);
-
-  const start = useCallback(async () => {
+  const start = useCallback(async (selectedProfileId: string | null) => {
     if (!selectedProfileId) {
       daemon.setError("Please select a profile");
       return;
@@ -51,7 +43,7 @@ export function useScreenHealthIntegration() {
     } finally {
       daemon.setLoading(false);
     }
-  }, [selectedProfileId, profiles.profiles, daemon]);
+  }, [profiles.profiles, daemon]);
 
   return {
     status: daemon.status,
@@ -63,8 +55,6 @@ export function useScreenHealthIntegration() {
     clearEvents: events.clearEvents,
 
     profiles: profiles.profiles,
-    selectedProfileId,
-    setSelectedProfileId,
     start,
     stop: daemon.stop,
     refreshStatus: daemon.refreshStatus,

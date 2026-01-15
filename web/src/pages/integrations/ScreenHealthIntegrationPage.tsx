@@ -1,4 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { GameIntegrationPage } from "../../components/GameIntegrationPage";
 import { getIntegratedGame } from "../../data/integratedGames";
 import type { GameEvent } from "../../types/integratedGames";
@@ -10,30 +11,59 @@ const game = getIntegratedGame("screen_health")!;
 export function ScreenHealthIntegrationPage() {
   const integration = useScreenHealthIntegration();
   const navigate = useNavigate();
+  const [browsingProfileId, setBrowsingProfileId] = useState<string>("");
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
+
+  // Initialize browsing profile to first available profile
+  useEffect(() => {
+    if (!browsingProfileId && integration.profiles.length > 0) {
+      setBrowsingProfileId(integration.profiles[0].id);
+    }
+  }, [browsingProfileId, integration.profiles]);
+
+  const handleUseProfile = () => {
+    if (browsingProfileId) {
+      setSelectedProfileId(browsingProfileId);
+    }
+  };
+
+  const selectedProfile = selectedProfileId
+    ? integration.profiles.find((p) => p.id === selectedProfileId)
+    : null;
 
   const profileSelector = (
-    <div className="space-y-2">
+    <div className="space-y-2 flex-1">
       <label className="text-sm font-medium text-white">Profile</label>
-      <select
-        value={integration.selectedProfileId || ""}
-        onChange={(e) => integration.setSelectedProfileId(e.target.value)}
-        className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-      >
-        {integration.profiles.map((profile) => (
-          <option key={profile.id} value={profile.id}>
-            {profile.name} {profile.type === "preset" ? "[Global]" : "[Local]"}
-          </option>
-        ))}
-      </select>
-      <div className="text-xs text-slate-400">
-        {integration.selectedProfileId && (
-          <>
-            {integration.profiles.find((p) => p.id === integration.selectedProfileId)?.type === "preset"
-              ? "Global preset (read-only)"
-              : "Local profile (customizable)"}
-          </>
-        )}
+      <div className="flex gap-2">
+        <select
+          value={browsingProfileId}
+          onChange={(e) => setBrowsingProfileId(e.target.value)}
+          className="flex-1 rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+        >
+          {integration.profiles.map((profile) => (
+            <option key={profile.id} value={profile.id}>
+              {profile.name} {profile.type === "preset" ? "[Global]" : "[Local]"}
+            </option>
+          ))}
+        </select>
+        <button
+          onClick={handleUseProfile}
+          disabled={!browsingProfileId || browsingProfileId === selectedProfileId}
+          className="rounded-lg bg-blue-600/80 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+          title="Use this profile for starting screen health"
+        >
+          Use this one
+        </button>
       </div>
+      {selectedProfile && (
+        <div className="text-xs text-slate-300">
+          <span className="font-medium">Active:</span> {selectedProfile.name}{" "}
+          {selectedProfile.type === "preset" ? "(Global preset)" : "(Local profile)"}
+        </div>
+      )}
+      {!selectedProfile && (
+        <div className="text-xs text-slate-400">No profile selected. Choose one and click "Use this one".</div>
+      )}
     </div>
   );
 
@@ -118,7 +148,23 @@ export function ScreenHealthIntegrationPage() {
 
   return (
     <>
-      {/* Profile Selector Section */}
+
+      <GameIntegrationPage
+        game={game}
+        status={integration.status}
+        loading={integration.loading}
+        error={integration.error}
+        events={gameEvents}
+        eventDisplayMap={EVENT_DISPLAY_MAP}
+        onStart={() => integration.start(selectedProfileId)}
+        onStop={integration.stop}
+        onClearEvents={integration.clearEvents}
+        formatEventDetails={formatEventDetails}
+        configurationPanel={configurationPanel}
+        setupGuide={setupGuide}
+        additionalStats={additionalStats}
+      >
+            {/* Profile Selector Section */}
       <section className="max-w-4xl mx-auto rounded-2xl bg-slate-800/80 p-4 md:p-6 shadow-lg ring-1 ring-white/5">
         <div className="flex flex-wrap items-center gap-4">
           {profileSelector}
@@ -141,22 +187,7 @@ export function ScreenHealthIntegrationPage() {
           </button>
         </div>
       </section>
-
-      <GameIntegrationPage
-        game={game}
-        status={integration.status}
-        loading={integration.loading}
-        error={integration.error}
-        events={gameEvents}
-        eventDisplayMap={EVENT_DISPLAY_MAP}
-        onStart={integration.start}
-        onStop={integration.stop}
-        onClearEvents={integration.clearEvents}
-        formatEventDetails={formatEventDetails}
-        configurationPanel={configurationPanel}
-        setupGuide={setupGuide}
-        additionalStats={additionalStats}
-      />
+    </GameIntegrationPage>
     </>
   );
 }
