@@ -4,6 +4,7 @@ import {
   ScreenHealthScreenshotFile,
   ScreenHealthSettings,
   screenHealthCaptureCalibrationScreenshot,
+  screenHealthSelectExistingScreenshot,
   screenHealthCaptureRoiDebugImages,
   screenHealthClearScreenshots,
   screenHealthDeleteScreenshot,
@@ -55,6 +56,24 @@ export function useScreenHealthScreenshots() {
   const openScreenshotsDir = useCallback(async () => {
     const result = await screenHealthOpenScreenshotsDir();
     if (!result.success) throw new Error(result.error || "Failed to open screenshots dir");
+  }, []);
+
+  const selectExistingScreenshot = useCallback(async () => {
+    const result = await screenHealthSelectExistingScreenshot();
+    if (result.canceled) {
+      return { canceled: true };
+    }
+    if (!result.success || !result.dataUrl || !result.width || !result.height || !result.filename || !result.path) {
+      throw new Error(result.error || "Failed to load screenshot");
+    }
+    setLastCapturedImage({
+      dataUrl: result.dataUrl,
+      width: result.width,
+      height: result.height,
+      filename: result.filename,
+      path: result.path,
+    });
+    return result;
   }, []);
 
   const captureCalibrationScreenshot = useCallback(
@@ -113,6 +132,7 @@ export function useScreenHealthScreenshots() {
     updateSettings,
     chooseScreenshotsDir,
     openScreenshotsDir,
+    selectExistingScreenshot,
     captureCalibrationScreenshot,
     captureRoiDebugImages,
     deleteScreenshot,

@@ -224,6 +224,41 @@ function registerScreenHealthHandlers(getDaemonBridge, getMainWindow) {
     }
   });
 
+  ipcMain.handle("screenHealth:selectExistingScreenshot", async () => {
+    try {
+      const mainWindow = getMainWindow();
+      const result = await dialog.showOpenDialog(mainWindow, {
+        title: "Select Screenshot Image",
+        properties: ["openFile"],
+        filters: [
+          { name: "Images", extensions: ["png", "jpg", "jpeg", "bmp", "gif"] },
+          { name: "All Files", extensions: ["*"] },
+        ],
+      });
+      if (result.canceled || result.filePaths.length === 0) {
+        return { success: false, canceled: true };
+      }
+      const imagePath = result.filePaths[0];
+      const image = nativeImage.createFromPath(imagePath);
+      if (image.isEmpty()) {
+        return { success: false, error: "Failed to load image file" };
+      }
+      const size = image.getSize();
+      const filename = path.basename(imagePath);
+      
+      return {
+        success: true,
+        filename,
+        path: imagePath,
+        width: size.width,
+        height: size.height,
+        dataUrl: image.toDataURL(),
+      };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  });
+
   ipcMain.handle("screenHealth:captureRoiDebugImages", async (_, monitorIndex, rois) => {
     try {
       const idx = Number(monitorIndex || 1);

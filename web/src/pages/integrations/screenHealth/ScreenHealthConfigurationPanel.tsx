@@ -40,6 +40,7 @@ type Props = {
 
   lastCapturedImage: { dataUrl: string; width: number; height: number; filename: string; path: string } | null;
   captureCalibrationScreenshot: (monitorIndex: number) => Promise<any>;
+  selectExistingScreenshot?: () => Promise<any>;
   captureRoiDebugImages: (
     monitorIndex: number,
     rois: Array<{ name: string; rect: { x: number; y: number; w: number; h: number } }>
@@ -82,6 +83,7 @@ function ScreenHealthConfigurationPanelInner(props: Props) {
     clearScreenshots,
     lastCapturedImage,
     captureCalibrationScreenshot,
+    selectExistingScreenshot,
     captureRoiDebugImages,
   } = props;
 
@@ -97,7 +99,10 @@ function ScreenHealthConfigurationPanelInner(props: Props) {
         onSaveProfile={props.onSaveProfile}
       />
 
-      <CaptureSettingsSection onCapture={captureCalibrationScreenshot} />
+      <CaptureSettingsSection
+        onCapture={captureCalibrationScreenshot}
+        onSelectExisting={selectExistingScreenshot}
+      />
 
       <DetectorSelectionSection />
 

@@ -100,6 +100,7 @@ export function ScreenHealthBuilderPage() {
           clearScreenshots={screenshots.clearScreenshots}
           lastCapturedImage={screenshots.lastCapturedImage}
           captureCalibrationScreenshot={screenshots.captureCalibrationScreenshot}
+          selectExistingScreenshot={screenshots.selectExistingScreenshot}
           captureRoiDebugImages={screenshots.captureRoiDebugImages}
           loadFromProfileId={fromId || undefined}
           profiles={profiles.profiles}

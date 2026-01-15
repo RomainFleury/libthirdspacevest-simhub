@@ -382,6 +382,16 @@ declare global {
       }>;
       screenHealthDeleteScreenshot: (filename: string) => Promise<{ success: boolean; error?: string }>;
       screenHealthClearScreenshots: () => Promise<{ success: boolean; error?: string }>;
+      screenHealthSelectExistingScreenshot: () => Promise<{
+        success: boolean;
+        canceled?: boolean;
+        error?: string;
+        filename?: string;
+        path?: string;
+        width?: number;
+        height?: number;
+        dataUrl?: string;
+      }>;
       screenHealthCaptureCalibrationScreenshot: (monitorIndex?: number) => Promise<{
         success: boolean;
         filename?: string;
@@ -798,6 +808,10 @@ export async function screenHealthDeleteScreenshot(filename: string) {
 
 export async function screenHealthClearScreenshots() {
   return await ensureBridge().screenHealthClearScreenshots();
+}
+
+export async function screenHealthSelectExistingScreenshot() {
+  return await ensureBridge().screenHealthSelectExistingScreenshot();
 }
 
 export async function screenHealthCaptureCalibrationScreenshot(monitorIndex = 1) {

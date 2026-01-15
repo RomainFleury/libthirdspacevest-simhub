@@ -94,6 +94,7 @@ contextBridge.exposeInMainWorld("vestBridge", {
   screenHealthClearScreenshots: () => ipcRenderer.invoke("screenHealth:clearScreenshots"),
   screenHealthCaptureCalibrationScreenshot: (monitorIndex) =>
     ipcRenderer.invoke("screenHealth:captureCalibrationScreenshot", monitorIndex),
+  screenHealthSelectExistingScreenshot: () => ipcRenderer.invoke("screenHealth:selectExistingScreenshot"),
   screenHealthCaptureRoiDebugImages: (monitorIndex, rois) =>
     ipcRenderer.invoke("screenHealth:captureRoiDebugImages", monitorIndex, rois),
   screenHealthStart: (profile) => ipcRenderer.invoke("screenHealth:start", profile),
