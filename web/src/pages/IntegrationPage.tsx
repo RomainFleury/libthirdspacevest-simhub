@@ -5,6 +5,7 @@ import {
   L4D2IntegrationPage,
   ScreenHealthIntegrationPage,
   ScreenHealthCalibrationPage,
+  ScreenHealthSettingsPage,
 } from "./integrations";
 
 /**
@@ -17,8 +18,18 @@ const INTEGRATION_PAGES: Record<string, React.ComponentType> = {
   screen_health: ScreenHealthIntegrationPage,
 };
 
-const INTEGRATION_SUBPAGES: Record<string, { calibration?: React.ComponentType }> = {
-  screen_health: { calibration: ScreenHealthCalibrationPage },
+const INTEGRATION_SUBPAGES: Record<string, { 
+  calibration?: React.ComponentType;
+  settings?: React.ComponentType;
+  builder?: React.ComponentType;
+  preview?: React.ComponentType;
+}> = {
+  screen_health: { 
+    calibration: ScreenHealthCalibrationPage,
+    settings: ScreenHealthSettingsPage,
+    builder: ScreenHealthCalibrationPage, // Will be renamed later
+    preview: null, // Will be created
+  },
 };
 
 /**
@@ -59,6 +70,9 @@ export function IntegrationPage() {
     <Routes>
       <Route index element={<PageComponent />} />
       {sub.calibration && <Route path="calibration" element={<sub.calibration />} />}
+      {sub.settings && <Route path="settings" element={<sub.settings />} />}
+      {sub.builder && <Route path="builder" element={<sub.builder />} />}
+      {sub.preview && <Route path="preview/:id" element={<sub.preview />} />}
       <Route path="*" element={<Navigate to={`/games/${gameId}`} replace />} />
     </Routes>
   );
