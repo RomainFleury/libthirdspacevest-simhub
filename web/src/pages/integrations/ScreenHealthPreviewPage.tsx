@@ -72,10 +72,10 @@ export function ScreenHealthPreviewPage() {
           <h1 className="text-2xl font-bold text-white mb-2">Profile Not Found</h1>
           <p className="text-slate-400 mb-6">No profile ID provided.</p>
           <Link
-            to="/games/screen_health"
+            to="/games/screen_health/settings"
             className="inline-flex items-center gap-2 rounded-lg bg-blue-600/80 px-4 py-2 font-medium text-white transition hover:bg-blue-600"
           >
-            ← Back to Integration
+            ← Back to Settings
           </Link>
         </div>
       </div>
@@ -103,10 +103,10 @@ export function ScreenHealthPreviewPage() {
         </div>
         <div className="flex gap-2">
           <Link
-            to="/games/screen_health"
+            to="/games/screen_health/settings"
             className="rounded-lg bg-slate-700/50 px-3 py-2 text-sm font-medium text-white ring-1 ring-white/10 hover:bg-slate-700"
           >
-            ← Back
+            ← Back to Settings
           </Link>
           {isLocal && (
             <button

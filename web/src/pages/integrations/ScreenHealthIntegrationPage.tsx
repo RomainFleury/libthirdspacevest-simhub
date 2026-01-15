@@ -156,7 +156,13 @@ export function ScreenHealthIntegrationPage() {
         error={integration.error}
         events={gameEvents}
         eventDisplayMap={EVENT_DISPLAY_MAP}
-        onStart={selectedProfileId ? () => integration.start(selectedProfileId) : undefined}
+        onStart={() => {
+          if (!selectedProfileId) {
+            // This shouldn't happen as the button should be disabled, but just in case
+            return;
+          }
+          integration.start(selectedProfileId);
+        }}
         onStop={integration.stop}
         onClearEvents={integration.clearEvents}
         formatEventDetails={formatEventDetails}
