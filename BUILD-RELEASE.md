@@ -170,12 +170,9 @@ Game mods are bundled with the app in `resources/mods/`:
 | Game | Files | Install Method |
 |------|-------|----------------|
 | Left 4 Dead 2 | `*.nut` VScripts | Click "Install Mod" in UI |
-| SUPERHOT VR | `ThirdSpace_SuperhotVR.dll` | Download from UI |
-| Pistol Whip | `ThirdSpace_PistolWhip.dll` | Download from UI |
-| GTA V | `ThirdSpaceGTAV.dll` | Download from UI |
 | Half-Life: Alyx | Link to NexusMods | External download |
 
-**Note:** The DLL mods must be compiled before building a release. See `mods/README.md` for build instructions.
+**Note:** Other mods (SUPERHOT VR, GTA V, Pistol Whip) have been moved to `misc-documentations/archived-untested-mods/` as they are untested.
 
 ## Distribution
 

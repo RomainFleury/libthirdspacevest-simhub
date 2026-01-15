@@ -145,13 +145,12 @@ class Command:
     gsi_port: Optional[int] = None
     # Half-Life: Alyx params
     log_path: Optional[str] = None
-    # Star Citizen params
-    message: Optional[str] = None  # Used for player name in Star Citizen
-    # SUPERHOT VR params
-    event: Optional[str] = None  # Event name (death, pistol_recoil, etc.)
-    hand: Optional[str] = None   # "left" or "right"
+    # Generic params
+    message: Optional[str] = None  # Used for player name or other messages
+    # Generic game event params (for TCP client integrations)
+    event: Optional[str] = None  # Event name
+    hand: Optional[str] = None   # "left" or "right" for hand-specific events
     priority: Optional[int] = None
-    # GTA V params
     angle: Optional[float] = None  # Damage angle in degrees
     damage: Optional[float] = None  # Damage amount
     health_remaining: Optional[float] = None  # Remaining health
@@ -236,7 +235,7 @@ class Event:
     # Half-Life: Alyx info
     log_path: Optional[str] = None
     params: Optional[Dict[str, Any]] = None  # For alyx_game_event params
-    # SUPERHOT VR info
+    # Generic game event info
     hand: Optional[str] = None  # "left" or "right" for hand-specific events
     # Predefined effects info
     effect_name: Optional[str] = None  # Name of effect being played/completed

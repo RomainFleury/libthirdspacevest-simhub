@@ -31,7 +31,7 @@ You are helping add a **bundled preset profile** for the “Generic Screen Healt
 
 ### Output profile shape (schema_version 0)
 Create a preset object like:
-- `preset_id`: stable id, e.g. `gtav_health_bar_v1`
+- `preset_id`: stable id, e.g. `cs2_health_bar_v1`
 - `display_name`: user-friendly string
 - `profile`: daemon-compatible JSON with:
   - `schema_version: 0`

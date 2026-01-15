@@ -1,14 +1,14 @@
 # Build script for all Third Space Vest mods
-# This script builds all mods in the repository: SUPERHOT VR, GTA V, Pistol Whip, and SimHub plugin
+# This script builds mods in the repository (currently only SimHub plugin)
 #
 # Usage:
 #   .\build-all-mods.ps1              # Build all mods
-#   .\build-all-mods.ps1 -Mods superhot,gta5  # Build specific mods
+#   .\build-all-mods.ps1 -Mods simhub  # Build specific mods
 #   .\build-all-mods.ps1 -Clean        # Clean before building
 
 param(
     [Parameter()]
-    [string[]]$Mods = @("superhot", "gta5", "pistolwhip", "simhub"),
+    [string[]]$Mods = @("simhub"),
     [switch]$Clean,
     [switch]$SkipPrerequisites
 )
@@ -20,33 +20,6 @@ Write-Host ""
 
 # Define mod configurations
 $modConfigs = @{
-    "superhot" = @{
-        Name = "SUPERHOT VR"
-        Path = "superhot-mod"
-        Solution = "ThirdSpace_SuperhotVR.sln"
-        OutputDll = "ThirdSpace_SuperhotVR\bin\Release\ThirdSpace_SuperhotVR.dll"
-        RequiresLibs = @("MelonLoader.dll", "0Harmony.dll", "Assembly-CSharp.dll", "UnityEngine.dll", "UnityEngine.CoreModule.dll")
-        LibsSource = "SUPERHOT VR\MelonLoader\Managed\"
-        BuildScript = $null
-    }
-    "gta5" = @{
-        Name = "GTA V"
-        Path = "gta5-mod"
-        Solution = "ThirdSpaceGTAV.sln"
-        OutputDll = "ThirdSpaceGTAV\bin\Release\ThirdSpaceGTAV.dll"
-        RequiresLibs = @("ScriptHookVDotNet.dll", "GTA.dll")
-        LibsSource = "Script Hook V .NET"
-        BuildScript = "build.ps1"
-    }
-    "pistolwhip" = @{
-        Name = "Pistol Whip"
-        Path = "pistolwhip-mod"
-        Solution = "ThirdSpace_PistolWhip.sln"
-        OutputDll = "ThirdSpace_PistolWhip\bin\Release\ThirdSpace_PistolWhip.dll"
-        RequiresLibs = @("MelonLoader.dll", "0Harmony.dll", "Il2Cppmscorlib.dll", "Il2CppUnityEngine.dll", "Assembly-CSharp.dll")
-        LibsSource = "Pistol Whip\MelonLoader\Managed\"
-        BuildScript = $null
-    }
     "simhub" = @{
         Name = "SimHub Plugin"
         Path = "simhub-plugin"
