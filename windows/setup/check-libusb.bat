@@ -65,21 +65,6 @@ if exist "%TEST_PATH%\libusb-1.0.dll" (
     goto :found
 )
 
-:: Try x86 (32-bit)
-set "TEST_PATH=%PYTHON_PREFIX%\Lib\site-packages\libusb\_platform\windows\x86"
-if exist "%TEST_PATH%\libusb-1.0.dll" (
-    set "LIBUSB_PATH=%TEST_PATH%"
-    set "LIBUSB_DLL=%TEST_PATH%\libusb-1.0.dll"
-    goto :found
-)
-
-:: Try arm64 (for ARM Windows)
-set "TEST_PATH=%PYTHON_PREFIX%\Lib\site-packages\libusb\_platform\windows\arm64"
-if exist "%TEST_PATH%\libusb-1.0.dll" (
-    set "LIBUSB_PATH=%TEST_PATH%"
-    set "LIBUSB_DLL=%TEST_PATH%\libusb-1.0.dll"
-    goto :found
-)
 
 :: DLL not found
 echo   [FAIL] libusb DLL not found!

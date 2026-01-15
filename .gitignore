@@ -1,4 +1,5 @@
 build
+!modern-third-space/build/vest-daemon-entry.py
 node_modules
 repomix-output.*
 

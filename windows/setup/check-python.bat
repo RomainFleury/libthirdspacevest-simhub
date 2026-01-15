@@ -35,37 +35,9 @@ if !ERRORLEVEL! equ 0 (
         set "DETECTION_METHOD=py launcher (Python 3.14)"
         goto :verify_python
     )
-    :: Try Python 3.11 as fallback (for older systems)
-    py -3.11 -c "import sys" >nul 2>&1
-    if !ERRORLEVEL! equ 0 (
-        set "DETECTED_PYTHON=py -3.11"
-        set "DETECTION_METHOD=py launcher (Python 3.11 - fallback)"
-        goto :verify_python
-    )
-    :: Try py launcher with any Python 3
-    py -3 -c "import sys" >nul 2>&1
-    if !ERRORLEVEL! equ 0 (
-        set "DETECTED_PYTHON=py -3"
-        set "DETECTION_METHOD=py launcher (Python 3.x)"
-        goto :verify_python
-    )
+
 )
 
-:: 3. Try python on PATH
-where python >nul 2>&1
-if !ERRORLEVEL! equ 0 (
-    set "DETECTED_PYTHON=python"
-    set "DETECTION_METHOD=python on PATH"
-    goto :verify_python
-)
-
-:: 4. Try python3 on PATH
-where python3 >nul 2>&1
-if !ERRORLEVEL! equ 0 (
-    set "DETECTED_PYTHON=python3"
-    set "DETECTION_METHOD=python3 on PATH"
-    goto :verify_python
-)
 
 :: No Python found
 echo   [FAIL] Python is not installed!

@@ -54,7 +54,7 @@ if "%VERSION_CLEAN:~0,1%"=="v" set "VERSION_CLEAN=%VERSION_CLEAN:~1%"
 if not "%VERSION_CLEAN%"=="%REQUIRED_VERSION%" (
     echo   [WARN] Yarn version mismatch!
     echo          Found: %YARN_VERSION%
-    echo          Required: %REQUIRED_VERSION% (from package.json)
+    echo          Required: %REQUIRED_VERSION% from package.json
     echo.
     echo   Corepack should automatically use the correct version.
     echo   Try: corepack enable
@@ -64,6 +64,6 @@ if not "%VERSION_CLEAN%"=="%REQUIRED_VERSION%" (
     exit /b 1
 )
 
-echo   [OK] Yarn %YARN_VERSION% (correct version)
+echo   [OK] Yarn %YARN_VERSION% correct version
 
 exit /b 0

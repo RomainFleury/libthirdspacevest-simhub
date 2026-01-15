@@ -85,7 +85,7 @@ if %ERRORLEVEL% equ 0 (
 echo.
 
 :: ============================================
-:: 6. bettercam (optional - for Screen Health)
+:: 6. bettercam - for Screen Health
 :: ============================================
 call "%~dp0setup\check-bettercam.bat"
 if %ERRORLEVEL% equ 0 (
@@ -143,7 +143,7 @@ if !CHECKS_FAILED! equ 0 (
         echo     - Or run start-daemon.bat + start-ui.bat separately
         echo.
     ) else (
-        echo   [OK] Setup complete (with warnings)
+        echo   [OK] Setup complete with warnings
         echo.
     )
 ) else (
@@ -154,4 +154,4 @@ if !CHECKS_FAILED! equ 0 (
 )
 
 
-exit
+@REM exit

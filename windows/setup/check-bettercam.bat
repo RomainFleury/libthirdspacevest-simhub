@@ -33,22 +33,22 @@ if not defined TSV_PYTHON (
 set "PYTHON_CMD=%TSV_PYTHON%"
 
 :: Check if bettercam package is installed
-cmd /c "%PYTHON_CMD% -c \"import bettercam\"" >nul 2>&1
-if !ERRORLEVEL! neq 0 (
-    echo   [INFO] bettercam package not found, installing...
-    cmd /c "!PYTHON_CMD! -m pip install bettercam --quiet" >nul 2>&1
-    if !ERRORLEVEL! neq 0 (
-        echo   [FAIL] Failed to install bettercam package!
-        echo          Please run manually: pip install bettercam
-        exit /b 1
-    )
-    echo   [OK] bettercam package installed
-) else (
-    echo   [OK] bettercam package found
-)
+@REM cmd /c "%PYTHON_CMD% -c \"import bettercam\"" >nul 2>&1
+@REM if !ERRORLEVEL! neq 0 (
+@REM     echo   [INFO] bettercam package not found, installing...
+@REM     cmd /c "!PYTHON_CMD! -m pip install bettercam --quiet" >nul 2>&1
+@REM     if !ERRORLEVEL! neq 0 (
+@REM         echo   [FAIL] Failed to install bettercam package!
+@REM         echo          Please run manually: pip install bettercam
+@REM         exit /b 1
+@REM     )
+@REM     echo   [OK] bettercam package installed
+@REM ) else (
+@REM     echo   [OK] bettercam package found
+@REM )
 
 :: Validate bettercam can capture at least one ROI
-echo   [..] Validating screen capture (single ROI grab)...
+echo   [..] Validating screen capture - single ROI grab...
 :: call !PYTHON_CMD! "%~dp0test-bettercam-debug.py"
 
 

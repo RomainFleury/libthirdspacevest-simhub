@@ -3,7 +3,7 @@ Name: modern-third-space
 Version: 0.1.0
 Summary: Modern Python bridge APIs for the Third Space Vest
 Author-email: SimHub Contributors <contact@simhub.dev>
-Requires-Python: >=3.11
+Requires-Python: >=3.14
 Description-Content-Type: text/markdown
 Requires-Dist: pyusb>=1.2.1
 Requires-Dist: mss>=9.0.1
