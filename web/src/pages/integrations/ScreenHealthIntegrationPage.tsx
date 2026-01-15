@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { GameIntegrationPage } from "../../components/GameIntegrationPage";
 import { getIntegratedGame } from "../../data/integratedGames";
 import type { GameEvent } from "../../types/integratedGames";
@@ -9,23 +9,35 @@ const game = getIntegratedGame("screen_health")!;
 
 export function ScreenHealthIntegrationPage() {
   const integration = useScreenHealthIntegration();
+  const navigate = useNavigate();
 
-  const configurationPanel = (
-    <div className="space-y-3">
-      <div className="text-sm text-slate-400">
-        Calibration (screenshots + ROI drawing) is in a separate page to avoid UI freezes.
-      </div>
-      <Link
-        to="/games/screen_health/calibration"
-        className="inline-flex items-center gap-2 rounded-lg bg-blue-600/80 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-600"
+  const profileSelector = (
+    <div className="space-y-2">
+      <label className="text-sm font-medium text-white">Profile</label>
+      <select
+        value={integration.selectedProfileId || ""}
+        onChange={(e) => integration.setSelectedProfileId(e.target.value)}
+        className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10 focus:ring-2 focus:ring-blue-500 focus:outline-none"
       >
-        Open calibration & settings →
-      </Link>
-      <div className="text-xs text-slate-500">
-        Tip: keep this page open while playing; do calibration once, then come back here.
+        {integration.profiles.map((profile) => (
+          <option key={profile.id} value={profile.id}>
+            {profile.name} {profile.type === "preset" ? "[Global]" : "[Local]"}
+          </option>
+        ))}
+      </select>
+      <div className="text-xs text-slate-400">
+        {integration.selectedProfileId && (
+          <>
+            {integration.profiles.find((p) => p.id === integration.selectedProfileId)?.type === "preset"
+              ? "Global preset (read-only)"
+              : "Local profile (customizable)"}
+          </>
+        )}
       </div>
     </div>
   );
+
+  const configurationPanel = null; // Removed - profile selection is now in main controls
 
   const setupGuide = (
     <div className="space-y-3 text-sm">
@@ -105,21 +117,47 @@ export function ScreenHealthIntegrationPage() {
   };
 
   return (
-    <GameIntegrationPage
-      game={game}
-      status={integration.status}
-      loading={integration.loading}
-      error={integration.error}
-      events={gameEvents}
-      eventDisplayMap={EVENT_DISPLAY_MAP}
-      onStart={integration.start}
-      onStop={integration.stop}
-      onClearEvents={integration.clearEvents}
-      formatEventDetails={formatEventDetails}
-      configurationPanel={configurationPanel}
-      setupGuide={setupGuide}
-      additionalStats={additionalStats}
-    />
+    <>
+      {/* Profile Selector Section */}
+      <section className="max-w-4xl mx-auto rounded-2xl bg-slate-800/80 p-4 md:p-6 shadow-lg ring-1 ring-white/5">
+        <div className="flex flex-wrap items-center gap-4">
+          {profileSelector}
+          <button
+            onClick={() => navigate("/games/screen_health/settings")}
+            disabled={integration.status.running}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-600/80 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            title={integration.status.running ? "Stop screen health to access settings" : "Open settings"}
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+              />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            Settings
+          </button>
+        </div>
+      </section>
+
+      <GameIntegrationPage
+        game={game}
+        status={integration.status}
+        loading={integration.loading}
+        error={integration.error}
+        events={gameEvents}
+        eventDisplayMap={EVENT_DISPLAY_MAP}
+        onStart={integration.start}
+        onStop={integration.stop}
+        onClearEvents={integration.clearEvents}
+        formatEventDetails={formatEventDetails}
+        configurationPanel={configurationPanel}
+        setupGuide={setupGuide}
+        additionalStats={additionalStats}
+      />
+    </>
   );
 }
 

@@ -2,38 +2,38 @@
 
 This document tracks the implementation progress for the Screen Health UI redesign.
 
-## Phase 1: Add IPC Handlers for Local Profile Management
+## Phase 1: Add IPC Handlers for Local Profile Management ✅
 
 ### Storage Cleanup
-- [ ] Remove `activeProfileId` from `screenHealthStorage.cjs`
-- [ ] Remove `getActiveProfile()` function from storage
-- [ ] Remove `setActiveProfile()` function from storage
-- [ ] Update `loadState()` to not include `activeProfileId`
-- [ ] Update `saveState()` to not save `activeProfileId`
-- [ ] Update `upsertProfile()` to not set `activeProfileId` automatically
+- [x] Remove `activeProfileId` from `screenHealthStorage.cjs`
+- [x] Remove `getActiveProfile()` function from storage
+- [x] Remove `setActiveProfile()` function from storage
+- [x] Update `loadState()` to not include `activeProfileId`
+- [x] Update `saveState()` to not save `activeProfileId`
+- [x] Update `upsertProfile()` to not set `activeProfileId` automatically
 
 ### IPC Handlers
-- [ ] Add `screenHealth:listProfiles` handler in `screenHealthHandlers.cjs`
-- [ ] Add `screenHealth:saveProfile` handler (always creates new, never updates)
-- [ ] Add `screenHealth:deleteProfile` handler
-- [ ] Add `screenHealth:getProfile` handler
+- [x] Add `screenHealth:listProfiles` handler in `screenHealthHandlers.cjs`
+- [x] Add `screenHealth:saveProfile` handler (always creates new, never updates)
+- [x] Add `screenHealth:deleteProfile` handler
+- [x] Add `screenHealth:getProfile` handler
 
 ### Preload & Bridge API
-- [ ] Add IPC methods to `preload.cjs`
-- [ ] Add TypeScript types to `bridgeApi.ts`
-- [ ] Add function exports to `bridgeApi.ts`
+- [x] Add IPC methods to `preload.cjs`
+- [x] Add TypeScript types to `bridgeApi.ts`
+- [x] Add function exports to `bridgeApi.ts`
 
-## Phase 2: Create Profile Management Hook
+## Phase 2: Create Profile Management Hook ✅
 
-- [ ] Create `useScreenHealthProfiles.ts` hook
-- [ ] Implement profile list combining presets + local storage
-- [ ] Implement unified profile type with `type: 'preset' | 'local'`
-- [ ] Add `listProfiles()` function
-- [ ] Add `saveProfile()` function (always creates new)
-- [ ] Add `deleteProfile()` function
-- [ ] Add `getProfile()` function
-- [ ] Add loading state management
-- [ ] Add error state management
+- [x] Create `useScreenHealthProfiles.ts` hook
+- [x] Implement profile list combining presets + local storage
+- [x] Implement unified profile type with `type: 'preset' | 'local'`
+- [x] Add `listProfiles()` function
+- [x] Add `saveProfile()` function (always creates new)
+- [x] Add `deleteProfile()` function
+- [x] Add `getProfile()` function
+- [x] Add loading state management
+- [x] Add error state management
 
 ## Phase 3: Update Integration Page
 
