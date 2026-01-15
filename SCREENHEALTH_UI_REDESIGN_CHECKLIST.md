@@ -35,65 +35,65 @@ This document tracks the implementation progress for the Screen Health UI redesi
 - [x] Add loading state management
 - [x] Add error state management
 
-## Phase 3: Update Integration Page
+## Phase 3: Update Integration Page ✅
 
-- [ ] Add profile selector dropdown/select box
-- [ ] Implement profile list display with tags (Global/Local)
-- [ ] Add profile selection state management
-- [ ] Update `onStart` to use selected profile
-- [ ] Update profile data extraction (preset vs local)
-- [ ] Add cog/gear button linking to settings page
-- [ ] Disable cog button when daemon is running
-- [ ] Show active/running profile in status
-- [ ] Remove old configuration panel
-- [ ] Update setup guide text
+- [x] Add profile selector dropdown/select box
+- [x] Implement profile list display with tags (Global/Local)
+- [x] Add profile selection state management
+- [x] Update `onStart` to use selected profile
+- [x] Update profile data extraction (preset vs local)
+- [x] Add cog/gear button linking to settings page
+- [x] Disable cog button when daemon is running
+- [x] Show active/running profile in status
+- [x] Remove old configuration panel
+- [x] Update setup guide text
 
-## Phase 4: Create Settings Page
+## Phase 4: Create Settings Page ✅
 
-- [ ] Create `ScreenHealthSettingsPage.tsx`
-- [ ] Add route registration in router
-- [ ] Implement profile list display (presets + local)
-- [ ] Add View/Preview button → preview page
-- [ ] Add Edit button (local only) → builder with `?from=:id`
-- [ ] Add Delete button (local only, disabled if running)
-- [ ] Add "Add New Profile" button → builder
-- [ ] Add refresh functionality
-- [ ] Add disabled state when daemon is running
-- [ ] Add placeholder section for future general settings
+- [x] Create `ScreenHealthSettingsPage.tsx`
+- [x] Add route registration in router
+- [x] Implement profile list display (presets + local)
+- [x] Add View/Preview button → preview page
+- [x] Add Edit button (local only) → builder with `?from=:id`
+- [x] Add Delete button (local only, disabled if running)
+- [x] Add "Add New Profile" button → builder
+- [x] Add refresh functionality
+- [x] Add disabled state when daemon is running
+- [x] Add placeholder section for future general settings
 
-## Phase 5: Update Builder Page
+## Phase 5: Update Builder Page ✅
 
 ### File Rename/Refactor
-- [ ] Rename `ScreenHealthCalibrationPage.tsx` → `ScreenHealthBuilderPage.tsx`
-- [ ] Update route from `/calibration` to `/builder`
-- [ ] Update route registration
-- [ ] Update imports/references
+- [x] Keep `ScreenHealthCalibrationPage.tsx` (used for builder route)
+- [x] Update route to `/builder`
+- [x] Update route registration
+- [x] Update imports/references
 
 ### Builder Page Updates
-- [ ] Add disabled state when daemon is running
-- [ ] Remove Start button from builder
-- [ ] Update page title/description to "Profile Builder"
-- [ ] Implement minimal template loading on page entry
-- [ ] Implement URL parameter `?from=:id` handling
-- [ ] Update `PresetProfilesSection` or replace with profile loader
-- [ ] Add "Load from Preset" dropdown
-- [ ] Add "Load from Local" dropdown
-- [ ] Add "Save to Local" button
-- [ ] Add duplicate name validation (warning only)
-- [ ] Remove Start button from `ProfileActionsController`
-- [ ] Update profile source tracking
+- [x] Add disabled state when daemon is running
+- [x] Remove Start button from builder
+- [x] Update page title/description to "Profile Builder"
+- [x] Implement minimal template loading on page entry
+- [x] Implement URL parameter `?from=:id` handling
+- [x] Update `PresetProfilesSection` to work with unified profiles
+- [x] Add "Load from Preset" dropdown
+- [x] Add "Load from Local" dropdown
+- [x] Add "Save to Local" button
+- [x] Add duplicate name validation (warning only)
+- [x] Remove Start button from `ProfileActionsController`
+- [x] Update profile source tracking
 
-## Phase 6: Create Preview Page
+## Phase 6: Create Preview Page ✅
 
-- [ ] Create `ScreenHealthPreviewPage.tsx`
-- [ ] Add route registration `/preview/:id`
-- [ ] Implement profile fetching by ID (preset or local)
-- [ ] Display profile details in read-only mode
-- [ ] Add Test button
-- [ ] Add Edit button (local only) → builder with `?from=:id`
-- [ ] Add Delete button (local only, disabled if running)
-- [ ] Add back navigation links
-- [ ] Add disabled state when daemon is running
+- [x] Create `ScreenHealthPreviewPage.tsx`
+- [x] Add route registration `/preview/:id`
+- [x] Implement profile fetching by ID (preset or local)
+- [x] Display profile details in read-only mode
+- [x] Add Test button
+- [x] Add Edit button (local only) → builder with `?from=:id`
+- [x] Add Delete button (local only, disabled if running)
+- [x] Add back navigation links
+- [x] Add disabled state when daemon is running
 
 ## Phase 7: Testing & Refinement
 
