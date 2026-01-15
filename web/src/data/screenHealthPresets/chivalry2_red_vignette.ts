@@ -28,8 +28,8 @@ const preset: ScreenHealthPreset = {
     detectors: [
       {
         type: "redness_rois",
-        cooldown_ms: 500,
-        threshold: { min_score: 0.7 },
+        cooldown_ms: 300,
+        threshold: { min_score: 0.6 },
         rois: [
           {
           "name": "front-left",
