@@ -41,34 +41,8 @@ export function ScreenshotsSection(props: {
       </div>
 
       <div className="rounded-xl bg-slate-900/50 p-3 text-sm text-slate-400">
-        For performance, screenshots are not listed inline. Use “Open folder” to inspect files in your file manager.
+        For performance, screenshots are not listed inline. Use "Open folder" to inspect files in your file manager.
       </div>
-
-      {settings && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs text-slate-400 block mb-1">Retention max count</label>
-            <input
-              type="number"
-              min={1}
-              value={settings.retentionMaxCount}
-              onChange={(e) => updateSettings({ retentionMaxCount: parseInt(e.target.value, 10) || 1 })}
-              className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-slate-400 block mb-1">Retention max age (days)</label>
-            <input
-              type="number"
-              min={1}
-              value={settings.retentionMaxAgeDays}
-              onChange={(e) => updateSettings({ retentionMaxAgeDays: parseInt(e.target.value, 10) || 1 })}
-              className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
-
