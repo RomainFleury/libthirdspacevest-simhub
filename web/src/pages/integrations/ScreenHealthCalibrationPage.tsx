@@ -1,12 +1,15 @@
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { useScreenHealthDaemonStatus } from "../../hooks/screenHealth/useScreenHealthDaemonStatus";
 import { useScreenHealthScreenshots } from "../../hooks/screenHealth/useScreenHealthScreenshots";
+import { useScreenHealthProfiles } from "../../hooks/screenHealth/useScreenHealthProfiles";
 import { ScreenHealthConfigurationPanel } from "./screenHealth/ScreenHealthConfigurationPanel";
 
 export function ScreenHealthCalibrationPage() {
   const daemon = useScreenHealthDaemonStatus();
   const screenshots = useScreenHealthScreenshots();
+  const profiles = useScreenHealthProfiles();
+  const [searchParams] = useSearchParams();
   const [perf, setPerf] = useState<{ statusMs?: number; settingsMs?: number } | null>(null);
 
   useEffect(() => {
@@ -31,6 +34,18 @@ export function ScreenHealthCalibrationPage() {
     };
   }, [daemon.refreshStatus, screenshots.refreshSettings]);
 
+  // Handle ?from=:id URL parameter to load a profile
+  useEffect(() => {
+    const fromId = searchParams.get("from");
+    if (fromId && profiles.profiles.length > 0) {
+      const profile = profiles.profiles.find((p) => p.id === fromId);
+      if (profile) {
+        // Profile will be loaded by the configuration panel
+        // This effect just ensures profiles are loaded
+      }
+    }
+  }, [searchParams, profiles.profiles]);
+
   const perfLine = useMemo(() => {
     if (!perf) return null;
     const parts = [];
@@ -39,13 +54,16 @@ export function ScreenHealthCalibrationPage() {
     return parts.join(" ");
   }, [perf]);
 
+  const isDisabled = daemon.status.running;
+  const fromId = searchParams.get("from");
+
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="text-white text-lg font-semibold">Screen Health calibration</div>
+          <div className="text-white text-lg font-semibold">Profile Builder</div>
           <div className="text-slate-400 text-sm">
-            Heavy UI (screenshots, ROI drawing, detector tuning). Keep this separate to avoid freezing the main page.
+            Create and edit screen health profiles. Configure detectors, ROIs, and settings.
           </div>
           {perfLine && <div className="text-xs text-slate-500 mt-1">Load timings: {perfLine}</div>}
         </div>
@@ -57,16 +75,37 @@ export function ScreenHealthCalibrationPage() {
         </Link>
       </div>
 
-      <ScreenHealthConfigurationPanel
-        settings={screenshots.settings}
-        updateSettings={screenshots.updateSettings}
-        chooseScreenshotsDir={screenshots.chooseScreenshotsDir}
-        openScreenshotsDir={screenshots.openScreenshotsDir}
-        clearScreenshots={screenshots.clearScreenshots}
-        lastCapturedImage={screenshots.lastCapturedImage}
-        captureCalibrationScreenshot={screenshots.captureCalibrationScreenshot}
-        captureRoiDebugImages={screenshots.captureRoiDebugImages}
-      />
+      {isDisabled && (
+        <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 px-4 py-3 text-amber-200">
+          <div className="flex items-center gap-2">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
+            </svg>
+            Stop screen health to access the builder
+          </div>
+        </div>
+      )}
+
+      <div className={isDisabled ? "opacity-50 pointer-events-none" : ""}>
+        <ScreenHealthConfigurationPanel
+          settings={screenshots.settings}
+          updateSettings={screenshots.updateSettings}
+          chooseScreenshotsDir={screenshots.chooseScreenshotsDir}
+          openScreenshotsDir={screenshots.openScreenshotsDir}
+          clearScreenshots={screenshots.clearScreenshots}
+          lastCapturedImage={screenshots.lastCapturedImage}
+          captureCalibrationScreenshot={screenshots.captureCalibrationScreenshot}
+          captureRoiDebugImages={screenshots.captureRoiDebugImages}
+          loadFromProfileId={fromId || undefined}
+          profiles={profiles.profiles}
+          onSaveProfile={profiles.saveProfile}
+        />
+      </div>
     </div>
   );
 }

@@ -1,8 +1,8 @@
 export function ProfileControlsSection(props: {
   onLoad: () => void;
   onExport: () => void;
-  onStart?: () => void;
-  starting?: boolean;
+  onSave?: () => void;
+  saving?: boolean;
   profileName: string;
   setProfileName: (v: string) => void;
   onTest?: () => void;
@@ -11,8 +11,8 @@ export function ProfileControlsSection(props: {
   const {
     onLoad,
     onExport,
-    onStart,
-    starting,
+    onSave,
+    saving,
     profileName,
     setProfileName,
     onTest,
@@ -44,14 +44,14 @@ export function ProfileControlsSection(props: {
           >
             Export JSON
           </button>
-          {onStart && (
+          {onSave && (
             <button
-              onClick={onStart}
-              disabled={starting}
+              onClick={onSave}
+              disabled={saving}
               className="rounded-lg bg-emerald-600/80 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-600 disabled:opacity-50"
-              title="Start the daemon watcher using the current draft profile."
+              title="Save profile to local storage (always creates new)."
             >
-              {starting ? "Starting..." : "Start watcher"}
+              {saving ? "Saving..." : "Save to Local"}
             </button>
           )}
           {onTest && (

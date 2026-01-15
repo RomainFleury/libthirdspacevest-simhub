@@ -44,10 +44,14 @@ type Props = {
     monitorIndex: number,
     rois: Array<{ name: string; rect: { x: number; y: number; w: number; h: number } }>
   ) => Promise<any>;
+  loadFromProfileId?: string;
+  profiles?: Array<{ type: "preset" | "local"; id: string; name: string; profile: Record<string, any> }>;
+  onSaveProfile?: (name: string, profile: Record<string, any>) => Promise<any>;
 };
 
 export function ScreenHealthConfigurationPanel(props: Props) {
-  const defaultPresetId = SCREEN_HEALTH_PRESETS[0]?.preset_id || "";
+  // Use minimal template as default, or load from profile if specified
+  const defaultPresetId = props.loadFromProfileId || SCREEN_HEALTH_PRESETS[0]?.preset_id || "";
   const dataUrl = props.lastCapturedImage?.dataUrl ?? null;
   return (
     <ScreenHealthProfileDraftProvider defaultPresetId={defaultPresetId}>
@@ -55,7 +59,11 @@ export function ScreenHealthConfigurationPanel(props: Props) {
         <ScreenHealthHealthBarDraftProvider>
           <ScreenHealthHealthNumberDraftProvider>
             <ScreenHealthCalibrationProvider dataUrl={dataUrl}>
-              <DraftFromSelectedPresetSync presets={SCREEN_HEALTH_PRESETS as any} />
+              <DraftFromSelectedPresetSync 
+                presets={SCREEN_HEALTH_PRESETS as any} 
+                loadFromProfileId={props.loadFromProfileId}
+                profiles={props.profiles}
+              />
               <ScreenHealthConfigurationPanelInner {...props} />
             </ScreenHealthCalibrationProvider>
           </ScreenHealthHealthNumberDraftProvider>
@@ -79,9 +87,15 @@ function ScreenHealthConfigurationPanelInner(props: Props) {
 
   return (
     <div className="space-y-6">
-      <PresetProfilesSection presets={SCREEN_HEALTH_PRESETS as any} />
+      <PresetProfilesSection 
+        presets={SCREEN_HEALTH_PRESETS as any} 
+        profiles={props.profiles}
+      />
 
-      <ProfileActionsController presets={SCREEN_HEALTH_PRESETS as any} />
+      <ProfileActionsController 
+        presets={SCREEN_HEALTH_PRESETS as any} 
+        onSaveProfile={props.onSaveProfile}
+      />
 
       <CaptureSettingsSection onCapture={captureCalibrationScreenshot} />
 
@@ -111,20 +125,236 @@ function DetectorSettingsSwitch() {
   return <HealthNumberSettings />;
 }
 
-function DraftFromSelectedPresetSync(props: { presets: Array<{ preset_id: string; display_name: string; profile: any }> }) {
-  const { presets } = props;
+function DraftFromSelectedPresetSync(props: { 
+  presets: Array<{ preset_id: string; display_name: string; profile: any }>;
+  loadFromProfileId?: string;
+  profiles?: Array<{ type: "preset" | "local"; id: string; name: string; profile: Record<string, any> }>;
+}) {
+  const { presets, loadFromProfileId, profiles } = props;
   const profileState = useScreenHealthProfileDraft();
-  const { replaceAll: replaceProfileDraft, setDetectorType } = useScreenHealthProfileDraftControls();
+  const { replaceAll: replaceProfileDraft, setDetectorType, setSelectedPresetId } = useScreenHealthProfileDraftControls();
   const { replaceAll: replaceRednessDraft } = useScreenHealthRednessDraftControls();
   const { replaceAll: replaceHealthBarDraft, setColorPickMode } = useScreenHealthHealthBarDraftControls();
   const { replaceAll: replaceHealthNumberDraft } = useScreenHealthHealthNumberDraftControls();
   const lastAppliedPresetIdRef = useRef<string | null>(null);
+  const hasLoadedFromIdRef = useRef(false);
+
+  // Load from profile ID on mount if specified
+  useEffect(() => {
+    if (loadFromProfileId && profiles && !hasLoadedFromIdRef.current) {
+      const profile = profiles.find((p) => p.id === loadFromProfileId);
+      if (profile) {
+        hasLoadedFromIdRef.current = true;
+        // Load the profile similar to onLoad in ProfileActionsController
+        const p: any = profile.profile;
+        replaceProfileDraft({
+          selectedPresetId: "__custom__",
+          profileName: profile.name || "Loaded Profile",
+          monitorIndex: Number(p.capture?.monitor_index || 1),
+          tickMs: Number(p.capture?.tick_ms || 50),
+        });
+        // Continue with detector loading below...
+        const detectors: any[] = Array.isArray(p.detectors) ? p.detectors : [];
+        const hbD = detectors.find((d: any) => d.type === "health_bar");
+        const hnD = detectors.find((d: any) => d.type === "health_number");
+        const redD = detectors.find((d: any) => d.type === "redness_rois");
+
+        if (hnD) {
+          setDetectorType("health_number");
+          replaceHealthNumberDraft({
+            roi: {
+              x: Number(hnD.roi?.x ?? 0),
+              y: Number(hnD.roi?.y ?? 0),
+              w: Number(hnD.roi?.w ?? 0.12),
+              h: Number(hnD.roi?.h ?? 0.06),
+            },
+            digits: Number(hnD.digits ?? 3),
+            invert: Boolean(hnD.preprocess?.invert ?? false),
+            threshold: Number(hnD.preprocess?.threshold ?? 0.6),
+            scale: Number(hnD.preprocess?.scale ?? 2),
+            readMin: Number(hnD.readout?.min ?? 0),
+            readMax: Number(hnD.readout?.max ?? 300),
+            stableReads: Number(hnD.readout?.stable_reads ?? 2),
+            hitMinDrop: Number(hnD.hit_on_decrease?.min_drop ?? 1),
+            hitCooldownMs: Number(hnD.hit_on_decrease?.cooldown_ms ?? 150),
+            hammingMax: Number(hnD.templates?.hamming_max ?? 120),
+            templateSize: {
+              w: Number(hnD.templates?.width ?? 16),
+              h: Number(hnD.templates?.height ?? 24),
+            },
+            templates: (hnD.templates?.digits && typeof hnD.templates.digits === "object" ? hnD.templates.digits : {}) as any,
+            calibrationError: null,
+            testResult: null,
+          });
+          setColorPickMode(null);
+          return;
+        }
+
+        if (hbD) {
+          setDetectorType("health_bar");
+          replaceHealthBarDraft({
+            roi: {
+              x: Number(hbD.roi?.x ?? 0),
+              y: Number(hbD.roi?.y ?? 0),
+              w: Number(hbD.roi?.w ?? 0.3),
+              h: Number(hbD.roi?.h ?? 0.03),
+            },
+            mode: hbD.color_sampling ? "color_sampling" : hbD.threshold_fallback ? "threshold_fallback" : "color_sampling",
+            filledRgb: Array.isArray(hbD.color_sampling?.filled_rgb)
+              ? [
+                  clampInt(Number(hbD.color_sampling.filled_rgb[0]), 0, 255),
+                  clampInt(Number(hbD.color_sampling.filled_rgb[1]), 0, 255),
+                  clampInt(Number(hbD.color_sampling.filled_rgb[2]), 0, 255),
+                ]
+              : [220, 40, 40],
+            emptyRgb: Array.isArray(hbD.color_sampling?.empty_rgb)
+              ? [
+                  clampInt(Number(hbD.color_sampling.empty_rgb[0]), 0, 255),
+                  clampInt(Number(hbD.color_sampling.empty_rgb[1]), 0, 255),
+                  clampInt(Number(hbD.color_sampling.empty_rgb[2]), 0, 255),
+                ]
+              : [40, 40, 40],
+            toleranceL1: clampInt(Number(hbD.color_sampling?.tolerance_l1 ?? 120), 0, 765),
+            fallbackMode: (hbD.threshold_fallback?.mode as any) || "brightness",
+            fallbackMin: Number(hbD.threshold_fallback?.min ?? 0.5),
+            hitMinDrop: Number(hbD.hit_on_decrease?.min_drop ?? 0.02),
+            hitCooldownMs: Number(hbD.hit_on_decrease?.cooldown_ms ?? 150),
+            colorPickMode: null,
+          });
+          setColorPickMode(null);
+          return;
+        }
+
+        setDetectorType("redness_rois");
+        replaceRednessDraft({
+          minScore: Number(redD?.threshold?.min_score ?? 0.35),
+          cooldownMs: Number(redD?.cooldown_ms ?? 200),
+          rois: (Array.isArray(redD?.rois) ? redD.rois : []).map((r: any, idx: number) => ({
+            name: String(r.name || `roi_${idx}`),
+            direction: r.direction || "",
+            rect: {
+              x: Number(r.rect?.x ?? 0),
+              y: Number(r.rect?.y ?? 0),
+              w: Number(r.rect?.w ?? 0.1),
+              h: Number(r.rect?.h ?? 0.1),
+            },
+          })),
+        });
+        setColorPickMode(null);
+      }
+    }
+  }, [loadFromProfileId, profiles, replaceProfileDraft, setDetectorType, replaceHealthNumberDraft, replaceHealthBarDraft, replaceRednessDraft, setColorPickMode]);
 
   useEffect(() => {
     const presetId = profileState.selectedPresetId;
-    if (!presetId) return;
+    if (!presetId || presetId === "__custom__") return;
     if (lastAppliedPresetIdRef.current === presetId) return;
 
+    // Check if it's a local profile first
+    if (profiles) {
+      const localProfile = profiles.find((p) => p.id === presetId && p.type === "local");
+      if (localProfile) {
+        lastAppliedPresetIdRef.current = presetId;
+        const p: any = localProfile.profile;
+        replaceProfileDraft({
+          selectedPresetId: "__custom__",
+          profileName: localProfile.name || "Loaded Profile",
+          monitorIndex: Number(p.capture?.monitor_index || 1),
+          tickMs: Number(p.capture?.tick_ms || 50),
+        });
+        // Load detector data (same logic as below)
+        const detectors: any[] = Array.isArray(p.detectors) ? p.detectors : [];
+        const hbD = detectors.find((d: any) => d.type === "health_bar");
+        const hnD = detectors.find((d: any) => d.type === "health_number");
+        const redD = detectors.find((d: any) => d.type === "redness_rois");
+
+        if (hnD) {
+          setDetectorType("health_number");
+          replaceHealthNumberDraft({
+            roi: {
+              x: Number(hnD.roi?.x ?? 0),
+              y: Number(hnD.roi?.y ?? 0),
+              w: Number(hnD.roi?.w ?? 0.12),
+              h: Number(hnD.roi?.h ?? 0.06),
+            },
+            digits: Number(hnD.digits ?? 3),
+            invert: Boolean(hnD.preprocess?.invert ?? false),
+            threshold: Number(hnD.preprocess?.threshold ?? 0.6),
+            scale: Number(hnD.preprocess?.scale ?? 2),
+            readMin: Number(hnD.readout?.min ?? 0),
+            readMax: Number(hnD.readout?.max ?? 300),
+            stableReads: Number(hnD.readout?.stable_reads ?? 2),
+            hitMinDrop: Number(hnD.hit_on_decrease?.min_drop ?? 1),
+            hitCooldownMs: Number(hnD.hit_on_decrease?.cooldown_ms ?? 150),
+            hammingMax: Number(hnD.templates?.hamming_max ?? 120),
+            templateSize: {
+              w: Number(hnD.templates?.width ?? 16),
+              h: Number(hnD.templates?.height ?? 24),
+            },
+            templates: (hnD.templates?.digits && typeof hnD.templates.digits === "object" ? hnD.templates.digits : {}) as any,
+            calibrationError: null,
+            testResult: null,
+          });
+          setColorPickMode(null);
+          return;
+        }
+
+        if (hbD) {
+          setDetectorType("health_bar");
+          replaceHealthBarDraft({
+            roi: {
+              x: Number(hbD.roi?.x ?? 0),
+              y: Number(hbD.roi?.y ?? 0),
+              w: Number(hbD.roi?.w ?? 0.3),
+              h: Number(hbD.roi?.h ?? 0.03),
+            },
+            mode: hbD.color_sampling ? "color_sampling" : hbD.threshold_fallback ? "threshold_fallback" : "color_sampling",
+            filledRgb: Array.isArray(hbD.color_sampling?.filled_rgb)
+              ? [
+                  clampInt(Number(hbD.color_sampling.filled_rgb[0]), 0, 255),
+                  clampInt(Number(hbD.color_sampling.filled_rgb[1]), 0, 255),
+                  clampInt(Number(hbD.color_sampling.filled_rgb[2]), 0, 255),
+                ]
+              : [220, 40, 40],
+            emptyRgb: Array.isArray(hbD.color_sampling?.empty_rgb)
+              ? [
+                  clampInt(Number(hbD.color_sampling.empty_rgb[0]), 0, 255),
+                  clampInt(Number(hbD.color_sampling.empty_rgb[1]), 0, 255),
+                  clampInt(Number(hbD.color_sampling.empty_rgb[2]), 0, 255),
+                ]
+              : [40, 40, 40],
+            toleranceL1: clampInt(Number(hbD.color_sampling?.tolerance_l1 ?? 120), 0, 765),
+            fallbackMode: (hbD.threshold_fallback?.mode as any) || "brightness",
+            fallbackMin: Number(hbD.threshold_fallback?.min ?? 0.5),
+            hitMinDrop: Number(hbD.hit_on_decrease?.min_drop ?? 0.02),
+            hitCooldownMs: Number(hbD.hit_on_decrease?.cooldown_ms ?? 150),
+            colorPickMode: null,
+          });
+          setColorPickMode(null);
+          return;
+        }
+
+        setDetectorType("redness_rois");
+        replaceRednessDraft({
+          minScore: Number(redD?.threshold?.min_score ?? 0.35),
+          cooldownMs: Number(redD?.cooldown_ms ?? 200),
+          rois: (Array.isArray(redD?.rois) ? redD.rois : []).map((r: any, idx: number) => ({
+            name: String(r.name || `roi_${idx}`),
+            direction: r.direction || "",
+            rect: {
+              x: Number(r.rect?.x ?? 0),
+              y: Number(r.rect?.y ?? 0),
+              w: Number(r.rect?.w ?? 0.1),
+              h: Number(r.rect?.h ?? 0.1),
+            },
+          })),
+        });
+        setColorPickMode(null);
+        return;
+      }
+    }
+
+    // Check if it's a preset
     const preset = presets.find((p) => p.preset_id === presetId);
     if (!preset) return;
 
@@ -238,8 +468,11 @@ function DraftFromSelectedPresetSync(props: { presets: Array<{ preset_id: string
   return null;
 }
 
-function ProfileActionsController(props: { presets: Array<{ preset_id: string; profile: any }> }) {
-  const { presets } = props;
+function ProfileActionsController(props: { 
+  presets: Array<{ preset_id: string; profile: any }>;
+  onSaveProfile?: (name: string, profile: Record<string, any>) => Promise<any>;
+}) {
+  const { presets, onSaveProfile } = props;
   const profileState = useScreenHealthProfileDraft();
   const { setProfileName, readDraft: readProfileDraft, replaceAll: replaceProfileDraft } = useScreenHealthProfileDraftControls();
   const { readDraft: readRednessDraft } = useScreenHealthRednessDraftControls();
@@ -253,8 +486,9 @@ function ProfileActionsController(props: { presets: Array<{ preset_id: string; p
   const [testError, setTestError] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [starting, setStarting] = useState(false);
-  const [startError, setStartError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   const buildDaemonProfile = () => {
     // Snapshot reads: this controller does not subscribe to draft state updates.
@@ -507,17 +741,30 @@ function ProfileActionsController(props: { presets: Array<{ preset_id: string; p
     }
   };
 
-  const onStart = async () => {
-    setStarting(true);
-    setStartError(null);
+  const onSave = async () => {
+    if (!onSaveProfile) return;
+    setSaving(true);
+    setSaveError(null);
+    setSaveSuccess(false);
     try {
       const profile = buildDaemonProfile();
-      const result = await screenHealthStart(profile);
-      if (!result.success) throw new Error(result.error || "Failed to start");
+      const name = profileState.profileName.trim();
+      if (!name) {
+        setSaveError("Profile name is required");
+        return;
+      }
+      // Check for duplicate names (warning only)
+      const saved = await onSaveProfile(name, profile);
+      if (saved) {
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 3000);
+      } else {
+        setSaveError("Failed to save profile");
+      }
     } catch (e) {
-      setStartError(e instanceof Error ? e.message : "Failed to start");
+      setSaveError(e instanceof Error ? e.message : "Failed to save profile");
     } finally {
-      setStarting(false);
+      setSaving(false);
     }
   };
 
@@ -526,8 +773,8 @@ function ProfileActionsController(props: { presets: Array<{ preset_id: string; p
       <ProfileControlsSection
         onLoad={onLoad}
         onExport={onExport}
-        onStart={onStart}
-        starting={starting}
+        onSave={onSaveProfile ? onSave : undefined}
+        saving={saving}
         profileName={profileState.profileName}
         setProfileName={setProfileName}
         onTest={onTest}
@@ -573,7 +820,8 @@ function ProfileActionsController(props: { presets: Array<{ preset_id: string; p
 
       {exportError && <div className="text-xs text-rose-300">{exportError}</div>}
       {loadError && <div className="text-xs text-rose-300">{loadError}</div>}
-      {startError && <div className="text-xs text-rose-300">{startError}</div>}
+      {saveError && <div className="text-xs text-rose-300">{saveError}</div>}
+      {saveSuccess && <div className="text-xs text-emerald-300">Profile saved successfully!</div>}
     </div>
   );
 }
