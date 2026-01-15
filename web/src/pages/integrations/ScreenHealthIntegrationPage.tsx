@@ -156,7 +156,7 @@ export function ScreenHealthIntegrationPage() {
         error={integration.error}
         events={gameEvents}
         eventDisplayMap={EVENT_DISPLAY_MAP}
-        onStart={() => integration.start(selectedProfileId)}
+        onStart={selectedProfileId ? () => integration.start(selectedProfileId) : undefined}
         onStop={integration.stop}
         onClearEvents={integration.clearEvents}
         formatEventDetails={formatEventDetails}

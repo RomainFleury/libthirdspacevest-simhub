@@ -29,20 +29,8 @@ export function useScreenHealthIntegration() {
       return;
     }
 
-    daemon.setLoading(true);
-    daemon.setError(null);
-    try {
-      const result = await screenHealthStart(profile.profile);
-      if (!result.success) {
-        daemon.setError(result.error || "Failed to start");
-      } else {
-        await daemon.refreshStatus();
-      }
-    } catch (e) {
-      daemon.setError(e instanceof Error ? e.message : "Failed to start");
-    } finally {
-      daemon.setLoading(false);
-    }
+    // Use startWithProfile which manages loading state internally
+    await daemon.startWithProfile(profile.profile);
   }, [profiles.profiles, daemon]);
 
   return {
