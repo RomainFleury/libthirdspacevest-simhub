@@ -1763,11 +1763,14 @@ class _MSSCaptureBackend:
         return img.raw  # BGRA bytes
 
 
-class _RapidShotCaptureBackend:
+class _BetterCamCaptureBackend:
     """
-    Optional RapidShot-based capture backend (Windows, DXGI).
+    Optional BetterCam-based capture backend (Windows, DXGI).
 
-    Optional-import to keep tests/dev environments working even without rapidshot installed.
+    BetterCam is a high-performance screen capture library using Desktop Duplication API.
+    It's compatible with Python 3.14+ and works reliably unlike rapidshot.
+
+    Optional-import to keep tests/dev environments working even without bettercam installed.
     """
 
     def __init__(self, monitor_index: int) -> None:
@@ -1780,26 +1783,26 @@ class _RapidShotCaptureBackend:
         if self._cap is not None:
             return
         try:
-            import rapidshot  # type: ignore
+            import bettercam  # type: ignore
         except (ModuleNotFoundError, ImportError) as e:  # pragma: no cover
             raise RuntimeError(
-                "rapidshot is required for rapidshot capture backend "
-                "(pip install rapidshot)"
+                "bettercam is required for BetterCam capture backend "
+                "(pip install bettercam)"
             ) from e
         except Exception as e:  # pragma: no cover
-            # rapidshot can fail during import/init on some systems (e.g. RDP, missing DXGI adapters).
+            # bettercam can fail during import/init on some systems (e.g. RDP, missing DXGI adapters).
             # Preserve the original error so users know what to fix.
-            raise RuntimeError(f"rapidshot import failed: {e}") from e
+            raise RuntimeError(f"bettercam import failed: {e}") from e
 
-        # rapidshot uses 0-based output index; our UI/daemon config is 1-based.
+        # bettercam uses 0-based output index; our UI/daemon config is 1-based.
         out_idx = int(self._monitor_index) - 1
         if out_idx < 0:
             raise ValueError(f"Invalid monitor_index={self._monitor_index}. Must be >= 1")
 
         # Create capture for this output. Use BGRA to match our downstream processing.
-        cap = rapidshot.create(output_idx=out_idx, output_color="BGRA")
+        cap = bettercam.create(output_idx=out_idx, output_color="BGRA")
         if cap is None:  # pragma: no cover
-            raise RuntimeError("rapidshot.create returned None")
+            raise RuntimeError("bettercam.create returned None")
         self._cap = cap
 
         # Determine output geometry; fall back to a one-time full grab if needed.
@@ -1808,9 +1811,16 @@ class _RapidShotCaptureBackend:
             self._output_w = int(res[0])
             self._output_h = int(res[1])
         else:
-            frame = self._cap.grab()
+            # BetterCam may need a moment to initialize - try a few times
+            frame = None
+            for attempt in range(3):
+                frame = self._cap.grab()
+                if frame is not None:
+                    break
+                time.sleep(0.1)  # Brief delay before retry
+            
             if frame is None:
-                raise RuntimeError("rapidshot grab returned None (capture not available)")
+                raise RuntimeError("bettercam grab returned None (capture not available)")
             self._output_h = int(frame.shape[0])
             self._output_w = int(frame.shape[1])
 
@@ -1824,28 +1834,45 @@ class _RapidShotCaptureBackend:
 
         l = int(left)
         t = int(top)
-        r = l + int(width)
-        b = t + int(height)
-        frame = self._cap.grab(region=(l, t, r, b))
+        w = int(width)
+        h = int(height)
+        
+        # BetterCam doesn't support region parameter in grab()
+        # Grab full frame and crop manually
+        # BetterCam may occasionally return None - retry a few times
+        frame = None
+        for attempt in range(3):
+            frame = self._cap.grab()
+            if frame is not None:
+                break
+            if attempt < 2:  # Don't sleep on last attempt
+                time.sleep(0.05)
+        
         if frame is None:
-            raise RuntimeError("rapidshot grab returned None")
+            raise RuntimeError("bettercam grab returned None")
+        
+        # Crop to requested region (frame is HxWx4, so [top:top+h, left:left+w])
+        cropped = frame[t:t+h, l:l+w]
+        
         # Ensure contiguous bytes in row-major order.
         try:
-            return frame.tobytes(order="C")
+            return cropped.tobytes(order="C")
         except TypeError:  # pragma: no cover (older numpy)
-            return frame.tobytes()
+            return cropped.tobytes()
 
 
 def _create_capture_backend(*, monitor_index: int):
     """
     Create the best available capture backend.
 
-    Prefer rapidshot on Windows (DXGI), fallback to mss (GDI).
+    Prefer BetterCam on Windows (DXGI, high performance), fallback to mss (GDI).
+    BetterCam is compatible with Python 3.14+ and more reliable than rapidshot.
     """
     if os.name == "nt":
         try:
-            return _RapidShotCaptureBackend(monitor_index=monitor_index)
+            return _BetterCamCaptureBackend(monitor_index=monitor_index)
         except Exception:
             # Fall back to mss below.
+            logger.debug("BetterCam not available, falling back to mss", exc_info=True)
             pass
     return _MSSCaptureBackend(monitor_index=monitor_index)

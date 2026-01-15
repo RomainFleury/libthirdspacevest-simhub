@@ -14,7 +14,7 @@ echo.
 if defined TSV_PYTHON (
     echo Using TSV_PYTHON=%TSV_PYTHON%
 ) else (
-    echo Using default Python resolution (py -3.11, python, python3)
+    echo Using default Python resolution (py -3.14, python, python3)
 )
 echo.
 

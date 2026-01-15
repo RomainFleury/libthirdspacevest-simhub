@@ -12,7 +12,7 @@ setlocal EnableDelayedExpansion
 :::   3. Yarn installation
 :::   4. Python packages (modern_third_space)
 :::   5. libusb (for USB vest communication)
-:::   6. rapidshot (for Screen Health feature)
+:::   6. bettercam (for Screen Health feature)
 :::   7. Web dependencies (node_modules)
 
 echo.
@@ -85,11 +85,11 @@ if %ERRORLEVEL% equ 0 (
 echo.
 
 :: ============================================
-:: 6. rapidshot (optional - for Screen Health)
+:: 6. bettercam (optional - for Screen Health)
 :: ============================================
-call "%~dp0setup\check-rapidshot.bat"
+call "%~dp0setup\check-bettercam.bat"
 if %ERRORLEVEL% equ 0 (
-    if "%RAPIDSHOT_OK%"=="1" (
+    if "%BETTERCAM_OK%"=="1" (
         set /a CHECKS_PASSED+=1
     ) else (
         set /a CHECKS_WARNED+=1
@@ -110,36 +110,6 @@ if %ERRORLEVEL% equ 0 (
 )
 echo.
 
-:summary
-:: ============================================
-:: Summary
-:: ============================================
-echo ========================================
-echo   Summary
-echo ========================================
-echo.
-echo   Passed:  %CHECKS_PASSED%
-echo   Failed:  %CHECKS_FAILED%
-echo   Warnings: %CHECKS_WARNED%
-echo.
-
-if %CHECKS_FAILED% equ 0 (
-    if %CHECKS_WARNED% equ 0 (
-        echo   [OK] All checks passed!
-    ) else (
-        echo   [OK] Setup complete (with warnings)
-    )
-    echo.
-    echo   Next steps:
-    echo     - Run start-all.bat to start the app
-    echo     - Or run start-daemon.bat + start-ui.bat separately
-    echo.
-) else (
-    echo   [!!] Some checks failed
-    echo.
-    echo   Please fix the issues above and run this script again.
-    echo.
-)
 
 echo ========================================
 echo.
@@ -150,4 +120,38 @@ echo     windows\README.md      - Setup documentation
 echo     windows\SETUP.md       - Detailed instructions
 echo.
 
-pause
+
+:summary
+:: ============================================
+:: Summary
+:: ============================================
+echo ========================================
+echo   Summary
+echo ========================================
+echo.
+echo   Passed:  !CHECKS_PASSED!
+echo   Failed:  !CHECKS_FAILED!
+echo   Warnings: !CHECKS_WARNED!
+echo.
+
+if !CHECKS_FAILED! equ 0 (
+    if !CHECKS_WARNED! equ 0 (
+        echo   [OK] All checks passed!
+        echo.
+        echo   Next steps:
+        echo     - Run start-all.bat to start the app
+        echo     - Or run start-daemon.bat + start-ui.bat separately
+        echo.
+    ) else (
+        echo   [OK] Setup complete (with warnings)
+        echo.
+    )
+) else (
+    echo   [ERROR] Some checks failed
+    echo.
+    echo   Please fix the issues above and run this script again.
+    echo.
+)
+
+
+exit

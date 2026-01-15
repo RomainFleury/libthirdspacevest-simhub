@@ -5,7 +5,7 @@ This project needs a **consistent Python version** across:
 - validation scripts (libusb, rapidshot)
 - dev scripts (start daemon / run with python)
 
-Some capture dependencies (notably `rapidshot` and/or its dependency `comtypes`) are **not compatible with Python 3.14+** at the time of writing, so we need an easy way to force a known-good Python (recommended: **3.11**).
+The project now uses **BetterCam** for screen capture, which is compatible with Python 3.14+. Python 3.14 is the recommended version, with 3.11+ as a fallback for older systems.
 
 ### Recommended approach: `windows/.env.bat` + `TSV_PYTHON`
 
@@ -14,7 +14,7 @@ We use an optional, local file `windows/.env.bat` that sets environment variable
 - **File**: `windows/.env.bat` *(local, not committed)*
 - **Variable**: `TSV_PYTHON`
   - Can be either:
-    - `py -3.11` (recommended if you have the Windows Python Launcher), or
+    - `py -3.14` (recommended if you have the Windows Python Launcher), or
     - an absolute path to `python.exe` (e.g. `C:\Python311\python.exe`), or
     - a venv python path (e.g. `modern-third-space\.venv\Scripts\python.exe`)
 
@@ -23,7 +23,7 @@ Example `windows/.env.bat`:
 ```bat
 @echo off
 REM Local overrides (not committed)
-set "TSV_PYTHON=py -3.11"
+set "TSV_PYTHON=py -3.14"
 REM or:
 REM set "TSV_PYTHON=C:\Python311\python.exe"
 REM set "TSV_PYTHON=%~dp0..\modern-third-space\.venv\Scripts\python.exe"
@@ -36,7 +36,7 @@ Windows scripts now do this near the top:
 1. If `windows/.env.bat` exists, `call` it (so variables apply to the current process).
 2. If `TSV_PYTHON` is defined, use it as the Python command for the script.
 3. Otherwise, fall back to:
-   - `py -3.11` if available, else
+   - `py -3.14` if available, else
    - `python` / `python3` on `PATH`.
 
 ### Files updated to support `TSV_PYTHON`
@@ -67,8 +67,8 @@ Plain `.env` (KEY=VALUE) is convenient but **hard to parse safely** in `.bat` wi
 
 ### Notes / troubleshooting
 
-- If you see rapidshot install failures on Python 3.14+, set `TSV_PYTHON=py -3.11` (or point to Python 3.11).
-- If capture still fails even with the right Python, RapidShot may be blocked by:
+- If you see BetterCam install failures, ensure you have Python 3.14+ installed.
+- If capture still fails even with the right Python, BetterCam may be blocked by:
   - Remote Desktop (RDP)
   - GPU driver / DXGI duplication restrictions
   - locked-down Windows capture policies

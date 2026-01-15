@@ -8,9 +8,9 @@
 - **Windows Store (Easiest):** Search "Node.js LTS" in Microsoft Store, click Install
 - **Direct Download:** Go to https://nodejs.org/, download the LTS version
 
-**Python 3.11+:**
+**Python 3.14+:**
 1. Go to https://www.python.org/downloads/
-2. Download Python 3.11 or newer
+2. Download Python 3.14 or newer
 3. Run installer, **CHECK "Add to PATH"** ⚠️
 4. Restart your terminal after installation
 
@@ -47,7 +47,7 @@
 
 ### Wrong Python version being used
 - Run `check-setup.bat` to configure the correct Python
-- Or manually edit `windows\.env.bat` to set `TSV_PYTHON=py -3.11`
+- Or manually edit `windows\.env.bat` to set `TSV_PYTHON=py -3.14`
 
 ---
 
@@ -57,12 +57,12 @@ Open Command Prompt (cmd) and run these commands:
 
 ```cmd
 :: Set Python version (optional but recommended)
-set TSV_PYTHON=py -3.11
+set TSV_PYTHON=py -3.14
 
 :: Install Python package
 cd path\to\libthirdspacevest-simhub\modern-third-space
 pip install -e .
-pip install libusb rapidshot
+pip install libusb bettercam
 
 :: Enable Yarn
 corepack enable
@@ -82,7 +82,7 @@ yarn dev
 ## Requirements
 
 - Windows 10 or 11
-- Python 3.11+ (Add to PATH during install)
+- Python 3.14+ (Add to PATH during install)
 - Node.js 18+ (LTS recommended)
 - ~500MB disk space for dependencies
 

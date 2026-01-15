@@ -1,5 +1,6 @@
 pyusb>=1.2.1
 mss>=9.0.1
+bettercam>=1.0.0
 
 [dev]
 ruff>=0.7.0

@@ -2,6 +2,8 @@
 
 If you're an AI assistant working on this repository, follow these steps to get oriented.
 
+Python DOES NOT LIKE UNICODE EMOJIS, NEVER USE EMOJI FOR ANY PYTHON RELATED SCRIPT.
+
 ## Cursor IDE Tips
 
 If you're using **Cursor IDE**, these features will help you get context faster:

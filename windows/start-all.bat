@@ -22,7 +22,7 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 
-::: Resolve Python command (TSV_PYTHON -> py -3.11 -> python/python3)
+::: Resolve Python command (TSV_PYTHON -> py -3.14 -> python/python3)
 ::: This resolved value is also exported as TSV_PYTHON for child processes
 set "PYTHON_CMD="
 if defined TSV_PYTHON (
@@ -30,8 +30,8 @@ if defined TSV_PYTHON (
 ) else (
     where py >nul 2>&1
     if !ERRORLEVEL! equ 0 (
-        py -3.11 -c "import sys" >nul 2>&1
-        if !ERRORLEVEL! equ 0 set "PYTHON_CMD=py -3.11"
+        py -3.14 -c "import sys" >nul 2>&1
+        if !ERRORLEVEL! equ 0 set "PYTHON_CMD=py -3.14"
     )
     if not defined PYTHON_CMD (
         where python >nul 2>&1

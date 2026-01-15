@@ -4,8 +4,8 @@
  * Helper module to run Python CLI commands with proper Python detection.
  * 
  * Python Resolution Order:
- * 1. TSV_PYTHON environment variable (e.g., "py -3.11" or "C:\Python311\python.exe")
- * 2. On Windows: py launcher with Python 3.11 (py -3.11)
+ * 1. TSV_PYTHON environment variable (e.g., "py -3.14" or "C:\Python314\python.exe")
+ * 2. On Windows: py launcher with Python 3.14 (py -3.14)
  * 3. Fallback: python (Windows) or python3 (Unix)
  * 
  * This matches the logic in windows/*.bat scripts and daemonBridge.cjs for consistency.
@@ -40,14 +40,14 @@ function detectPythonCommand() {
     return { cmd: parts[0], args: parts.slice(1) };
   }
 
-  // 2. On Windows, try py launcher with Python 3.11
+  // 2. On Windows, try py launcher with Python 3.14
   if (process.platform === "win32") {
     try {
-      execSync('py -3.11 -c "import sys"', { stdio: "ignore", timeout: 5000 });
-      console.log("[python] Using: py -3.11 (detected via py launcher)");
-      return { cmd: "py", args: ["-3.11"] };
+      execSync('py -3.14 -c "import sys"', { stdio: "ignore", timeout: 5000 });
+      console.log("[python] Using: py -3.14 (detected via py launcher)");
+      return { cmd: "py", args: ["-3.14"] };
     } catch (e) {
-      // py -3.11 not available, fall through
+      // py -3.14 not available, fall through
     }
   }
 
@@ -65,7 +65,7 @@ export default function runPythonCommand(command, args = []) {
       
       // Run as module: python -m modern_third_space.cli <command> <args>
       const pythonArgs = [
-        ...pythonInfo.args,  // e.g., ["-3.11"] for py launcher
+        ...pythonInfo.args,  // e.g., ["-3.14"] for py launcher
         "-u", // unbuffered output
         "-m",
         "modern_third_space.cli",

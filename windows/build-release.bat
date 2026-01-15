@@ -5,7 +5,7 @@ setlocal EnableDelayedExpansion
 :: This script builds a complete Windows installer
 ::
 :: Prerequisites:
-::   - Python 3.11+ (in PATH)
+::   - Python 3.14+ (in PATH)
 ::   - Node.js 18+ (in PATH)
 ::   - Yarn (install via: corepack enable)
 ::
@@ -21,16 +21,16 @@ echo.
 :: Load optional local python override (windows\.env.bat)
 if exist "%~dp0.env.bat" call "%~dp0.env.bat"
 
-:: Resolve Python command (TSV_PYTHON -> py -3.11 -> python/python3)
+:: Resolve Python command (TSV_PYTHON -> py -3.14 -> python/python3)
 set "PYTHON_CMD="
 if defined TSV_PYTHON (
     set "PYTHON_CMD=%TSV_PYTHON%"
 ) else (
     where py >nul 2>&1
     if %ERRORLEVEL% equ 0 (
-        py -3.11 -c "import sys" >nul 2>&1
+        py -3.14 -c "import sys" >nul 2>&1
         if %ERRORLEVEL% equ 0 (
-            set "PYTHON_CMD=py -3.11"
+            set "PYTHON_CMD=py -3.14"
         )
     )
     if not defined PYTHON_CMD (
@@ -47,7 +47,7 @@ if defined TSV_PYTHON (
 )
 if not defined PYTHON_CMD (
     echo [ERROR] Python is not installed or not in PATH!
-    echo Install Python 3.11+ (recommended) and re-run.
+    echo Install Python 3.14+ (recommended) and re-run.
     pause
     exit /b 1
 )

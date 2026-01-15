@@ -31,7 +31,7 @@ cd web && yarn install && yarn dev
 
 ### Windows
 
-1. Install [Node.js LTS](https://nodejs.org/) and [Python 3.11+](https://python.org/)
+1. Install [Node.js LTS](https://nodejs.org/) and [Python 3.14+](https://python.org/)
 2. Double-click `windows/check-setup.bat` (checks prerequisites, installs packages)
 3. Double-click `windows/start-all.bat`
 
@@ -118,7 +118,7 @@ The Electron debugger console allows you to monitor USB connectivity, trigger in
 
 - Node.js v24+ (v24.11.1 recommended — see `web/.nvmrc`)
 - Yarn (enabled via `corepack enable`)
-- Python 3.11+ (for the `modern-third-space` bridge)
+- Python 3.14+ (for the `modern-third-space` bridge)
 
 ### Windows Quick Setup
 
@@ -126,7 +126,7 @@ The Electron debugger console allows you to monitor USB connectivity, trigger in
 
 1. **Install requirements:**
    - [Node.js LTS](https://nodejs.org/) (click the green LTS button)
-   - [Python 3.11+](https://python.org/) (check "Add to PATH" during install)
+   - [Python 3.14+](https://python.org/) (check "Add to PATH" during install)
 
 2. **Check setup & install:** Double-click `windows/check-setup.bat`
    - This checks all prerequisites, installs missing packages, and helps configure Python
@@ -256,7 +256,7 @@ This section describes how to build a distributable Windows installer. For detai
 
 ### Prerequisites
 
-- **Python 3.11+** with `pyinstaller` and `libusb` installed
+- **Python 3.14+** with `pyinstaller` and `libusb` installed
 - **Node.js 18+ (LTS)** with Yarn enabled (`corepack enable`)
 - **Yarn** - Use `--ignore-engines` flag if you have yarn 1.22.19 (repomix requires 1.22.22+)
 

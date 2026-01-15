@@ -13,16 +13,16 @@ echo.
 :: Load optional local python override (windows\.env.bat)
 if exist "%~dp0.env.bat" call "%~dp0.env.bat"
 
-::: Resolve Python command (TSV_PYTHON -> py -3.11 -> python/python3)
+::: Resolve Python command (TSV_PYTHON -> py -3.14 -> python/python3)
 set "PYTHON_CMD="
 if defined TSV_PYTHON (
     set "PYTHON_CMD=%TSV_PYTHON%"
 ) else (
     where py >nul 2>&1
     if %ERRORLEVEL% equ 0 (
-        py -3.11 -c "import sys" >nul 2>&1
+        py -3.14 -c "import sys" >nul 2>&1
         if %ERRORLEVEL% equ 0 (
-            set "PYTHON_CMD=py -3.11"
+            set "PYTHON_CMD=py -3.14"
         )
     )
     if not defined PYTHON_CMD (
@@ -40,9 +40,9 @@ if defined TSV_PYTHON (
 if not defined PYTHON_CMD (
     echo [ERROR] Python is not installed!
     echo.
-    echo Please install Python 3.11+:
+    echo Please install Python 3.14+:
     echo   1. Go to https://www.python.org/downloads/
-    echo   2. Download Python 3.11 or newer
+    echo   2. Download Python 3.14 or newer
     echo   3. Run installer, CHECK "Add to PATH"
     echo   4. Restart your computer
     echo.

@@ -11,7 +11,7 @@ You need **Node.js** and **Python**:
 | Software | How to Install |
 |----------|----------------|
 | **Node.js** | Download from [nodejs.org](https://nodejs.org/) (LTS version) |
-| **Python** | Download from [python.org](https://www.python.org/downloads/) (3.11+) |
+| **Python** | Download from [python.org](https://www.python.org/downloads/) (3.14+) |
 
 > **Important**: During Python installation, check "Add to PATH"
 
@@ -52,7 +52,7 @@ These are called by `check-setup.bat` but can also be run individually:
 | `setup/check-yarn.bat` | Checks/installs Yarn |
 | `setup/check-python-packages.bat` | Installs `modern_third_space` package |
 | `setup/check-libusb.bat` | Installs libusb for USB communication |
-| `setup/check-rapidshot.bat` | Installs rapidshot for Screen Health |
+| `setup/check-bettercam.bat` | Installs bettercam for Screen Health |
 | `setup/check-web-dependencies.bat` | Installs web/node_modules |
 
 ---
@@ -62,14 +62,14 @@ These are called by `check-setup.bat` but can also be run individually:
 All scripts automatically detect the best Python to use:
 
 1. **TSV_PYTHON** environment variable (if set in `.env.bat`)
-2. **py -3.11** via the Python Launcher (if available)
+2. **py -3.14** via the Python Launcher (if available)
 3. **python** or **python3** as fallback
 
 To pin a specific Python version, create `windows\.env.bat`:
 
 ```batch
 @echo off
-set TSV_PYTHON=py -3.11
+set TSV_PYTHON=py -3.14
 ```
 
 See `.env.bat.example` for more options.

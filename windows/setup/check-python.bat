@@ -14,7 +14,7 @@ echo [CHECK] Checking Python installation...
 :: Load existing .env.bat if present
 if exist "%~dp0..\.env.bat" call "%~dp0..\.env.bat"
 
-:: Detect Python using unified logic: TSV_PYTHON -> py -3.11 -> python/python3
+:: Detect Python using unified logic: TSV_PYTHON -> py -3.14 -> python/python3
 set "DETECTED_PYTHON="
 set "DETECTED_VERSION="
 set "DETECTION_METHOD="
@@ -26,13 +26,20 @@ if defined TSV_PYTHON (
     goto :verify_python
 )
 
-:: 2. Try py launcher with Python 3.11
+:: 2. Try py launcher with Python 3.14 (preferred)
 where py >nul 2>&1
 if !ERRORLEVEL! equ 0 (
+    py -3.14 -c "import sys" >nul 2>&1
+    if !ERRORLEVEL! equ 0 (
+        set "DETECTED_PYTHON=py -3.14"
+        set "DETECTION_METHOD=py launcher (Python 3.14)"
+        goto :verify_python
+    )
+    :: Try Python 3.11 as fallback (for older systems)
     py -3.11 -c "import sys" >nul 2>&1
     if !ERRORLEVEL! equ 0 (
         set "DETECTED_PYTHON=py -3.11"
-        set "DETECTION_METHOD=py launcher (Python 3.11)"
+        set "DETECTION_METHOD=py launcher (Python 3.11 - fallback)"
         goto :verify_python
     )
     :: Try py launcher with any Python 3
@@ -63,9 +70,9 @@ if !ERRORLEVEL! equ 0 (
 :: No Python found
 echo   [FAIL] Python is not installed!
 echo.
-echo   Please install Python 3.11+:
+echo   Please install Python 3.14+:
 echo     1. Go to https://www.python.org/downloads/
-echo     2. Download Python 3.11 or newer
+echo     2. Download Python 3.14 or newer
 echo     3. Run installer, CHECK "Add to PATH"
 echo     4. Restart your terminal
 echo.
@@ -79,7 +86,7 @@ for /f "tokens=*" %%i in ('%DETECTED_PYTHON% --version 2^>^&1') do set "DETECTED
 %DETECTED_PYTHON% -c "import sys; exit(0 if sys.version_info >= (3, 9) else 1)" >nul 2>&1
 if !ERRORLEVEL! neq 0 (
     echo   [FAIL] %DETECTED_VERSION% is too old or not working
-    echo   Please install Python 3.11+ from https://www.python.org/downloads/
+    echo   Please install Python 3.14+ from https://www.python.org/downloads/
     exit /b 1
 )
 

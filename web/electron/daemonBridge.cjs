@@ -41,8 +41,8 @@ const PYTHON_SRC_PATH = path.resolve(
  * Detect the best Python command to use.
  * 
  * Resolution order:
- * 1. TSV_PYTHON environment variable (e.g., "py -3.11" or "C:\Python311\python.exe")
- * 2. On Windows: py launcher with Python 3.11 (py -3.11)
+ * 1. TSV_PYTHON environment variable (e.g., "py -3.14" or "C:\Python314\python.exe")
+ * 2. On Windows: py launcher with Python 3.14 (py -3.14)
  * 3. Fallback: python (Windows) or python3 (Unix)
  * 
  * This matches the logic in windows/*.bat scripts for consistency.
@@ -58,16 +58,16 @@ function detectPythonCommand() {
     return { cmd: parts[0], args: parts.slice(1) };
   }
 
-  // 2. On Windows, try py launcher with Python 3.11
+  // 2. On Windows, try py launcher with Python 3.14
   if (process.platform === "win32") {
     try {
-      // Test if py -3.11 works
-      execSync('py -3.11 -c "import sys"', { stdio: "ignore", timeout: 5000 });
-      console.log("[daemon] Using Python: py -3.11 (detected via py launcher)");
-      return { cmd: "py", args: ["-3.11"] };
+      // Test if py -3.14 works
+      execSync('py -3.14 -c "import sys"', { stdio: "ignore", timeout: 5000 });
+      console.log("[daemon] Using Python: py -3.14 (detected via py launcher)");
+      return { cmd: "py", args: ["-3.14"] };
     } catch (e) {
-      // py -3.11 not available, fall through
-      console.log("[daemon] py -3.11 not available, falling back to python");
+      // py -3.14 not available, fall through
+      console.log("[daemon] py -3.14 not available, falling back to python");
     }
   }
 
@@ -240,7 +240,7 @@ class DaemonBridge extends EventEmitter {
         const pythonInfo = detectPythonCommand();
         cmd = pythonInfo.cmd;
         args = [
-          ...pythonInfo.args,  // e.g., ["-3.11"] for py launcher
+          ...pythonInfo.args,  // e.g., ["-3.14"] for py launcher
           "-u",
           "-m",
           "modern_third_space.cli",

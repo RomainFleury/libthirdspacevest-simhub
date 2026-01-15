@@ -27,9 +27,9 @@ if %ERRORLEVEL% neq 0 (
 if not defined TSV_PYTHON (
     where py >nul 2>&1
     if !ERRORLEVEL! equ 0 (
-        py -3.11 -c "import sys" >nul 2>&1
+        py -3.14 -c "import sys" >nul 2>&1
         if !ERRORLEVEL! equ 0 (
-            set "TSV_PYTHON=py -3.11"
+            set "TSV_PYTHON=py -3.14"
         )
     )
     if not defined TSV_PYTHON (
