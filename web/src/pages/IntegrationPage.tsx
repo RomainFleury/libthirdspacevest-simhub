@@ -4,7 +4,7 @@ import {
   AlyxIntegrationPage,
   L4D2IntegrationPage,
   ScreenHealthIntegrationPage,
-  ScreenHealthCalibrationPage,
+  ScreenHealthBuilderPage,
   ScreenHealthSettingsPage,
   ScreenHealthPreviewPage,
 } from "./integrations";
@@ -26,9 +26,9 @@ const INTEGRATION_SUBPAGES: Record<string, {
   preview?: React.ComponentType;
 }> = {
   screen_health: { 
-    calibration: ScreenHealthCalibrationPage,
+    calibration: ScreenHealthBuilderPage,
     settings: ScreenHealthSettingsPage,
-    builder: ScreenHealthCalibrationPage,
+    builder: ScreenHealthBuilderPage,
     preview: ScreenHealthPreviewPage,
   },
 };

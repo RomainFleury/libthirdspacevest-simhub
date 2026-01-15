@@ -5,7 +5,7 @@ import { useScreenHealthScreenshots } from "../../hooks/screenHealth/useScreenHe
 import { useScreenHealthProfiles } from "../../hooks/screenHealth/useScreenHealthProfiles";
 import { ScreenHealthConfigurationPanel } from "./screenHealth/ScreenHealthConfigurationPanel";
 
-export function ScreenHealthCalibrationPage() {
+export function ScreenHealthBuilderPage() {
   const daemon = useScreenHealthDaemonStatus();
   const screenshots = useScreenHealthScreenshots();
   const profiles = useScreenHealthProfiles();
