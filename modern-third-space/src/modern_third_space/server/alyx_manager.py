@@ -126,6 +126,98 @@ def parse_tactsuit_line(line: str) -> Optional[AlyxEvent]:
 # Haptic Mapper (Phase 3)
 # =============================================================================
 
+#
+# Per-event haptics gating
+#
+# We keep the defaults aligned with the UI:
+# - PlayerHurt + PlayerDeath default ON
+# - everything else default OFF (opt-in)
+#
+
+DEFAULT_ENABLED_EVENTS: dict[str, bool] = {
+    # Core
+    "PlayerHurt": True,
+    "PlayerDeath": True,
+    # Opt-in (curated list)
+    "PlayerShootWeapon": False,
+    "PlayerHealth": False,
+    "PlayerHeal": False,
+    "PlayerUsingHealthstation": False,
+    "PlayerGrabbityPull": False,
+    "PlayerGrabbityLockStart": False,
+    "PlayerGrabbityLockStop": False,
+    "GrabbityGloveCatch": False,
+    "PlayerGrabbedByBarnacle": False,
+    "PlayerReleasedByBarnacle": False,
+    "PlayerCoughStart": False,
+    "PlayerCoughEnd": False,
+    "TwoHandStart": False,
+    "TwoHandEnd": False,
+    "Reset": False,
+    "PlayerDropAmmoInBackpack": False,
+    "PlayerDropResinInBackpack": False,
+    "PlayerRetrievedBackpackClip": False,
+    "PlayerStoredItemInItemholder": False,
+    "PlayerRemovedItemFromItemholder": False,
+    "ItemPickup": False,
+    "ItemReleased": False,
+    "PlayerPistolClipInserted": False,
+    "PlayerPistolChamberedRound": False,
+    "PlayerShotgunShellLoaded": False,
+    "PlayerShotgunLoadedShells": False,
+    "PlayerShotgunUpgradeGrenadeLauncherState": False,
+}
+
+# Cooldowns (seconds) for spammy events. Others default to 0.
+DEFAULT_EVENT_COOLDOWN_S: dict[str, float] = {
+    "PlayerShootWeapon": 0.08,
+    "PlayerHealth": 1.0,
+    "PlayerCoughStart": 0.75,
+    "PlayerCoughEnd": 0.25,
+    "Reset": 2.0,
+}
+
+
+@dataclass
+class AlyxHapticsSettings:
+    """
+    Per-event haptics settings for Alyx.
+
+    v1 schema (as passed via daemon command):
+      {"enabled_events": {"PlayerHurt": true, "PlayerShootWeapon": false, ...}}
+    """
+
+    enabled_events: dict[str, bool]
+    cooldown_s: dict[str, float]
+    _last_trigger_ts: dict[str, float]
+
+    @classmethod
+    def from_payload(cls, payload: Optional[dict]) -> "AlyxHapticsSettings":
+        enabled = dict(DEFAULT_ENABLED_EVENTS)
+        cooldown_s = dict(DEFAULT_EVENT_COOLDOWN_S)
+
+        if isinstance(payload, dict):
+            raw_enabled = payload.get("enabled_events")
+            if isinstance(raw_enabled, dict):
+                for k, v in raw_enabled.items():
+                    if isinstance(k, str):
+                        enabled[k] = bool(v)
+
+            raw_cd = payload.get("cooldowns")
+            if isinstance(raw_cd, dict):
+                for k, v in raw_cd.items():
+                    if isinstance(k, str):
+                        try:
+                            cooldown_s[k] = max(0.0, float(v))
+                        except Exception:
+                            pass
+
+        return cls(enabled_events=enabled, cooldown_s=cooldown_s, _last_trigger_ts={})
+
+    def is_enabled(self, event_type: str) -> bool:
+        return bool(self.enabled_events.get(event_type, False))
+
+
 def angle_to_cells(angle: float) -> List[int]:
     """
     Convert damage angle (0-360°) to vest cells.
@@ -162,18 +254,30 @@ def angle_to_cells(angle: float) -> List[int]:
         return RIGHT_SIDE
 
 
-def map_event_to_haptics(event: AlyxEvent) -> List[tuple[int, int]]:
+def map_event_to_haptics(
+    event: AlyxEvent,
+    settings: Optional[AlyxHapticsSettings] = None,
+    primary_is_left: Optional[bool] = None,
+) -> List[tuple[int, int]]:
     """
     Map an Alyx event to haptic commands.
     
     Returns list of (cell, speed) tuples.
     
     Uses correct hardware cell layout from cell_layout module.
-    
-    NOTE: Only damage and death events trigger haptics.
-    Other events (shooting, backpack, etc.) are logged but not haptic-enabled.
     """
-    commands = []
+    st = settings or AlyxHapticsSettings.from_payload(None)
+    if not st.is_enabled(event.type):
+        return []
+
+    commands: List[tuple[int, int]] = []
+
+    def _hand_is_left(is_primary_hand: bool) -> bool:
+        # If we don't know, assume primary is right (default False).
+        pil = bool(primary_is_left) if primary_is_left is not None else False
+        # is_primary_hand refers to whichever hand is currently primary.
+        # If primary is left, primary-hand events are left; otherwise they're right.
+        return pil == bool(is_primary_hand)
     
     if event.type == "PlayerHurt":
         angle = event.params.get("angle", 0.0)
@@ -190,12 +294,147 @@ def map_event_to_haptics(event: AlyxEvent) -> List[tuple[int, int]]:
         # Full vest strong effect
         for cell in ALL_CELLS:
             commands.append((cell, 10))
+
+    elif event.type == "PlayerShootWeapon":
+        weapon = str(event.params.get("weapon", "") or "")
+        wl = weapon.lower()
+        if "shotgun" in wl:
+            speed = 7
+        elif "rapidfire" in wl or "smg" in wl:
+            speed = 4
+        else:
+            speed = 5
+        # Recoil pulse on front upper cells
+        commands.append((Cell.FRONT_UPPER_LEFT, speed))
+        commands.append((Cell.FRONT_UPPER_RIGHT, speed))
+
+    elif event.type == "PlayerHealth":
+        health = event.params.get("health", 100)
+        try:
+            health_i = int(health)
+        except Exception:
+            health_i = 100
+        if health_i <= 30:
+            # Heartbeat-like: subtle left-side pulse
+            commands.append((Cell.FRONT_UPPER_LEFT, 3))
+            commands.append((Cell.FRONT_LOWER_LEFT, 3))
+
+    elif event.type in ("PlayerHeal", "PlayerUsingHealthstation"):
+        # Soothing wave on front
+        for cell in FRONT_CELLS:
+            commands.append((cell, 2))
+
+    elif event.type in ("PlayerGrabbityPull", "PlayerGrabbityLockStart", "PlayerGrabbityLockStop", "GrabbityGloveCatch"):
+        is_primary_hand = bool(event.params.get("is_primary_hand", True))
+        is_left = _hand_is_left(is_primary_hand)
+
+        if event.type == "PlayerGrabbityPull":
+            speed = 3
+        elif event.type == "GrabbityGloveCatch":
+            speed = 4
+        elif event.type == "PlayerGrabbityLockStart":
+            speed = 3
+        else:  # PlayerGrabbityLockStop
+            speed = 2
+
+        if is_left:
+            commands.append((Cell.FRONT_UPPER_LEFT, speed))
+            commands.append((Cell.FRONT_LOWER_LEFT, speed))
+        else:
+            commands.append((Cell.FRONT_UPPER_RIGHT, speed))
+            commands.append((Cell.FRONT_LOWER_RIGHT, speed))
+
+    elif event.type == "PlayerGrabbedByBarnacle":
+        # Strong pull-up effect on back upper cells
+        commands.append((Cell.BACK_UPPER_LEFT, 8))
+        commands.append((Cell.BACK_UPPER_RIGHT, 8))
+
+    elif event.type == "PlayerReleasedByBarnacle":
+        # Release tap on back upper cells
+        commands.append((Cell.BACK_UPPER_LEFT, 4))
+        commands.append((Cell.BACK_UPPER_RIGHT, 4))
+
+    elif event.type == "PlayerCoughStart":
+        # Subtle chest pulses (front cells)
+        for cell in FRONT_CELLS:
+            commands.append((cell, 2))
+
+    elif event.type == "PlayerCoughEnd":
+        # Small “end” tap (lower front)
+        commands.append((Cell.FRONT_LOWER_LEFT, 1))
+        commands.append((Cell.FRONT_LOWER_RIGHT, 1))
+
+    elif event.type == "TwoHandStart":
+        # Subtle shoulder/upper feedback
+        commands.append((Cell.FRONT_UPPER_LEFT, 2))
+        commands.append((Cell.FRONT_UPPER_RIGHT, 2))
+
+    elif event.type == "TwoHandEnd":
+        commands.append((Cell.FRONT_UPPER_LEFT, 1))
+        commands.append((Cell.FRONT_UPPER_RIGHT, 1))
+
+    elif event.type == "Reset":
+        # Quick full-vest pulse on spawn
+        for cell in ALL_CELLS:
+            commands.append((cell, 3))
+
+    elif event.type in (
+        "PlayerDropAmmoInBackpack",
+        "PlayerDropResinInBackpack",
+        "PlayerRetrievedBackpackClip",
+        "PlayerStoredItemInItemholder",
+        "PlayerRemovedItemFromItemholder",
+    ):
+        left = bool(event.params.get("left_side", False))
+        cell = Cell.BACK_UPPER_LEFT if left else Cell.BACK_UPPER_RIGHT
+        speed = 4 if event.type == "PlayerRetrievedBackpackClip" else 3
+        commands.append((cell, speed))
+
+    elif event.type == "ItemPickup":
+        left = bool(event.params.get("left_shoulder", False))
+        cell = Cell.BACK_UPPER_LEFT if left else Cell.BACK_UPPER_RIGHT
+        commands.append((cell, 3))
+
+    elif event.type == "ItemReleased":
+        left = bool(event.params.get("left_hand_used", False))
+        if left:
+            commands.append((Cell.FRONT_LOWER_LEFT, 2))
+        else:
+            commands.append((Cell.FRONT_LOWER_RIGHT, 2))
+
+    elif event.type in ("PlayerPistolClipInserted", "PlayerPistolChamberedRound"):
+        speed = 3 if event.type == "PlayerPistolClipInserted" else 2
+        commands.append((Cell.FRONT_UPPER_LEFT, speed))
+        commands.append((Cell.FRONT_UPPER_RIGHT, speed))
+
+    elif event.type in ("PlayerShotgunShellLoaded", "PlayerShotgunLoadedShells"):
+        speed = 4
+        commands.append((Cell.FRONT_UPPER_LEFT, speed))
+        commands.append((Cell.FRONT_UPPER_RIGHT, speed))
+
+    elif event.type == "PlayerShotgunUpgradeGrenadeLauncherState":
+        # State change tap
+        try:
+            state = int(event.params.get("state", 0))
+        except Exception:
+            state = 0
+        speed = 5 if state else 3
+        commands.append((Cell.FRONT_LOWER_LEFT, speed))
+        commands.append((Cell.FRONT_LOWER_RIGHT, speed))
     
-    # All other events are tracked but don't trigger haptics
-    # This includes: PlayerShootWeapon, PlayerHealth, PlayerHeal, 
-    # PlayerGrabbityPull, GrabbityGloveCatch, PlayerGrabbedByBarnacle,
-    # PlayerCoughStart, TwoHandStart, Reset, backpack interactions, etc.
-    
+    # If not mapped, do nothing (even if enabled).
+    if not commands:
+        return []
+
+    # Apply cooldown AFTER mapping, so non-triggering events don't consume cooldown windows.
+    cd = float(st.cooldown_s.get(event.type, 0.0) or 0.0)
+    if cd > 0.0:
+        now = time.time()
+        last = float(st._last_trigger_ts.get(event.type, 0.0) or 0.0)
+        if (now - last) < cd:
+            return []
+        st._last_trigger_ts[event.type] = now
+
     return commands
 
 
@@ -343,6 +582,10 @@ class AlyxManager:
         self._log_path: Optional[Path] = None
         self._watcher: Optional[ConsoleLogWatcher] = None
         self._running = False
+
+        # Runtime config/state
+        self._haptics_settings: AlyxHapticsSettings = AlyxHapticsSettings.from_payload(None)
+        self._primary_is_left: bool = False
         
         # Stats
         self._events_received = 0
@@ -378,12 +621,17 @@ class AlyxManager:
         
         return None
     
-    def start(self, log_path: Optional[str] = None) -> tuple[bool, Optional[str]]:
+    def start(
+        self,
+        log_path: Optional[str] = None,
+        alyx_settings: Optional[dict] = None,
+    ) -> tuple[bool, Optional[str]]:
         """
         Start watching for Alyx events.
         
         Args:
             log_path: Path to console.log, or None for auto-detect
+            alyx_settings: Optional Alyx settings payload passed from daemon command
             
         Returns:
             (success, error_message)
@@ -399,6 +647,11 @@ class AlyxManager:
         
         if not self._log_path:
             return False, "Could not find console.log. Ensure Half-Life Alyx is installed and launched with -condebug"
+
+        # Store per-event haptics settings for this run (restart required to apply changes)
+        self._haptics_settings = AlyxHapticsSettings.from_payload(alyx_settings)
+        # Reset primary-hand tracking (updated via PrimaryHandChanged events)
+        self._primary_is_left = False
         
         # Create watcher
         self._watcher = ConsoleLogWatcher(
@@ -428,6 +681,7 @@ class AlyxManager:
             self._watcher = None
         
         self._running = False
+        self._haptics_settings = AlyxHapticsSettings.from_payload(None)
         logger.info("Alyx integration stopped")
         return True
     
@@ -438,13 +692,21 @@ class AlyxManager:
         self._last_event_type = event.type
         
         logger.debug(f"Alyx event: {event.type} - {event.params}")
+
+        # Track primary hand changes for hand-relative events.
+        if event.type == "PrimaryHandChanged":
+            self._primary_is_left = bool(event.params.get("is_primary_left", False))
         
         # Emit event to callback (for broadcasting)
         if self.on_game_event:
             self.on_game_event(event.type, event.params)
         
         # Map to haptics and trigger
-        haptic_commands = map_event_to_haptics(event)
+        haptic_commands = map_event_to_haptics(
+            event,
+            settings=self._haptics_settings,
+            primary_is_left=self._primary_is_left,
+        )
         for cell, speed in haptic_commands:
             self._trigger(cell, speed)
     

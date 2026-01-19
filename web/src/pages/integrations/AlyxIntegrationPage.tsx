@@ -26,6 +26,68 @@ const EVENT_DISPLAY_MAP: Record<string, EventDisplayInfo> = {
   PlayerRetrievedBackpackClip: { label: "Get Clip", icon: "📦", color: "text-amber-400" },
 };
 
+const EFFECT_TOGGLE_ORDER: string[] = [
+  // Core
+  "PlayerHurt",
+  "PlayerDeath",
+
+  // Combat + health
+  "PlayerShootWeapon",
+  "PlayerHealth",
+  "PlayerHeal",
+  "PlayerUsingHealthstation",
+
+  // Gravity gloves
+  "PlayerGrabbityPull",
+  "PlayerGrabbityLockStart",
+  "PlayerGrabbityLockStop",
+  "GrabbityGloveCatch",
+
+  // Environment / interactions
+  "PlayerGrabbedByBarnacle",
+  "PlayerReleasedByBarnacle",
+  "PlayerCoughStart",
+  "PlayerCoughEnd",
+  "TwoHandStart",
+  "TwoHandEnd",
+  "Reset",
+
+  // Backpack / itemholder
+  "PlayerDropAmmoInBackpack",
+  "PlayerDropResinInBackpack",
+  "PlayerRetrievedBackpackClip",
+  "PlayerStoredItemInItemholder",
+  "PlayerRemovedItemFromItemholder",
+  "ItemPickup",
+  "ItemReleased",
+
+  // Reload / weapon interactions
+  "PlayerPistolClipInserted",
+  "PlayerPistolChamberedRound",
+  "PlayerShotgunShellLoaded",
+  "PlayerShotgunLoadedShells",
+  "PlayerShotgunUpgradeGrenadeLauncherState",
+];
+
+const EVENT_TOGGLE_LABEL_OVERRIDES: Record<string, string> = {
+  PlayerUsingHealthstation: "Use Health Station",
+  PlayerGrabbityLockStart: "Gravity Lock Start",
+  PlayerGrabbityLockStop: "Gravity Lock Stop",
+  PlayerStoredItemInItemholder: "Item Holder Store",
+  PlayerRemovedItemFromItemholder: "Item Holder Remove",
+  ItemPickup: "Item Pickup",
+  ItemReleased: "Item Released",
+  PlayerPistolClipInserted: "Pistol Reload: Clip Inserted",
+  PlayerPistolChamberedRound: "Pistol Reload: Chamber Round",
+  PlayerShotgunShellLoaded: "Shotgun Reload: Shell Loaded",
+  PlayerShotgunLoadedShells: "Shotgun Reload: Loaded Shells",
+  PlayerShotgunUpgradeGrenadeLauncherState: "Shotgun: Grenade Launcher State",
+};
+
+function getToggleLabel(eventType: string): string {
+  return EVENT_TOGGLE_LABEL_OVERRIDES[eventType] || EVENT_DISPLAY_MAP[eventType]?.label || eventType;
+}
+
 function formatEventDetails(event: GameEvent): string {
   const alyxEvent = event as unknown as AlyxGameEvent;
   if (alyxEvent.type === "PlayerHurt" && alyxEvent.params?.health !== undefined) {
@@ -45,10 +107,13 @@ export function AlyxIntegrationPage() {
     gameEvents,
     modInfo,
     savedLogPath,
+    enabledEvents,
+    restartRequired,
     start,
     stop,
     clearEvents,
     browseLogPath,
+    setEventEnabled,
   } = useAlyxIntegration();
 
   // Convert Alyx events to generic GameEvent format
@@ -96,6 +161,49 @@ export function AlyxIntegrationPage() {
           <p className="mt-1 text-xs text-emerald-400">
             ✓ Custom path saved
           </p>
+        )}
+      </div>
+
+      <div className="pt-2 border-t border-slate-700/60">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-medium text-slate-200">Haptics (per-event)</h3>
+          <span className="text-xs text-slate-500">
+            Defaults: damage/death ON, others OFF
+          </span>
+        </div>
+
+        {restartRequired && status.running && (
+          <div className="mt-3 rounded-lg bg-amber-900/20 border border-amber-700/30 px-3 py-2 text-xs text-amber-200">
+            Settings saved. Stop and Start the Alyx integration to apply changes.
+          </div>
+        )}
+
+        {!enabledEvents ? (
+          <p className="mt-3 text-sm text-slate-500">Loading settings…</p>
+        ) : (
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
+            {EFFECT_TOGGLE_ORDER.map((eventType) => {
+              const checked = Boolean(enabledEvents[eventType]);
+              const label = getToggleLabel(eventType);
+              return (
+                <label
+                  key={eventType}
+                  className="flex items-center justify-between gap-3 rounded-lg bg-slate-900/40 border border-slate-700/40 px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <div className="text-sm text-slate-200 truncate">{label}</div>
+                    <div className="text-xs text-slate-500 font-mono truncate">{eventType}</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={(e) => setEventEnabled(eventType, e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                </label>
+              );
+            })}
+          </div>
         )}
       </div>
     </div>
