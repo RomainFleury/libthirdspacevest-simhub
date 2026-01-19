@@ -20,7 +20,7 @@ class GamePlayerMapping:
     
     Example:
         - Game "cs2" maps Player 1 → device_123, Player 2 → device_456
-        - Game "gtav" maps Player 1 → device_789 (different assignment)
+        - Game "alyx" maps Player 1 → device_789 (different assignment)
     """
     
     def __init__(self):
@@ -33,7 +33,7 @@ class GamePlayerMapping:
         Set a player mapping for a game.
         
         Args:
-            game_id: The game identifier (e.g., "cs2", "gtav")
+            game_id: The game identifier (e.g., "cs2", "alyx")
             player_num: Player number (1, 2, 3...)
             device_id: The device to map to
         

@@ -6,12 +6,6 @@ This directory contains pre-built game mod files that are bundled with the Third
 
 ```
 mods/
-├── superhot-vr/           # SUPERHOT VR MelonLoader mod
-│   └── ThirdSpace_SuperhotVR.dll
-├── pistolwhip/            # Pistol Whip MelonLoader mod
-│   └── ThirdSpace_PistolWhip.dll
-├── gta5/                  # GTA V SHVDN mod
-│   └── ThirdSpaceGTAV.dll
 ├── alyx/                  # Half-Life: Alyx scripts
 │   └── (Lua scripts from NexusMods)
 └── l4d2/                  # Left 4 Dead 2 VScripts (in misc-documentations/)
@@ -20,35 +14,11 @@ mods/
 
 ## Building Mods
 
-### MelonLoader Mods (SUPERHOT VR, Pistol Whip)
+Currently, no mods require building in this directory. The mods here are either:
+- Pre-built files from external sources (Alyx scripts from NexusMods)
+- Copied from `misc-documentations/` during the build process (L4D2 scripts)
 
-These require:
-- Visual Studio 2019/2022
-- .NET Framework 4.7.2
-- MelonLoader dependencies from the game
-
-Build steps:
-```powershell
-# SUPERHOT VR
-cd superhot-mod
-./build.ps1
-
-# Pistol Whip
-cd pistolwhip-mod
-./build.ps1
-```
-
-### SHVDN Mod (GTA V)
-
-Requires:
-- Visual Studio 2019/2022
-- .NET Framework 4.8
-- ScriptHookVDotNet references
-
-```powershell
-cd gta5-mod
-./build.ps1
-```
+For archived/untested mods, see `misc-documentations/archived-untested-mods/`.
 
 ## CI/CD Building
 
@@ -62,15 +32,10 @@ The workflow:
 
 ## Adding Pre-built Mods Manually
 
-If you've built the mods locally:
+If you need to add mods manually:
 
-1. Build the mod in Release mode
-2. Copy the `.dll` to the appropriate folder:
-   - `mods/superhot-vr/ThirdSpace_SuperhotVR.dll`
-   - `mods/pistolwhip/ThirdSpace_PistolWhip.dll`
-   - `mods/gta5/ThirdSpaceGTAV.dll`
-
-3. The release build will bundle these automatically
+1. Place the mod files in the appropriate folder under `mods/`
+2. The release build will bundle these automatically
 
 ## Version Tracking
 

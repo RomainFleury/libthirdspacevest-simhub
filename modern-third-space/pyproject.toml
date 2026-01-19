@@ -6,9 +6,11 @@ readme = "README.md"
 authors = [
   { name = "SimHub Contributors", email = "contact@simhub.dev" }
 ]
-requires-python = ">=3.11"
+requires-python = ">=3.14"
 dependencies = [
-  "pyusb>=1.2.1"
+  "pyusb>=1.2.1",
+  "mss>=9.0.1",
+  "bettercam>=1.0.0"
 ]
 
 [project.optional-dependencies]

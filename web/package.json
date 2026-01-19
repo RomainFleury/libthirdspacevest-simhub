@@ -1,6 +1,6 @@
 {
   "name": "third-space-vest",
-  "version": "0.0.1",
+  "version": "0.1.0-alpha.1",
   "description": "Third Space Vest haptic device controller and game integration hub",
   "private": true,
   "type": "module",
@@ -16,7 +16,8 @@
     "build:electron:dir": "yarn build && electron-builder --win --dir --config electron-builder.yml",
     "build:all": "node scripts/build-release.mjs",
     "repomix": "repomix .. --config repomix.config.json",
-    "check:python": "node scripts/check-python-setup.mjs"
+    "check:python": "node scripts/check-python-setup.mjs",
+    "stop:daemon": "node scripts/stop-daemon.mjs"
   },
   "repository": {
     "type": "git",

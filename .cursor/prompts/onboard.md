@@ -13,7 +13,7 @@ I'm ready to help with the **Third Space Vest** project. I understand:
 - 🚫 **Never modify** `legacy-do-not-change/`
 - 🔌 **Daemon-centric**: All vest commands → TCP 5050 → Python Daemon
 - 📦 **Isolation**: `vest/` package stays separate from integrations
-- 🎮 **Game integrations**: 7 games implemented (CS2, Alyx, L4D2, GTAV, SUPERHOT, Pistol Whip, Star Citizen)
+- 🎮 **Game integrations**: Active integrations (CS2, Alyx, L4D2, SimHub). Some untested integrations archived in `misc-documentations/archived-untested-mods/`
 - 🧪 **Testing**: Game integration tests MUST pass before PRs
 
 ## Key Commands

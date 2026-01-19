@@ -51,7 +51,15 @@ reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUn
 
 ## Quick Build (Windows)
 
-**Double-click to build:**
+**First, ensure prerequisites are installed:**
+
+```
+windows/check-setup.bat
+```
+
+This checks Python, Node.js, and all dependencies. Fix any issues before building.
+
+**Then, double-click to build:**
 
 ```
 windows/build-release.bat
@@ -162,12 +170,9 @@ Game mods are bundled with the app in `resources/mods/`:
 | Game | Files | Install Method |
 |------|-------|----------------|
 | Left 4 Dead 2 | `*.nut` VScripts | Click "Install Mod" in UI |
-| SUPERHOT VR | `ThirdSpace_SuperhotVR.dll` | Download from UI |
-| Pistol Whip | `ThirdSpace_PistolWhip.dll` | Download from UI |
-| GTA V | `ThirdSpaceGTAV.dll` | Download from UI |
 | Half-Life: Alyx | Link to NexusMods | External download |
 
-**Note:** The DLL mods must be compiled before building a release. See `mods/README.md` for build instructions.
+**Note:** Other mods (SUPERHOT VR, GTA V, Pistol Whip) have been moved to `misc-documentations/archived-untested-mods/` as they are untested.
 
 ## Distribution
 
