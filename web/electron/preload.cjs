@@ -60,6 +60,7 @@ contextBridge.exposeInMainWorld("vestBridge", {
   alyxGetModInfo: () => ipcRenderer.invoke("alyx:getModInfo"),
   alyxBrowseLogPath: () => ipcRenderer.invoke("alyx:browseLogPath"),
   alyxGetSettings: () => ipcRenderer.invoke("alyx:getSettings"),
+  alyxSetSettings: (settings) => ipcRenderer.invoke("alyx:setSettings", settings),
   alyxSetLogPath: (logPath) => ipcRenderer.invoke("alyx:setLogPath", logPath),
 
   // Left 4 Dead 2 Integration API

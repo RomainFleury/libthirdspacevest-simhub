@@ -145,6 +145,7 @@ export type AlyxBrowseResult = {
 export type AlyxSettingsResult = {
   success: boolean;
   logPath?: string | null;
+  enabledEvents?: Record<string, boolean>;
   error?: string;
 };
 
@@ -312,6 +313,7 @@ declare global {
       alyxGetModInfo: () => Promise<AlyxModInfoResult>;
       alyxBrowseLogPath: () => Promise<AlyxBrowseResult>;
       alyxGetSettings: () => Promise<AlyxSettingsResult>;
+      alyxSetSettings: (settings: { logPath?: string | null; enabledEvents?: Record<string, boolean> }) => Promise<{ success: boolean; error?: string }>;
       alyxSetLogPath: (logPath: string | null) => Promise<{ success: boolean; error?: string }>;
       // Left 4 Dead 2 Integration API
       l4d2Start: (logPath?: string, playerName?: string) => Promise<{
@@ -730,6 +732,13 @@ export async function alyxBrowseLogPath(): Promise<AlyxBrowseResult> {
  */
 export async function alyxGetSettings(): Promise<AlyxSettingsResult> {
   return await ensureBridge().alyxGetSettings();
+}
+
+/**
+ * Set Alyx settings (partial update).
+ */
+export async function alyxSetSettings(settings: { logPath?: string | null; enabledEvents?: Record<string, boolean> }): Promise<{ success: boolean; error?: string }> {
+  return await ensureBridge().alyxSetSettings(settings);
 }
 
 /**

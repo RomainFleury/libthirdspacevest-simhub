@@ -145,6 +145,13 @@ class Command:
     gsi_port: Optional[int] = None
     # Half-Life: Alyx params
     log_path: Optional[str] = None
+    # Half-Life: Alyx settings (optional)
+    # Passed on alyx_start to control per-event haptics gating.
+    # Expected schema (v1):
+    # {
+    #   "enabled_events": { "PlayerHurt": true, "PlayerShootWeapon": false, ... }
+    # }
+    alyx_settings: Optional[Dict[str, Any]] = None
     # Generic params
     message: Optional[str] = None  # Used for player name or other messages
     # Generic game event params (for TCP client integrations)
@@ -179,6 +186,7 @@ class Command:
             speed=data.get("speed"),
             gsi_port=data.get("gsi_port"),
             log_path=data.get("log_path"),
+            alyx_settings=data.get("alyx_settings"),
             message=data.get("message"),
             event=data.get("event"),
             hand=data.get("hand"),
