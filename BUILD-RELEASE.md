@@ -71,7 +71,7 @@ This script:
 3. Builds the React UI
 4. Packages everything into an installer
 
-Output: `web/release/`
+Output: `web/release/<yyyy-MM-dd_HH-mm_xxxxxxxx>/` (new subfolder each run; avoids reusing locked `win-unpacked`).
 
 ## Manual Build Steps
 
@@ -114,7 +114,7 @@ cd web
 yarn build:electron
 ```
 
-Output: `web/release/`
+Output: `web/release/<yyyy-MM-dd_HH-mm_xxxxxxxx>/`
 
 ### Alternative: Build Directory Only (Faster)
 
@@ -124,7 +124,7 @@ For testing without creating an installer:
 yarn build:electron:dir
 ```
 
-Output: `web/release/win-unpacked/`
+Output: `web/release/<yyyy-MM-dd_HH-mm_xxxxxxxx>/win-unpacked/`
 
 ## Build Script Options
 
@@ -302,7 +302,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: windows-release
-          path: web/release/*.exe
+          path: web/release
 ```
 
 ## Versioning

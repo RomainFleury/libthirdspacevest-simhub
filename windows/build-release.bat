@@ -10,7 +10,7 @@ setlocal EnableDelayedExpansion
 ::   - Yarn (install via: corepack enable)
 ::
 :: Output:
-::   web/release/Third Space Vest Setup 1.0.0.exe
+::   web/release/<yyyy-MM-dd_HH-mm_xxxxxxxx>/Third Space Vest Setup 1.0.0.exe
 
 echo.
 echo ========================================
@@ -91,11 +91,12 @@ if exist "..\modern-third-space\build\dist\vest-daemon.exe" (
 )
 echo.
 
-:: Step 5: Package with electron-builder
+:: Step 5: Package with electron-builder (fresh subfolder under release\ each run)
 echo [5/5] Packaging with Electron Builder...
-
+for /f "delims=" %%i in ('node scripts\release-output-dir.mjs') do set "RELEASE_OUT=%%i"
+echo Build output directory: !RELEASE_OUT!
 set CSC_IDENTITY_AUTO_DISCOVERY=false
-call yarn electron-builder --win --config electron-builder.yml
+call yarn electron-builder --win --config electron-builder.yml --config.directories.output=!RELEASE_OUT!
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Failed to package application!
     exit /b 1
@@ -106,11 +107,12 @@ echo ========================================
 echo   BUILD SUCCESSFUL!
 echo ========================================
 echo.
-echo Output files are in: web\release\
+echo Output files are in: web\!RELEASE_OUT!\
 echo.
 echo   - Third Space Vest Setup 1.0.0.exe -- installer
 echo   - Third Space Vest-1.0.0-portable.zip -- portable
 echo.
+echo Open that folder in Explorer if you need it ^(each build uses a new subfolder under release\^).
+echo.
 
-:: Open the release folder
-start "" "%~dp0..\web\release"
+pause
