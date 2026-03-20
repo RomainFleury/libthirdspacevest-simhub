@@ -134,6 +134,12 @@ export function L4D2IntegrationPage() {
             ) : (
               <span className="text-slate-500">Select game directory first</span>
             )}
+            {gameDir && !modStatus.installed && (modStatus.missingFiles?.length ?? 0) > 0 && (
+              <p className="text-xs text-slate-500 mt-1 max-w-md">
+                Missing in <code className="bg-slate-700 px-1 rounded">scripts/vscripts</code>:{' '}
+                {modStatus.missingFiles!.join(', ')}
+              </p>
+            )}
           </div>
           <button
             onClick={handleInstallMod}
@@ -219,8 +225,9 @@ export function L4D2IntegrationPage() {
         <li>
           <strong className="text-slate-300">Start the game:</strong>
           <ul className="list-disc list-inside ml-4 mt-1 space-y-1">
-            <li>Launch L4D2 and start a Campaign game</li>
-            <li>The mod auto-loads in Campaign mode</li>
+            <li>Launch L4D2 and start any game mode</li>
+            <li>Supported: Campaign, Versus, Survival, Scavenge</li>
+            <li>The mod auto-loads for each mode</li>
           </ul>
         </li>
         <li>
@@ -231,10 +238,10 @@ export function L4D2IntegrationPage() {
           </ul>
         </li>
       </ol>
-      <div className="rounded-lg bg-amber-900/30 ring-1 ring-amber-500/30 p-3 mt-4">
-        <p className="text-amber-200 text-xs">
-          <strong>⚠️ Important:</strong> The mod only works in <strong>Campaign mode</strong> (not Versus, Survival, etc.). 
-          The VScript hooks are only enabled in Scripted Mode which Campaign uses.
+      <div className="rounded-lg bg-green-900/30 ring-1 ring-green-500/30 p-3 mt-4">
+        <p className="text-green-200 text-xs">
+          <strong>✅ All game modes supported:</strong> Campaign, Versus, Survival, and Scavenge. 
+          The mod automatically enables for each mode with full damage tracking and directional feedback.
         </p>
       </div>
       <p className="text-slate-500 text-xs mt-2">

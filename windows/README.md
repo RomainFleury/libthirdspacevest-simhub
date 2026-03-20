@@ -83,8 +83,8 @@ To create a standalone Windows installer that doesn't require Python or Node.js:
 **Double-click** `build-release.bat`
 
 This creates:
-- `web/release/Third Space Vest Setup 1.0.0.exe` - Windows installer
-- `web/release/Third Space Vest-1.0.0-portable.zip` - Portable version
+- `web/release/<yyyy-MM-dd_HH-mm_xxxxxxxx>/Third Space Vest Setup 1.0.0.exe` - Windows installer
+- `web/release/<...>/Third Space Vest-1.0.0-portable.zip` - Portable version
 
 See [BUILD-RELEASE.md](../BUILD-RELEASE.md) for detailed build instructions.
 

@@ -1192,7 +1192,10 @@ class VestDaemon:
         """Start the Alyx console log watcher."""
         log_path = command.log_path  # Can be None for auto-detect
         
-        success, error = self._alyx_manager.start(log_path)
+        success, error = self._alyx_manager.start(
+            log_path,
+            alyx_settings=command.alyx_settings,
+        )
         
         if success:
             actual_path = str(self._alyx_manager.log_path) if self._alyx_manager.log_path else None

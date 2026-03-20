@@ -119,6 +119,31 @@ HAPTICS_MOD_PATTERN = re.compile(
     re.IGNORECASE
 )
 
+# Names in PlayerHurt that indicate special/common infected (attacker in SI vs survivor damage).
+# Squirrel table iteration order varies; we use these to pick victim-first vs attacker-first.
+_L4D2_SI_NAME_LOWER = frozenset(
+    {
+        "boomer",
+        "charger",
+        "hunter",
+        "infected",
+        "jockey",
+        "smoker",
+        "spitter",
+        "tank",
+        "witch",
+    }
+)
+
+
+def _l4d2_token_is_special_infected(name: str) -> bool:
+    n = name.strip().lower()
+    if not n or n == "unknown":
+        return False
+    if n in _L4D2_SI_NAME_LOWER:
+        return True
+    return n.startswith("witch")
+
 
 def parse_console_line(line: str, player_name: Optional[str] = None) -> Optional[L4D2Event]:
     """
@@ -155,19 +180,74 @@ def parse_console_line(line: str, player_name: Optional[str] = None) -> Optional
         
         # Map event types to our internal format
         if event_type == "PlayerHurt":
-            # Format: {PlayerHurt|victim|damage|angle|damage_type|attacker}
+            # Mod uses WriteHapticEvent() with a Squirrel table; foreach key order is not stable.
+            # Observed layouts (field2 is always numeric damage when present):
+            # - damage|attacker|angle|damage_type|victim (first field numeric)
+            # - attacker|damage|angle|damage_type|victim (SI hurting survivor, e.g. Hunter|41|31|crush|Coach)
+            # - victim|damage|angle|damage_type|attacker (e.g. Maveck|2|0|blast|unknown)
+            # - victim|damage|angle|damage_type|attacker (survivor crush FF: Coach|1|158|crush|Maveck)
+            # - attacker|damage|angle|damage_type|victim (Tank|3|0|unknown|unknown)
             if len(params_list) >= 5:
                 try:
-                    victim = params_list[0]
-                    damage = int(params_list[1])
-                    angle = int(params_list[2]) if params_list[2] else 0
-                    damage_type = params_list[3]
-                    attacker = params_list[4]
-                    
-                    # Filter by player name if provided
+                    a0, a1 = params_list[0], params_list[1]
+                    a2, a3, a4 = params_list[2], params_list[3], params_list[4]
+                    victim: str
+                    damage: int
+                    attacker: str
+                    angle: int
+                    damage_type: str
+                    if a0.isdigit():
+                        damage = int(a0)
+                        attacker = a1
+                        angle = int(a2) if a2 else 0
+                        damage_type = a3
+                        victim = a4
+                    elif (
+                        a1.isdigit()
+                        and a4.lower() == "unknown"
+                        and a3.lower() != "unknown"
+                    ):
+                        victim = a0
+                        damage = int(a1)
+                        angle = int(a2) if a2 else 0
+                        damage_type = a3
+                        attacker = a4
+                    elif a1.isdigit() and _l4d2_token_is_special_infected(a0):
+                        attacker = a0
+                        damage = int(a1)
+                        angle = int(a2) if a2 else 0
+                        damage_type = a3
+                        victim = a4
+                    elif a1.isdigit() and _l4d2_token_is_special_infected(a4):
+                        victim = a0
+                        damage = int(a1)
+                        angle = int(a2) if a2 else 0
+                        damage_type = a3
+                        attacker = a4
+                    elif (
+                        a1.isdigit()
+                        and a0.lower() != a4.lower()
+                        and a4.lower() != "unknown"
+                        and a0.lower() != "unknown"
+                        and not _l4d2_token_is_special_infected(a0)
+                        and not _l4d2_token_is_special_infected(a4)
+                        and a3.lower() == "crush"
+                    ):
+                        victim = a0
+                        damage = int(a1)
+                        angle = int(a2) if a2 else 0
+                        damage_type = a3
+                        attacker = a4
+                    elif a1.isdigit():
+                        attacker = a0
+                        damage = int(a1)
+                        angle = int(a2) if a2 else 0
+                        damage_type = a3
+                        victim = a4
+                    else:
+                        return None
                     if player_name and victim.lower() != player_name.lower():
                         return None
-                    
                     return L4D2Event(
                         type="player_damage",
                         raw=line,

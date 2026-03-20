@@ -5,7 +5,7 @@ appId: com.thirdspace.vest
 productName: Third Space Vest
 copyright: Copyright © 2024 Third Space Vest Contributors
 
-# Directories
+# Directories (output is overridden by build-release.bat / electron-pack-win.mjs / build-release.mjs)
 directories:
   output: release
   buildResources: build
@@ -34,7 +34,7 @@ extraResources:
   # These are pre-built mod files that users can download/install from the UI
   # =========================================================================
   
-  # L4D2 VScript mod files (auto-install from UI)
+  # L4D2 VScript mod files (auto-install from UI): every *.nut in vscripts (haptics + coop/versus/survival/scavenge)
   - from: "../misc-documentations/bhaptics-svg-24-nov/l4d2/third-space-vest-mod/scripts/vscripts/"
     to: "mods/l4d2/"
     filter:

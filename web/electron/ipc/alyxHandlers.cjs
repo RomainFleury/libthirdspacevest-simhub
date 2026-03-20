@@ -12,7 +12,8 @@ function registerAlyxHandlers(getMainWindow) {
     const daemon = getDaemonBridge();
     // Use saved log path if not provided
     const pathToUse = logPath || alyxStorage.getAlyxLogPath();
-    return await daemon.alyxStart(pathToUse);
+    const enabledEvents = alyxStorage.getAlyxEnabledEvents();
+    return await daemon.alyxStart(pathToUse, { enabled_events: enabledEvents });
   });
 
   // Stop Alyx integration
@@ -70,9 +71,21 @@ function registerAlyxHandlers(getMainWindow) {
       return {
         success: true,
         logPath: alyxStorage.getAlyxLogPath(),
+        enabledEvents: alyxStorage.getAlyxEnabledEvents(),
       };
     } catch (error) {
       console.error("Error in alyx:getSettings:", error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Set Alyx settings (partial update)
+  ipcMain.handle("alyx:setSettings", async (_event, settings) => {
+    try {
+      alyxStorage.setAlyxSettings(settings);
+      return { success: true };
+    } catch (error) {
+      console.error("Error in alyx:setSettings:", error);
       return { success: false, error: error.message };
     }
   });

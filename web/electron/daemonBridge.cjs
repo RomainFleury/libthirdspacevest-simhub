@@ -805,10 +805,14 @@ class DaemonBridge extends EventEmitter {
   /**
    * Start Alyx console log watcher.
    * @param {string} [logPath] - Optional path to console.log (auto-detect if not provided)
+   * @param {Object} [alyxSettings] - Optional alyx_settings payload for daemon (e.g. { enabled_events: {...} })
    */
-  async alyxStart(logPath) {
+  async alyxStart(logPath, alyxSettings) {
     try {
       const params = logPath ? { log_path: logPath } : {};
+      if (alyxSettings && typeof alyxSettings === "object") {
+        params.alyx_settings = alyxSettings;
+      }
       const response = await this.sendCommand("alyx_start", params);
       return {
         success: response.success ?? false,

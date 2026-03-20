@@ -42,6 +42,26 @@ function getModPath() {
   return MOD_SOURCE_PATH;
 }
 
+/** @returns {string[]} */
+function listL4d2NutFilenames(modPath) {
+  if (!fs.existsSync(modPath)) {
+    return [];
+  }
+  return fs
+    .readdirSync(modPath)
+    .filter((f) => f.toLowerCase().endsWith(".nut"))
+    .sort();
+}
+
+/** If source dir is unreadable, still validate these shipped files. */
+const L4D2_FALLBACK_NUT_FILES = [
+  "thirdspacevest_haptics.nut",
+  "coop.nut",
+  "versus.nut",
+  "survival.nut",
+  "scavenge.nut",
+];
+
 function registerL4D2Handlers(getMainWindow) {
   // Start Left 4 Dead 2 integration
   ipcMain.handle("l4d2:start", async (_, logPath, playerName) => {
@@ -195,17 +215,32 @@ function registerL4D2Handlers(getMainWindow) {
       }
 
       const vscriptsPath = path.join(gameDir, "scripts", "vscripts");
-      const hapticsFile = path.join(vscriptsPath, "thirdspacevest_haptics.nut");
-      const coopFile = path.join(vscriptsPath, "coop.nut");
+      const modPath = getModPath();
+      const nutsFromSource = listL4d2NutFilenames(modPath);
+      const expectedNuts =
+        nutsFromSource.length > 0 ? nutsFromSource : L4D2_FALLBACK_NUT_FILES;
 
-      const hapticsExists = fs.existsSync(hapticsFile);
-      const coopExists = fs.existsSync(coopFile);
+      const missingFiles = [];
+      for (const f of expectedNuts) {
+        if (!fs.existsSync(path.join(vscriptsPath, f))) {
+          missingFiles.push(f);
+        }
+      }
+
+      const hapticsExists = fs.existsSync(path.join(vscriptsPath, "thirdspacevest_haptics.nut"));
+      const modeScriptsInstalled = {
+        coop: fs.existsSync(path.join(vscriptsPath, "coop.nut")),
+        versus: fs.existsSync(path.join(vscriptsPath, "versus.nut")),
+        survival: fs.existsSync(path.join(vscriptsPath, "survival.nut")),
+        scavenge: fs.existsSync(path.join(vscriptsPath, "scavenge.nut")),
+      };
 
       return {
         success: true,
-        installed: hapticsExists && coopExists,
+        installed: missingFiles.length === 0,
         hapticsInstalled: hapticsExists,
-        coopInstalled: coopExists,
+        modeScriptsInstalled,
+        missingFiles,
         gameDir: gameDir,
       };
     } catch (error) {
@@ -232,19 +267,18 @@ function registerL4D2Handlers(getMainWindow) {
       const vscriptsPath = path.join(gameDir, "scripts", "vscripts");
       fs.mkdirSync(vscriptsPath, { recursive: true });
 
-      // Copy the mod files
-      const filesToCopy = ["thirdspacevest_haptics.nut", "coop.nut"];
-      const copiedFiles = [];
+      const nutFiles = listL4d2NutFilenames(modPath);
+      if (nutFiles.length === 0) {
+        return {
+          success: false,
+          error: `No .nut files found in mod source: ${modPath}`,
+        };
+      }
 
-      for (const file of filesToCopy) {
+      const copiedFiles = [];
+      for (const file of nutFiles) {
         const srcPath = path.join(modPath, file);
         const destPath = path.join(vscriptsPath, file);
-        
-        if (!fs.existsSync(srcPath)) {
-          console.warn(`Source file not found: ${srcPath}`);
-          continue;
-        }
-
         fs.copyFileSync(srcPath, destPath);
         copiedFiles.push(file);
         console.log(`Copied: ${file} -> ${destPath}`);

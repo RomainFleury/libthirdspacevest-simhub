@@ -24,6 +24,7 @@ import { spawn } from "child_process";
 import { existsSync, mkdirSync, copyFileSync } from "fs";
 import { resolve, dirname, join } from "path";
 import { fileURLToPath } from "url";
+import { getReleaseOutputSubpath } from "./release-output-dir.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -144,12 +145,18 @@ async function buildRenderer() {
  */
 async function packageElectron(dirOnly = false) {
   logStep(3, "Packaging with Electron Builder");
-  
-  const args = ["electron-builder", "--win", "--config", "electron-builder.yml"];
+  const outDir = getReleaseOutputSubpath();
+  log(`Packaging to: ${outDir}`, colors.cyan);
+  const args = [
+    "electron-builder",
+    "--win",
+    "--config",
+    "electron-builder.yml",
+    `--config.directories.output=${outDir}`,
+  ];
   if (dirOnly) {
     args.push("--dir");
   }
-  
   await runCommand("yarn", args, {
     cwd: WEB_DIR,
   });
@@ -203,8 +210,7 @@ async function main() {
     log("╚════════════════════════════════════════════════════════════╝", colors.green);
     console.log();
     
-    const releaseDir = resolve(WEB_DIR, "release");
-    log(`Output: ${releaseDir}`, colors.bright);
+    log(`Output root: ${resolve(WEB_DIR, "release")} (timestamped subfolder per run)`, colors.bright);
     console.log();
     
   } catch (err) {

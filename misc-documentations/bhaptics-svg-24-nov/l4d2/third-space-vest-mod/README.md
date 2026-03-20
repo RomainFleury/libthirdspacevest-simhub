@@ -18,19 +18,23 @@ This VScript mod enables haptic feedback integration for Left 4 Dead 2 by output
 
 3. **Copy the mod files:**
    - Copy `thirdspacevest_haptics.nut` to: `scripts/vscripts/thirdspacevest_haptics.nut`
-   - Copy `coop.nut` to: `scripts/vscripts/coop.nut` (enables Scripted Mode for campaign)
+   - Copy mode-specific scripts to enable Scripted Mode:
+     - `coop.nut` → `scripts/vscripts/coop.nut` (Campaign mode)
+     - `versus.nut` → `scripts/vscripts/versus.nut` (Versus mode)
+     - `survival.nut` → `scripts/vscripts/survival.nut` (Survival mode)
+     - `scavenge.nut` → `scripts/vscripts/scavenge.nut` (Scavenge mode)
 
 4. **How it works:**
    
    **Automatic (Recommended):**
-   - The `coop.nut` file is a Mode Script that auto-loads when you start a campaign
-   - It enables Scripted Mode (required for game event hooks)
-   - It automatically loads `thirdspacevest_haptics.nut`
-   - **No manual loading needed!** Just start a campaign game.
+   - Mode scripts auto-load based on the game mode you play
+   - They enable Scripted Mode (required for game event hooks)
+   - They automatically load `thirdspacevest_haptics.nut`
+   - **No manual loading needed!** Just start any game mode.
    
    **Manual loading (if needed):**
    - Open console (enable in game settings, press `~`)
-   - Type: `script_execute coop` (this loads the mode script which enables Scripted Mode)
+   - Type: `script_execute coop` (for Campaign), `script_execute versus` (for Versus), etc.
    - Or type: `script_execute thirdspacevest_haptics` (loads just the haptics script, but Scripted Mode won't be enabled)
 
 ### Method 2: VPK Package (Advanced)
@@ -51,12 +55,12 @@ This VScript mod enables haptic feedback integration for Left 4 Dead 2 by output
    - Press `~` (tilde) to open console
 
 3. **Load the mod:**
-   - Launch the game and start a campaign (single-player or local server)
-   - The `coop.nut` Mode Script will auto-load, enabling Scripted Mode
+   - Launch the game and start any game mode (Campaign, Versus, Survival, or Scavenge)
+   - The appropriate Mode Script will auto-load, enabling Scripted Mode
    - Open console (`~`) to verify
    - You should see: `[L4D2Haptics] Third Space Vest integration mod loaded!`
    - You should see: `[L4D2Haptics] Game event callbacks registered!`
-   - **Note:** If you see `WARNING: Scripted Mode not enabled!`, make sure `coop.nut` is in the `scripts/vscripts/` folder
+   - **Note:** If you see `WARNING: Scripted Mode not enabled!`, make sure the mode script file is in the `scripts/vscripts/` folder
 
 ## Event Format
 
@@ -123,9 +127,12 @@ The mod outputs events to `console.log` in this format:
 
 ### Scripted Mode not enabled error
 - **Cause:** The mod requires Scripted Mode to be enabled for game event hooks to work
-- **Solution:** Make sure `coop.nut` is in `scripts/vscripts/` folder
-- **How it works:** `coop.nut` is a Mode Script that auto-loads when you start a campaign, enabling Scripted Mode
-- **Alternative:** If you're not playing campaign mode, create a Mode Script for your game mode (e.g., `versus.nut`, `survival.nut`)
+- **Solution:** Make sure the appropriate mode script is in `scripts/vscripts/` folder:
+  - `coop.nut` for Campaign mode
+  - `versus.nut` for Versus mode
+  - `survival.nut` for Survival mode
+  - `scavenge.nut` for Scavenge mode
+- **How it works:** Mode scripts auto-load when you start their respective game mode, enabling Scripted Mode
 - **Phase 1 fallback:** If Scripted Mode isn't enabled, the integration will still work with vanilla console.log parsing (attack events, etc.)
 
 ### No events in console.log

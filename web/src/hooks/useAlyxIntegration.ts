@@ -6,6 +6,7 @@ import {
   alyxGetModInfo,
   alyxBrowseLogPath,
   alyxGetSettings,
+  alyxSetSettings,
   alyxSetLogPath,
   subscribeToDaemonEvents,
   AlyxStatus,
@@ -19,6 +20,8 @@ export type AlyxGameEvent = {
   ts: number;
   params?: Record<string, unknown>;
 };
+
+export type AlyxEnabledEvents = Record<string, boolean>;
 
 const MAX_EVENTS = 50; // Max events to keep in history
 
@@ -34,6 +37,8 @@ export function useAlyxIntegration() {
   const [gameEvents, setGameEvents] = useState<AlyxGameEvent[]>([]);
   const [modInfo, setModInfo] = useState<AlyxModInfo | null>(null);
   const [savedLogPath, setSavedLogPath] = useState<string | null>(null);
+  const [enabledEvents, setEnabledEvents] = useState<AlyxEnabledEvents | null>(null);
+  const [restartRequired, setRestartRequired] = useState(false);
   const eventIdCounter = useRef(0);
 
   // Fetch status on mount and periodically
@@ -70,6 +75,7 @@ export function useAlyxIntegration() {
       const result = await alyxGetSettings();
       if (result.success) {
         setSavedLogPath(result.logPath || null);
+        setEnabledEvents(result.enabledEvents || null);
       }
     } catch (err) {
       console.error("Failed to get Alyx settings:", err);
@@ -134,6 +140,7 @@ export function useAlyxIntegration() {
         setError(errorMsg);
         return; // Don't fetch status if failed
       }
+      setRestartRequired(false);
       await fetchStatus();
     } catch (err) {
       console.error("[Alyx] Start exception:", err);
@@ -151,6 +158,8 @@ export function useAlyxIntegration() {
       if (!result.success) {
         setError(result.error || "Failed to stop Alyx integration");
       }
+      // If settings were changed while running, they apply on next start.
+      setRestartRequired(false);
       await fetchStatus();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to stop Alyx integration");
@@ -192,6 +201,25 @@ export function useAlyxIntegration() {
     }
   }, []);
 
+  const setEventEnabled = useCallback(async (eventType: string, enabled: boolean) => {
+    const prev = enabledEvents || {};
+    const next: AlyxEnabledEvents = { ...prev, [eventType]: enabled };
+    setEnabledEvents(next);
+    try {
+      const result = await alyxSetSettings({ enabledEvents: next });
+      if (!result.success) {
+        setError(result.error || "Failed to save Alyx settings");
+      } else {
+        setError(null);
+        // Changes apply on next Start.
+        if (status.running) setRestartRequired(true);
+      }
+    } catch (err) {
+      console.error("Failed to save Alyx settings:", err);
+      setError(err instanceof Error ? err.message : "Failed to save Alyx settings");
+    }
+  }, [enabledEvents, status.running]);
+
   return {
     status,
     loading,
@@ -199,11 +227,14 @@ export function useAlyxIntegration() {
     gameEvents,
     modInfo,
     savedLogPath,
+    enabledEvents,
+    restartRequired,
     start,
     stop,
     clearEvents,
     browseLogPath,
     setLogPath,
+    setEventEnabled,
     refresh: fetchStatus,
   };
 }

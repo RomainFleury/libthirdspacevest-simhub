@@ -180,8 +180,16 @@ Since vanilla L4D2 doesn't output damage to console.log, we created a VScript mo
 - Phase 1 still detects attack events and provides basic haptic feedback
 
 **Loading the Mod:**
-- In-game console: `script_execute thirdspacevest_haptics` (no path, no .nut extension)
+- **Automatic (Recommended):** Mode scripts auto-load based on game mode:
+  - `coop.nut` for Campaign mode
+  - `versus.nut` for Versus mode
+  - `survival.nut` for Survival mode
+  - `scavenge.nut` for Scavenge mode
+- Each mode script enables Scripted Mode and loads `thirdspacevest_haptics.nut`
+- **Manual loading:** In-game console: `script_execute thirdspacevest_haptics` (no path, no .nut extension)
 - File location: `<L4D2>/left4dead2/scripts/vscripts/thirdspacevest_haptics.nut`
+- Mode scripts location: `<L4D2>/left4dead2/scripts/vscripts/[mode].nut`
+- **✅ All game modes supported!**
 
 ## Event-to-Haptic Mapping
 

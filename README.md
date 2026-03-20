@@ -304,10 +304,10 @@ windows/build-release.bat
    yarn build:electron
    ```
 
-   This creates:
-   - `web/release/Third Space Vest Setup 1.0.0.exe` - NSIS installer
-   - `web/release/Third Space Vest-1.0.0-portable.zip` - Portable version
-   - `web/release/win-unpacked/` - Unpacked app directory
+   This creates (under a **new** folder each run, e.g. `web/release/2026-03-25_15-36_a1b2c3d4/`):
+   - `Third Space Vest Setup 1.0.0.exe` - NSIS installer
+   - `Third Space Vest-1.0.0-portable.zip` - Portable version
+   - `win-unpacked/` - Unpacked app directory
 
 ### Build Output
 
@@ -315,15 +315,16 @@ After a successful build, you'll find:
 
 ```
 web/release/
-├── Third Space Vest Setup 1.0.0.exe    # NSIS installer (~150-200 MB)
-├── Third Space Vest-1.0.0-portable.zip # Portable version
-└── win-unpacked/                        # Unpacked app directory
-    ├── Third Space Vest.exe
-    └── resources/
-        ├── daemon/
-        │   └── vest-daemon.exe          # Python daemon (PyInstaller)
-        └── mods/                         # Bundled game mods
-            └── l4d2/
+└── <yyyy-MM-dd_HH-mm_xxxxxxxx>/        # example: 2026-03-25_15-36_a1b2c3d4
+    ├── Third Space Vest Setup 1.0.0.exe
+    ├── Third Space Vest-1.0.0-portable.zip
+    └── win-unpacked/
+        ├── Third Space Vest.exe
+        └── resources/
+            ├── daemon/
+            │   └── vest-daemon.exe
+            └── mods/
+                └── l4d2/
 ```
 
 ### Troubleshooting
