@@ -26,10 +26,18 @@ interface L4D2GameEvent {
   timestamp: number;
 }
 
+interface L4D2ModeScriptsInstalled {
+  coop: boolean;
+  versus: boolean;
+  survival: boolean;
+  scavenge: boolean;
+}
+
 interface ModStatus {
   installed: boolean;
   hapticsInstalled?: boolean;
-  coopInstalled?: boolean;
+  modeScriptsInstalled?: L4D2ModeScriptsInstalled;
+  missingFiles?: string[];
   gameDir?: string;
 }
 
@@ -205,7 +213,8 @@ export function useL4D2Integration() {
         setModStatus({
           installed: result.installed,
           hapticsInstalled: result.hapticsInstalled,
-          coopInstalled: result.coopInstalled,
+          modeScriptsInstalled: result.modeScriptsInstalled,
+          missingFiles: result.missingFiles,
           gameDir: result.gameDir,
         });
       }

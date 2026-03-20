@@ -134,6 +134,12 @@ export function L4D2IntegrationPage() {
             ) : (
               <span className="text-slate-500">Select game directory first</span>
             )}
+            {gameDir && !modStatus.installed && (modStatus.missingFiles?.length ?? 0) > 0 && (
+              <p className="text-xs text-slate-500 mt-1 max-w-md">
+                Missing in <code className="bg-slate-700 px-1 rounded">scripts/vscripts</code>:{' '}
+                {modStatus.missingFiles!.join(', ')}
+              </p>
+            )}
           </div>
           <button
             onClick={handleInstallMod}
