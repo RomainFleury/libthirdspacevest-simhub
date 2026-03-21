@@ -15,10 +15,12 @@ export type ScreenHealthPreset = {
 import eaBattlefront2_2017_RedVignette from "./screenHealthPresets/ea_battlefront_2_2017_red_vignette";
 import gtavHealthBar from "./screenHealthPresets/gtav_health_bar";
 import chivalry2RedVignette from "./screenHealthPresets/chivalry2_red_vignette";
+import ut2004RedVignette from "./screenHealthPresets/ut2004_red_vignette";
 
 export const SCREEN_HEALTH_PRESETS: ScreenHealthPreset[] = [
   chivalry2RedVignette, 
   eaBattlefront2_2017_RedVignette, 
-  gtavHealthBar
+  gtavHealthBar,
+  ut2004RedVignette,
 ];
 
