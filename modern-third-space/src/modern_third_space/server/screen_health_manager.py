@@ -13,6 +13,7 @@ Design constraints:
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import os
@@ -497,6 +498,47 @@ class ScreenHealthProfile:
     debug: Optional[ScreenHealthDebugConfig] = None
 
 
+def _bgra_tight_bytes_to_hwc(raw: bytes, width: int, height: int) -> Any:
+    """Interpret tight row-major BGRA bytes as HxWx4 uint8 (same layout as BetterCam)."""
+    try:
+        import numpy as np
+    except ImportError as e:
+        raise RuntimeError("frame requires numpy (bundled with bettercam)") from e
+    w, h = int(width), int(height)
+    if w <= 0 or h <= 0:
+        raise ValueError("frame_width and frame_height must be > 0")
+    expected = w * h * 4
+    if len(raw) != expected:
+        raise ValueError(f"frame length {len(raw)} != width*height*4 ({expected}) for {w}x{h}")
+    return np.frombuffer(raw, dtype=np.uint8).reshape((h, w, 4))
+
+
+def _decode_inline_bgra_base64_to_hwc(b64: str, width: int, height: int) -> Any:
+    """Decode standard base64 into HxWx4 uint8 BGRA (legacy; prefer file + raw bytes)."""
+    raw = base64.b64decode(b64.strip(), validate=False)
+    return _bgra_tight_bytes_to_hwc(raw, width, height)
+
+
+def _crop_bgra_regions_from_hwc(
+    frame_hwc: Any, regions: List[Tuple[int, int, int, int]]
+) -> List[bytes]:
+    """Crop (left, top, width, height) from HxWx4 BGRA; row-major bytes per region."""
+    results: List[bytes] = []
+    fh, fw = int(frame_hwc.shape[0]), int(frame_hwc.shape[1])
+    for left, top, width, height in regions:
+        l, t, w, h = int(left), int(top), int(width), int(height)
+        if w <= 0 or h <= 0:
+            raise ValueError("region width and height must be > 0")
+        if l < 0 or t < 0 or l + w > fw or t + h > fh:
+            raise ValueError(f"region ({l},{t},{w},{h}) out of bounds for frame {fw}x{fh}")
+        cropped = frame_hwc[t : t + h, l : l + w, :]
+        try:
+            results.append(cropped.tobytes(order="C"))
+        except TypeError:
+            results.append(cropped.tobytes())
+    return results
+
+
 class ScreenHealthManager:
     """
     Daemon-managed screen watcher.
@@ -505,6 +547,8 @@ class ScreenHealthManager:
     - on_game_event(event_type: str, params: dict)
     - on_trigger(cell: int, speed: int)
     """
+
+    _BATCH_CAPTURE_FAIL_LOG_INTERVAL_S = 10.0
 
     def __init__(
         self,
@@ -547,6 +591,9 @@ class ScreenHealthManager:
         self._health_number_candidate_count: Dict[str, int] = {}
         self._prev_health_value_by_detector: Dict[str, int] = {}
         self._last_health_value_emitted: Dict[str, int] = {}
+
+        self._last_batch_capture_fail_log_ts: float = 0.0
+        self._batch_capture_fail_burst: bool = False
 
     @property
     def is_running(self) -> bool:
@@ -597,10 +644,19 @@ class ScreenHealthManager:
         }
 
     def test_profile_once(
-        self, profile: Dict[str, Any] | str, *, output_dir: Optional[str] = None
+        self,
+        profile: Dict[str, Any] | str,
+        *,
+        frame_bgra_bytes: bytes,
+        frame_width: int,
+        frame_height: int,
+        output_dir: Optional[str] = None,
     ) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
         """
         Validate a profile and run a single evaluation pass (no thread, no events).
+
+        ROIs are cropped from tight row-major BGRA bytes (same layout as BetterCam). The client
+        typically writes these bytes to a temp file and passes the path to the daemon over TCP.
 
         Returns:
         - success: bool
@@ -620,12 +676,20 @@ class ScreenHealthManager:
             except Exception as e:
                 return False, None, f"failed to prepare output_dir: {e}"
 
-        # Best-effort capture backend
+        fw = int(frame_width)
+        fh = int(frame_height)
+        if not frame_bgra_bytes or fw <= 0 or fh <= 0:
+            return (
+                False,
+                None,
+                "frame_bgra_bytes (non-empty), frame_width, and frame_height (> 0) are required",
+            )
         try:
-            capture = _create_capture_backend(monitor_index=parsed.capture.monitor_index)
-            frame_w, frame_h = capture.get_frame_size()
+            frame_hwc = _bgra_tight_bytes_to_hwc(frame_bgra_bytes, fw, fh)
+            frame_w, frame_h = fw, fh
         except Exception as e:
-            return False, None, f"capture not available: {e}"
+            return False, None, f"static frame: {e}"
+        frame_source = "file_bgra"
 
         t0 = time.perf_counter()
         detectors_out: List[Dict[str, Any]] = []
@@ -679,6 +743,7 @@ class ScreenHealthManager:
                 "profile_name": parsed.name,
                 "capture": {"monitor_index": parsed.capture.monitor_index, "tick_ms": parsed.capture.tick_ms},
                 "frame": {"w": frame_w, "h": frame_h},
+                "frame_source": frame_source,
                 "total_ms": total_ms,
                 "detectors": detectors_out,
                 "output_dir": str(out_dir) if out_dir else None,
@@ -689,7 +754,7 @@ class ScreenHealthManager:
         cap0 = time.perf_counter()
         try:
             regions_only = [(l, t, w, h) for _, _, _, l, t, w, h in all_regions]
-            captured_data = capture.capture_multiple_bgra(regions_only)
+            captured_data = _crop_bgra_regions_from_hwc(frame_hwc, regions_only)
         except Exception as e:
             return False, None, f"batch capture failed: {e}"
         cap_ms = (time.perf_counter() - cap0) * 1000.0
@@ -783,6 +848,7 @@ class ScreenHealthManager:
             "profile_name": parsed.name,
             "capture": {"monitor_index": parsed.capture.monitor_index, "tick_ms": parsed.capture.tick_ms},
             "frame": {"w": frame_w, "h": frame_h},
+            "frame_source": frame_source,
             "total_ms": total_ms,
             "detectors": detectors_out,
             "output_dir": str(out_dir) if out_dir else None,
@@ -823,6 +889,9 @@ class ScreenHealthManager:
         # Debug runtime
         self._debug_tick = 0
         self._debug_saved_once.clear()
+
+        self._last_batch_capture_fail_log_ts = 0.0
+        self._batch_capture_fail_burst = False
 
     def _env_flag(self, name: str) -> bool:
         v = os.getenv(name)
@@ -1045,12 +1114,22 @@ class ScreenHealthManager:
                 regions_only = [(l, t, w, h) for _, _, _, l, t, w, h in all_regions]
                 captured_data = capture.capture_multiple_bgra(regions_only)
             except Exception as e:
-                logger.error(f"[screen_health] Batch capture failed: {e}")
+                now = time.time()
+                if now - self._last_batch_capture_fail_log_ts >= self._BATCH_CAPTURE_FAIL_LOG_INTERVAL_S:
+                    logger.error("[screen_health] Batch capture failed: %s", e)
+                    self._last_batch_capture_fail_log_ts = now
+                else:
+                    logger.debug("[screen_health] Batch capture failed (throttled): %s", e)
+                self._batch_capture_fail_burst = True
                 elapsed = time.time() - loop_start
                 sleep_for = tick_s - elapsed
                 if sleep_for > 0:
                     time.sleep(sleep_for)
                 continue
+
+            if self._batch_capture_fail_burst:
+                logger.info("[screen_health] Batch capture recovered")
+                self._batch_capture_fail_burst = False
 
             # Process all captured regions
             for (detector_type, detector_obj, name, left, top, w, h), raw_bgra in zip(all_regions, captured_data):

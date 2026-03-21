@@ -105,7 +105,8 @@ echo Close the app window to stop, then close the daemon window.
 echo.
 
 ::: Start the app (pass TSV_PYTHON to Electron so it uses same Python for auto-start)
-endlocal & set "TSV_PYTHON=%TSV_PYTHON%" & call yarn dev
+::: Note: endlocal restores the working directory to the script folder; cd back to web before yarn.
+endlocal & set "TSV_PYTHON=%TSV_PYTHON%" & cd /d "%~dp0..\web" & call yarn dev
 
 ::: If we get here, the app was stopped
 echo.

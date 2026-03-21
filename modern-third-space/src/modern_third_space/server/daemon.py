@@ -14,9 +14,11 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
 import signal
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 from ..vest import VestController, VestStatus, list_devices, get_effect, all_effects_to_dict, effect_to_dict
@@ -244,7 +246,16 @@ class VestDaemon:
                     # Client disconnected abruptly (common on Windows)
                     logger.debug(f"Client {client.id} connection lost: {e}")
                     break
-                
+                except ValueError as e:
+                    # readline() raises ValueError when a line exceeds StreamReader limit (default 64 KiB)
+                    logger.error("Client %s: command line exceeds read buffer (%s)", client.id, e)
+                    try:
+                        err = response_error("Command line exceeds server read buffer limit")
+                        await self._clients.send_to_client(client, err.to_json())
+                    except Exception:
+                        pass
+                    break
+
                 if not line:
                     # Client disconnected
                     break
@@ -1424,6 +1435,60 @@ class VestDaemon:
         if not command.profile:
             return response_screen_health_test(success=False, error="profile is required", req_id=command.req_id)
 
+        path_s = (command.frame_bgra_path or "").strip()
+        b64_legacy = (command.frame_bgra_base64 or "").strip()
+        if (not path_s and not b64_legacy) or command.frame_width is None or command.frame_height is None:
+            return response_screen_health_test(
+                success=False,
+                error=(
+                    "frame_bgra_path (raw BGRA file) or legacy frame_bgra_base64, plus frame_width "
+                    "and frame_height, are required for screen_health_test"
+                ),
+                req_id=command.req_id,
+            )
+        try:
+            fw_req = int(command.frame_width)
+            fh_req = int(command.frame_height)
+        except (TypeError, ValueError):
+            return response_screen_health_test(
+                success=False,
+                error="frame_width and frame_height must be integers",
+                req_id=command.req_id,
+            )
+        if fw_req <= 0 or fh_req <= 0:
+            return response_screen_health_test(
+                success=False,
+                error="frame_width and frame_height must be positive",
+                req_id=command.req_id,
+            )
+
+        frame_file: Optional[Path] = None
+        if path_s:
+            frame_file = Path(path_s).expanduser().resolve()
+            if not frame_file.is_file():
+                return response_screen_health_test(
+                    success=False,
+                    error=f"frame_bgra_path is not a file: {frame_file}",
+                    req_id=command.req_id,
+                )
+            try:
+                raw_bgra = frame_file.read_bytes()
+            except OSError as e:
+                return response_screen_health_test(
+                    success=False,
+                    error=f"failed to read frame_bgra_path: {e}",
+                    req_id=command.req_id,
+                )
+        else:
+            try:
+                raw_bgra = base64.b64decode(b64_legacy, validate=False)
+            except Exception as e:
+                return response_screen_health_test(
+                    success=False,
+                    error=f"invalid frame_bgra_base64: {e}",
+                    req_id=command.req_id,
+                )
+
         # Always log/print test runs for debugging (even if profile debug mode is off).
         try:
             prof_name = None
@@ -1440,10 +1505,12 @@ class VestDaemon:
             mon_idx = None
             tick_ms = None
 
+        src_tag = f"path={frame_file}" if frame_file is not None else "legacy_base64"
         msg0 = (
             f"[screen_health_test] start req_id={command.req_id} "
             f"profile={prof_name or '<unnamed>'} monitor_index={mon_idx} tick_ms={tick_ms} "
-            f"output_dir={command.output_dir or '<none>'}"
+            f"output_dir={command.output_dir or '<none>'} "
+            f"frame={fw_req}x{fh_req} bytes={len(raw_bgra)} {src_tag}"
         )
         logger.info(msg0)
         print(msg0)
@@ -1451,6 +1518,9 @@ class VestDaemon:
         try:
             ok, result, err = self._screen_health_manager.test_profile_once(
                 command.profile,
+                frame_bgra_bytes=raw_bgra,
+                frame_width=fw_req,
+                frame_height=fh_req,
                 output_dir=command.output_dir,
             )
             if ok and result:
@@ -1513,6 +1583,12 @@ class VestDaemon:
             logger.exception(msg1)
             print(msg1)
             return response_screen_health_test(success=False, error=str(e), req_id=command.req_id)
+        finally:
+            if frame_file is not None:
+                try:
+                    frame_file.unlink(missing_ok=True)
+                except OSError:
+                    pass
 
     # -------------------------------------------------------------------------
     # Generic Screen Health Watcher callbacks

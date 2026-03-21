@@ -2,16 +2,11 @@ import { Link, useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useScreenHealthProfiles } from "../../hooks/screenHealth/useScreenHealthProfiles";
 import { useScreenHealthDaemonStatus } from "../../hooks/screenHealth/useScreenHealthDaemonStatus";
-import { screenHealthTest, screenHealthDeleteProfile } from "../../lib/bridgeApi";
-
 export function ScreenHealthPreviewPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const profiles = useScreenHealthProfiles();
   const daemon = useScreenHealthDaemonStatus();
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<Record<string, any> | null>(null);
-  const [testError, setTestError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
@@ -28,25 +23,6 @@ export function ScreenHealthPreviewPage() {
 
   const isDisabled = daemon.status.running;
   const isLocal = profile?.type === "local";
-
-  const handleTest = async () => {
-    if (!profile) return;
-    setTesting(true);
-    setTestError(null);
-    setTestResult(null);
-    try {
-      const result = await screenHealthTest(profile.profile);
-      if (!result.success) {
-        setTestError(result.error || "Test failed");
-      } else {
-        setTestResult(result.test_result || null);
-      }
-    } catch (e) {
-      setTestError(e instanceof Error ? e.message : "Test failed");
-    } finally {
-      setTesting(false);
-    }
-  };
 
   const handleDelete = async () => {
     if (!profile || !isLocal) return;
@@ -168,18 +144,10 @@ export function ScreenHealthPreviewPage() {
         </pre>
       </section>
 
-      {/* Actions */}
-      <section className="rounded-2xl bg-slate-800/80 p-4 md:p-6 shadow-lg ring-1 ring-white/5">
-        <h2 className="text-lg font-semibold text-white mb-4">Actions</h2>
-        <div className="flex flex-wrap gap-3">
-          <button
-            onClick={handleTest}
-            disabled={isDisabled || testing}
-            className="rounded-lg bg-slate-600/80 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-600 disabled:opacity-50"
-          >
-            {testing ? "Testing..." : "Test Profile"}
-          </button>
-          {isLocal && (
+      {isLocal && (
+        <section className="rounded-2xl bg-slate-800/80 p-4 md:p-6 shadow-lg ring-1 ring-white/5">
+          <h2 className="text-lg font-semibold text-white mb-4">Actions</h2>
+          <div className="flex flex-wrap gap-3">
             <button
               onClick={handleDelete}
               disabled={isDisabled || deleting}
@@ -187,49 +155,9 @@ export function ScreenHealthPreviewPage() {
             >
               {deleting ? "Deleting..." : "Delete Profile"}
             </button>
-          )}
-        </div>
-
-        {testError && (
-          <div className="mt-4 rounded-lg bg-rose-500/10 border border-rose-500/20 px-4 py-3 text-rose-200 text-sm">
-            {testError}
           </div>
-        )}
-
-        {testResult && (
-          <div className="mt-4 rounded-xl bg-slate-900/40 p-3 ring-1 ring-white/5 text-sm">
-            <div className="text-white font-medium mb-1">Test Result</div>
-            <div className="text-xs text-slate-300 space-y-1">
-              <div className="font-mono text-slate-400">
-                total_ms={typeof testResult.total_ms === "number" ? testResult.total_ms.toFixed(2) : "?"} output_dir=
-                {typeof testResult.output_dir === "string" ? testResult.output_dir : "(none)"}
-              </div>
-              {Array.isArray(testResult.detectors) && (
-                <div className="space-y-1">
-                  {testResult.detectors.slice(0, 8).map((d: any, idx: number) => (
-                    <div key={idx} className="font-mono text-slate-400">
-                      {d.type}:{d.name}{" "}
-                      {typeof d.score === "number" ? `score=${d.score.toFixed(3)}` : ""}
-                      {typeof d.percent === "number" ? ` percent=${(d.percent * 100).toFixed(1)}%` : ""}
-                      {typeof d.read === "number" ? ` read=${d.read}` : d.read === null ? " read=null" : ""}
-                      {typeof d.image_path === "string" ? ` file=${d.image_path}` : ""}
-                      {typeof d.capture_ms === "number" ? ` cap=${d.capture_ms.toFixed(2)}ms` : ""}
-                      {typeof d.eval_ms === "number" ? ` eval=${d.eval_ms.toFixed(2)}ms` : ""}
-                    </div>
-                  ))}
-                </div>
-              )}
-              {Array.isArray(testResult.errors) && testResult.errors.length > 0 && (
-                <div className="text-amber-200/80">
-                  {testResult.errors.slice(0, 3).map((e: string, i: number) => (
-                    <div key={i}>{e}</div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </section>
+        </section>
+      )}
     </div>
   );
 }

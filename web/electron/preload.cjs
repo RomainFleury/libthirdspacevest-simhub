@@ -101,7 +101,8 @@ contextBridge.exposeInMainWorld("vestBridge", {
   screenHealthStart: (profile) => ipcRenderer.invoke("screenHealth:start", profile),
   screenHealthStop: () => ipcRenderer.invoke("screenHealth:stop"),
   screenHealthStatus: () => ipcRenderer.invoke("screenHealth:status"),
-  screenHealthTest: (profile, outputDir) => ipcRenderer.invoke("screenHealth:test", profile, outputDir),
+  screenHealthTestProfileOnScreenshot: (profile, imagePath, outputDir) =>
+    ipcRenderer.invoke("screenHealth:test", profile, imagePath, outputDir ?? null),
   // Profile management
   screenHealthListProfiles: () => ipcRenderer.invoke("screenHealth:listProfiles"),
   screenHealthSaveProfile: (profileData) => ipcRenderer.invoke("screenHealth:saveProfile", profileData),

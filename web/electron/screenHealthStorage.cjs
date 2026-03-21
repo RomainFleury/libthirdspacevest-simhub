@@ -99,10 +99,28 @@ function upsertProfile(profile) {
   // }
   const daemonProfile = profile.profile ? profile.profile : profile;
   const name = profile.name || daemonProfile.name || "Unnamed Profile";
-  
-  // Always create new profile (never update existing, even if id provided)
+  const existingId =
+    profile.id && typeof profile.id === "string" && profile.id.trim() ? profile.id.trim() : "";
+
+  if (existingId) {
+    const idx = state.profiles.findIndex((p) => p.id === existingId);
+    if (idx < 0) {
+      throw new Error(`Profile not found: ${existingId}`);
+    }
+    const prev = state.profiles[idx];
+    const next = {
+      ...prev,
+      name,
+      profile: daemonProfile,
+      updatedAt: nowIso,
+    };
+    state.profiles[idx] = next;
+    saveState(state);
+    return next;
+  }
+
   const p = {
-    id: _makeId(), // Always generate new ID
+    id: _makeId(),
     name,
     profile: daemonProfile,
     updatedAt: nowIso,

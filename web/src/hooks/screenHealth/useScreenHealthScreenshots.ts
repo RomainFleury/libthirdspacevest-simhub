@@ -1,11 +1,10 @@
 import { useCallback, useState } from "react";
 import {
-  ScreenHealthCapturedImage,
   ScreenHealthScreenshotFile,
   ScreenHealthSettings,
   screenHealthCaptureCalibrationScreenshot,
   screenHealthSelectExistingScreenshot,
-  screenHealthCaptureRoiDebugImages,
+  screenHealthTestProfileOnScreenshot,
   screenHealthClearScreenshots,
   screenHealthDeleteScreenshot,
   screenHealthGetScreenshotDataUrl,
@@ -94,11 +93,9 @@ export function useScreenHealthScreenshots() {
     []
   );
 
-  const captureRoiDebugImages = useCallback(
-    async (monitorIndex: number, rois: Array<{ name: string; rect: { x: number; y: number; w: number; h: number } }>) => {
-      const result = await screenHealthCaptureRoiDebugImages(monitorIndex, rois);
-      if (!result.success) throw new Error(result.error || "Failed to capture ROI debug images");
-      return (result.outputs || []) as ScreenHealthCapturedImage[];
+  const evaluateProfileOnScreenshot = useCallback(
+    async (profile: Record<string, any>, imagePath: string) => {
+      return await screenHealthTestProfileOnScreenshot(profile, imagePath);
     },
     []
   );
@@ -134,7 +131,7 @@ export function useScreenHealthScreenshots() {
     openScreenshotsDir,
     selectExistingScreenshot,
     captureCalibrationScreenshot,
-    captureRoiDebugImages,
+    evaluateProfileOnScreenshot,
     deleteScreenshot,
     clearScreenshots,
     loadScreenshotPreview,

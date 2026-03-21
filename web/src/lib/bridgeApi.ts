@@ -197,14 +197,14 @@ export type ScreenHealthStartResult = {
   error?: string;
 };
 
-export type ScreenHealthTestResult = {
+export type ScreenHealthStopResult = {
   success: boolean;
-  test_result?: Record<string, any> | null;
   error?: string;
 };
 
-export type ScreenHealthStopResult = {
+export type ScreenHealthTestResult = {
   success: boolean;
+  test_result?: Record<string, any> | null;
   error?: string;
 };
 
@@ -414,10 +414,18 @@ declare global {
       screenHealthStart: (profile: Record<string, any>) => Promise<ScreenHealthStartResult>;
       screenHealthStop: () => Promise<ScreenHealthStopResult>;
       screenHealthStatus: () => Promise<ScreenHealthStatus>;
-      screenHealthTest: (profile: Record<string, any>, outputDir?: string | null) => Promise<ScreenHealthTestResult>;
+      screenHealthTestProfileOnScreenshot: (
+        profile: Record<string, any>,
+        imagePath: string,
+        outputDir?: string | null
+      ) => Promise<ScreenHealthTestResult>;
       // Profile management
       screenHealthListProfiles: () => Promise<ScreenHealthListProfilesResult>;
-      screenHealthSaveProfile: (profileData: { name: string; profile: Record<string, any> }) => Promise<ScreenHealthSaveProfileResult>;
+      screenHealthSaveProfile: (profileData: {
+        name: string;
+        profile: Record<string, any>;
+        id?: string;
+      }) => Promise<ScreenHealthSaveProfileResult>;
       screenHealthDeleteProfile: (profileId: string) => Promise<ScreenHealthDeleteProfileResult>;
       screenHealthGetProfile: (profileId: string) => Promise<ScreenHealthGetProfileResult>;
       // Multi-Vest Management API
@@ -846,8 +854,12 @@ export async function screenHealthStatus(): Promise<ScreenHealthStatus> {
   return await ensureBridge().screenHealthStatus();
 }
 
-export async function screenHealthTest(profile: Record<string, any>, outputDir?: string | null): Promise<ScreenHealthTestResult> {
-  return await ensureBridge().screenHealthTest(profile, outputDir ?? null);
+export async function screenHealthTestProfileOnScreenshot(
+  profile: Record<string, any>,
+  imagePath: string,
+  outputDir?: string | null
+): Promise<ScreenHealthTestResult> {
+  return await ensureBridge().screenHealthTestProfileOnScreenshot(profile, imagePath, outputDir ?? null);
 }
 
 /**
@@ -858,12 +870,12 @@ export async function screenHealthListProfiles(): Promise<ScreenHealthListProfil
 }
 
 /**
- * Save a profile to local storage. Always creates a new profile (never updates existing).
- * @param profileData Profile data with name and profile JSON
+ * Save a profile to local storage. Pass `id` to update an existing profile; omit `id` to create a new one.
  */
 export async function screenHealthSaveProfile(profileData: {
   name: string;
   profile: Record<string, any>;
+  id?: string;
 }): Promise<ScreenHealthSaveProfileResult> {
   return await ensureBridge().screenHealthSaveProfile(profileData);
 }

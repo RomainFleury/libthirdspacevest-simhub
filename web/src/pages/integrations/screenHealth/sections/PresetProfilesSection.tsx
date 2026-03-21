@@ -7,7 +7,7 @@ export function PresetProfilesSection(props: {
 }) {
   const { presets, profiles } = props;
   const state = useScreenHealthProfileDraft();
-  const { setSelectedPresetId } = useScreenHealthProfileDraftControls();
+  const { setSelectedPresetId, setEditingLocalProfileId } = useScreenHealthProfileDraftControls();
   
   // Check if selected ID is a preset or local profile
   const isPreset = presets.some((p) => p.preset_id === state.selectedPresetId);
@@ -23,8 +23,9 @@ export function PresetProfilesSection(props: {
   const hints: string[] = Array.isArray(meta?.hints) ? meta.hints : [];
 
   const handleSelectChange = (value: string) => {
-    // If it's a local profile ID, set it directly (DraftFromSelectedPresetSync will handle loading)
-    // Otherwise, it's a preset ID
+    if (presets.some((p) => p.preset_id === value)) {
+      setEditingLocalProfileId(null);
+    }
     setSelectedPresetId(value);
   };
 

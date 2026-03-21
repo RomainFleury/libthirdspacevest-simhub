@@ -34,18 +34,6 @@ export function ScreenHealthBuilderPage() {
     };
   }, [daemon.refreshStatus, screenshots.refreshSettings]);
 
-  // Handle ?from=:id URL parameter to load a profile
-  useEffect(() => {
-    const fromId = searchParams.get("from");
-    if (fromId && profiles.profiles.length > 0) {
-      const profile = profiles.profiles.find((p) => p.id === fromId);
-      if (profile) {
-        // Profile will be loaded by the configuration panel
-        // This effect just ensures profiles are loaded
-      }
-    }
-  }, [searchParams, profiles.profiles]);
-
   const perfLine = useMemo(() => {
     if (!perf) return null;
     const parts = [];
@@ -56,6 +44,8 @@ export function ScreenHealthBuilderPage() {
 
   const isDisabled = daemon.status.running;
   const fromId = searchParams.get("from");
+  const fromProfile =
+    fromId && profiles.profiles.length > 0 ? profiles.profiles.find((p) => p.id === fromId) : undefined;
 
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-4">
@@ -74,6 +64,29 @@ export function ScreenHealthBuilderPage() {
           ← Back to integration
         </Link>
       </div>
+
+      {profiles.error && (
+        <div className="rounded-xl bg-rose-500/10 border border-rose-500/25 px-4 py-3 text-rose-200 text-sm">
+          Could not refresh profile list: {profiles.error}
+        </div>
+      )}
+
+      {fromId && (
+        <div className="rounded-xl bg-sky-500/10 border border-sky-500/20 px-4 py-3 text-sky-100/95 text-sm">
+          <span className="font-medium text-white">Opened from Screen Health</span>
+          {fromProfile ? (
+            <span className="text-sky-200/90"> — loading editor for “{fromProfile.name}”.</span>
+          ) : profiles.loading ? (
+            <span className="text-sky-200/90"> — resolving profile…</span>
+          ) : (
+            <span className="text-amber-200/90">
+              {" "}
+              — no profile matches id <code className="text-xs bg-slate-800/80 px-1 rounded">{fromId}</code>. Pick one
+              below or use Load JSON.
+            </span>
+          )}
+        </div>
+      )}
 
       {isDisabled && (
         <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 px-4 py-3 text-amber-200">
@@ -101,7 +114,7 @@ export function ScreenHealthBuilderPage() {
           lastCapturedImage={screenshots.lastCapturedImage}
           captureCalibrationScreenshot={screenshots.captureCalibrationScreenshot}
           selectExistingScreenshot={screenshots.selectExistingScreenshot}
-          captureRoiDebugImages={screenshots.captureRoiDebugImages}
+          evaluateProfileOnScreenshot={screenshots.evaluateProfileOnScreenshot}
           loadFromProfileId={fromId || undefined}
           profiles={profiles.profiles}
           onSaveProfile={profiles.saveProfile}

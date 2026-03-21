@@ -7,6 +7,8 @@ type ProfileDraftState = {
   profileName: string;
   monitorIndex: number;
   tickMs: number;
+  /** When set, "Update" overwrites this local profile id; cleared for presets / JSON load. */
+  editingLocalProfileId: string | null;
 };
 
 type StateCtx = ProfileDraftState;
@@ -17,6 +19,7 @@ type ActionsCtx = {
   setProfileName: (v: string) => void;
   setMonitorIndex: (v: number) => void;
   setTickMs: (v: number) => void;
+  setEditingLocalProfileId: (v: string | null) => void;
   replaceAll: (next: Partial<ProfileDraftState>) => void;
   readDraft: () => ProfileDraftState;
 };
@@ -31,6 +34,7 @@ export function ScreenHealthProfileDraftProvider(props: { defaultPresetId: strin
     profileName: "Default",
     monitorIndex: 1,
     tickMs: 50,
+    editingLocalProfileId: null,
   };
   const [state, setState] = useState<ProfileDraftState>(initial);
   const stateRef = useRef<ProfileDraftState>(initial);
@@ -50,6 +54,7 @@ export function ScreenHealthProfileDraftProvider(props: { defaultPresetId: strin
       setProfileName: (v) => setStateAndRef((p) => ({ ...p, profileName: v })),
       setMonitorIndex: (v) => setStateAndRef((p) => ({ ...p, monitorIndex: v })),
       setTickMs: (v) => setStateAndRef((p) => ({ ...p, tickMs: v })),
+      setEditingLocalProfileId: (v) => setStateAndRef((p) => ({ ...p, editingLocalProfileId: v })),
       replaceAll: (next) => setStateAndRef((p) => ({ ...p, ...next })),
       readDraft: () => stateRef.current,
     };

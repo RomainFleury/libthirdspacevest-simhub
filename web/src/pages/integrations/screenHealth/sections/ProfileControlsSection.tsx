@@ -1,22 +1,24 @@
 export function ProfileControlsSection(props: {
   onLoad: () => void;
   onExport: () => void;
-  onSave?: () => void;
+  /** Overwrites the open local profile (same storage id). */
+  onUpdateProfile?: () => void;
+  /** Always creates a new local profile entry. */
+  onSaveNewCopy?: () => void;
+  saveNewCopyLabel?: string;
   saving?: boolean;
   profileName: string;
   setProfileName: (v: string) => void;
-  onTest?: () => void;
-  testing?: boolean;
 }) {
   const {
     onLoad,
     onExport,
-    onSave,
+    onUpdateProfile,
+    onSaveNewCopy,
+    saveNewCopyLabel = "Save a new copy",
     saving,
     profileName,
     setProfileName,
-    onTest,
-    testing,
   } = props;
 
   return (
@@ -30,38 +32,42 @@ export function ProfileControlsSection(props: {
             className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
           />
         </div>
-        <div className="flex items-end gap-2">
+        <div className="flex flex-wrap items-end gap-2">
           <button
+            type="button"
             onClick={onLoad}
             className="rounded-lg bg-slate-600/80 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-600"
-            title="Load a JSON profile into the current draft (not saved anywhere)."
+            title="Load a JSON profile into the current draft (not saved to local list until you save)."
           >
             Load JSON
           </button>
           <button
+            type="button"
             onClick={onExport}
             className="rounded-lg bg-slate-600/80 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-600"
           >
             Export JSON
           </button>
-          {onSave && (
+          {onUpdateProfile && (
             <button
-              onClick={onSave}
+              type="button"
+              onClick={onUpdateProfile}
               disabled={saving}
-              className="rounded-lg bg-emerald-600/80 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-600 disabled:opacity-50"
-              title="Save profile to local storage (always creates new)."
+              className="rounded-lg bg-emerald-600/90 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-600 disabled:opacity-50"
+              title="Overwrite the local profile you opened (same slot in storage). Renaming updates the stored name."
             >
-              {saving ? "Saving..." : "Save to Local"}
+              {saving ? "Saving…" : "Update"}
             </button>
           )}
-          {onTest && (
+          {onSaveNewCopy && (
             <button
-              onClick={onTest}
-              disabled={testing}
+              type="button"
+              onClick={onSaveNewCopy}
+              disabled={saving}
               className="rounded-lg bg-slate-600/80 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-600 disabled:opacity-50"
-              title="Ask the daemon to validate and run one evaluation pass (captures ROI crops and returns timings)."
+              title="Create a new local profile with the current draft (does not replace the one you are editing)."
             >
-              {testing ? "Testing..." : "Test config"}
+              {saving ? "Saving…" : saveNewCopyLabel}
             </button>
           )}
         </div>
@@ -69,4 +75,3 @@ export function ProfileControlsSection(props: {
     </div>
   );
 }
-

@@ -1,10 +1,15 @@
+import { useState } from "react";
+import { SCREEN_HEALTH_PRESETS } from "../../../../data/screenHealthPresets";
+import { buildScreenHealthDaemonProfile } from "../buildDaemonProfile";
 import { DIRECTION_KEYS } from "../constants";
-import { useScreenHealthProfileDraft } from "../draft/ProfileDraftContext";
+import { useScreenHealthProfileDraft, useScreenHealthProfileDraftControls } from "../draft/ProfileDraftContext";
 import { useScreenHealthRednessDraft, useScreenHealthRednessDraftControls } from "../draft/RednessDraftContext";
 import { useScreenHealthHealthBarDraft, useScreenHealthHealthBarDraftControls } from "../draft/HealthBarDraftContext";
 import { useScreenHealthHealthNumberDraft, useScreenHealthHealthNumberDraftControls } from "../draft/HealthNumberDraftContext";
 import { clamp01 } from "../utils";
 import type { RoiRect } from "../draft/types";
+
+const PRESETS = SCREEN_HEALTH_PRESETS as Array<{ preset_id: string; profile: { meta?: unknown } }>;
 
 // Reference resolution for pixel calculations (1920x1080)
 const REF_WIDTH = 1920;
@@ -14,7 +19,7 @@ function RoiPreviewInfo({ rect }: { rect: RoiRect }) {
   const percentage = (rect.w * rect.h * 100).toFixed(2);
   const pixelWidth = Math.round(rect.w * REF_WIDTH);
   const pixelHeight = Math.round(rect.h * REF_HEIGHT);
-  
+
   return (
     <div className="text-xs text-slate-400 mt-2 p-2 rounded bg-slate-800/30">
       <div className="font-medium text-slate-300 mb-1">Capture Preview</div>
@@ -29,19 +34,27 @@ function RoiPreviewInfo({ rect }: { rect: RoiRect }) {
 }
 
 export function RoiListSection(props: {
-  captureRoiDebugImages: (monitorIndex: number, rois: Array<{ name: string; rect: { x: number; y: number; w: number; h: number } }>) => void;
+  lastCapturedImage: { path: string } | null;
+  evaluateProfileOnScreenshot: (
+    profile: Record<string, any>,
+    imagePath: string
+  ) => Promise<{ success: boolean; test_result?: Record<string, any> | null; error?: string }>;
 }) {
-  const { captureRoiDebugImages } = props;
+  const { lastCapturedImage, evaluateProfileOnScreenshot } = props;
   const profile = useScreenHealthProfileDraft();
+  const { readDraft: readProfileDraft } = useScreenHealthProfileDraftControls();
   const redness = useScreenHealthRednessDraft();
-  const { updateRoi, removeRoi } = useScreenHealthRednessDraftControls();
+  const { readDraft: readRednessDraft, updateRoi, removeRoi } = useScreenHealthRednessDraftControls();
   const hb = useScreenHealthHealthBarDraft();
-  const { setRoi: setHealthBarRoi } = useScreenHealthHealthBarDraftControls();
+  const { readDraft: readHealthBarDraft, setRoi: setHealthBarRoi } = useScreenHealthHealthBarDraftControls();
   const hn = useScreenHealthHealthNumberDraft();
-  const { setRoi: setHealthNumberRoi } = useScreenHealthHealthNumberDraftControls();
+  const { readDraft: readHealthNumberDraft, setRoi: setHealthNumberRoi } = useScreenHealthHealthNumberDraftControls();
+
+  const [evaluating, setEvaluating] = useState(false);
+  const [evalError, setEvalError] = useState<string | null>(null);
+  const [evalResult, setEvalResult] = useState<Record<string, any> | null>(null);
 
   const detectorType = profile.detectorType;
-  const monitorIndex = profile.monitorIndex;
   const rois = redness.rois;
   const healthBarRoi = hb.roi;
   const healthNumberRoi = hn.roi;
@@ -49,21 +62,40 @@ export function RoiListSection(props: {
   const title =
     detectorType === "health_bar" ? "Health bar ROI" : detectorType === "health_number" ? "Health number ROI" : "ROIs";
 
+  const hasScreenshotPath = Boolean(lastCapturedImage?.path?.trim());
   const canCapture =
-    detectorType === "health_bar" ? !!healthBarRoi : detectorType === "health_number" ? !!healthNumberRoi : rois.length > 0;
+    hasScreenshotPath &&
+    (detectorType === "health_bar"
+      ? !!healthBarRoi
+      : detectorType === "health_number"
+        ? !!healthNumberRoi
+        : rois.length > 0);
 
-  const capture = () => {
-    if (detectorType === "health_bar") {
-      if (!healthBarRoi) return;
-      captureRoiDebugImages(monitorIndex, [{ name: "health_bar", rect: { ...healthBarRoi } }] as any);
-      return;
+  const runEvaluate = async () => {
+    const imagePath = lastCapturedImage?.path?.trim();
+    if (!imagePath) return;
+    setEvaluating(true);
+    setEvalError(null);
+    setEvalResult(null);
+    try {
+      const daemonProfile = buildScreenHealthDaemonProfile({
+        profileDraft: readProfileDraft(),
+        redness: readRednessDraft(),
+        hb: readHealthBarDraft(),
+        hn: readHealthNumberDraft(),
+        presets: PRESETS,
+      });
+      const result = await evaluateProfileOnScreenshot(daemonProfile, imagePath);
+      if (!result.success) {
+        setEvalError(result.error || "Evaluation failed");
+        return;
+      }
+      setEvalResult(result.test_result || null);
+    } catch (e) {
+      setEvalError(e instanceof Error ? e.message : "Evaluation failed");
+    } finally {
+      setEvaluating(false);
     }
-    if (detectorType === "health_number") {
-      if (!healthNumberRoi) return;
-      captureRoiDebugImages(monitorIndex, [{ name: "health_number", rect: { ...healthNumberRoi } }] as any);
-      return;
-    }
-    if (rois.length) captureRoiDebugImages(monitorIndex, rois as any);
   };
 
   return (
@@ -71,14 +103,61 @@ export function RoiListSection(props: {
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-white">{title}</h3>
         <button
-          onClick={capture}
-          disabled={!canCapture}
+          type="button"
+          onClick={() => void runEvaluate()}
+          disabled={!canCapture || evaluating}
           className="rounded-lg bg-slate-600/80 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-600 disabled:opacity-50"
-          title="Capture current ROI crops for debugging"
+          title={
+            hasScreenshotPath
+              ? "Send selected screenshot to the daemon and evaluate ROIs"
+              : "Capture or load a screenshot first"
+          }
         >
-          Capture ROI {detectorType === "health_bar" || detectorType === "health_number" ? "crop" : "crops"}
+          {evaluating ? "Evaluating…" : `Evaluate ROI${detectorType === "health_bar" || detectorType === "health_number" ? "" : "s"} (daemon)`}
         </button>
       </div>
+
+      {!hasScreenshotPath && (
+        <div className="text-xs text-amber-200/90">Select or capture a calibration screenshot to enable evaluation.</div>
+      )}
+
+      {evalError && <div className="text-xs text-rose-300">{evalError}</div>}
+
+      {evalResult && (
+        <div className="rounded-xl bg-slate-900/40 p-3 ring-1 ring-white/5 text-sm">
+          <div className="text-white font-medium mb-1">Daemon evaluation</div>
+          <div className="text-xs text-slate-300 space-y-1">
+            <div className="font-mono text-slate-400">
+              source={String(evalResult.frame_source || "?")} total_ms=
+              {typeof evalResult.total_ms === "number" ? evalResult.total_ms.toFixed(2) : "?"} frame=
+              {evalResult.frame && typeof evalResult.frame === "object"
+                ? `${evalResult.frame.w}x${evalResult.frame.h}`
+                : "?"}
+            </div>
+            {Array.isArray(evalResult.detectors) && (
+              <div className="space-y-1">
+                {evalResult.detectors.slice(0, 12).map((d: any, idx: number) => (
+                  <div key={idx} className="font-mono text-slate-400">
+                    {d.type}:{d.name}{" "}
+                    {typeof d.score === "number" ? `score=${d.score.toFixed(3)}` : ""}
+                    {typeof d.percent === "number" ? ` percent=${(d.percent * 100).toFixed(1)}%` : ""}
+                    {typeof d.read === "number" ? ` read=${d.read}` : d?.read === null ? " read=null" : ""}
+                    {typeof d.image_path === "string" ? ` file=${d.image_path}` : ""}
+                    {d.error ? ` err=${d.error}` : ""}
+                  </div>
+                ))}
+              </div>
+            )}
+            {Array.isArray(evalResult.errors) && evalResult.errors.length > 0 && (
+              <div className="text-amber-200/80">
+                {evalResult.errors.slice(0, 5).map((err: string, i: number) => (
+                  <div key={i}>{err}</div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {detectorType === "health_bar" ? (
         !healthBarRoi ? (
@@ -150,6 +229,7 @@ export function RoiListSection(props: {
             <RoiPreviewInfo rect={healthBarRoi} />
             <div className="flex items-center justify-end gap-2">
               <button
+                type="button"
                 onClick={() => setHealthBarRoi(null)}
                 className="rounded-lg bg-rose-600/70 px-3 py-2 text-sm font-medium text-white transition hover:bg-rose-600"
               >
@@ -228,6 +308,7 @@ export function RoiListSection(props: {
             <RoiPreviewInfo rect={healthNumberRoi} />
             <div className="flex items-center justify-end gap-2">
               <button
+                type="button"
                 onClick={() => setHealthNumberRoi(null)}
                 className="rounded-lg bg-rose-600/70 px-3 py-2 text-sm font-medium text-white transition hover:bg-rose-600"
               >
@@ -331,6 +412,7 @@ export function RoiListSection(props: {
               <RoiPreviewInfo rect={r.rect} />
               <div className="flex items-center justify-end gap-2">
                 <button
+                  type="button"
                   onClick={() => removeRoi(idx)}
                   className="rounded-lg bg-rose-600/70 px-3 py-2 text-sm font-medium text-white transition hover:bg-rose-600"
                 >
@@ -344,4 +426,3 @@ export function RoiListSection(props: {
     </div>
   );
 }
-

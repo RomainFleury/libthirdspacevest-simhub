@@ -97,7 +97,7 @@ I need help with [your task here].
 
 - `legacy-do-not-change/` — verbatim copy of the historical driver/library. Treat as read-only and layer patches elsewhere.
 - `modern-third-space/` — Python package that dynamically loads the legacy `thirdspace.py` driver and exposes a modern API plus CLI endpoints for other tooling (Electron debugger, scripts, etc.).
-- `web/` — Electron + React + Tailwind workspace (plus Repomix tooling). All Node dependencies, UI code, and yarn-based workflows live here so they stay isolated from the legacy tree.
+- `web/` — Electron + React + Tailwind workspace (plus Repomix tooling). All Node dependencies, UI code, and yarn-based workflows live here so they stay isolated from the legacy tree. **Run `yarn install` and all other `yarn` commands only from `web/`** (there is no `package.json` at the repository root).
 - `misc-documentations/` — curated documentation, assets, and legacy SimHub/bHaptics references (e.g., Alyx mod README, SimHub plugin sources, illustrative images). Nothing here is built or shipped, but it provides design/reference material for future work.
 
 When adding new functionality:

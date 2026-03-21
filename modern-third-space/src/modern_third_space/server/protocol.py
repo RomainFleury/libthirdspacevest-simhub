@@ -172,7 +172,12 @@ class Command:
     # Generic screen health watcher params
     profile: Optional[Dict[str, Any]] = None  # Screen health profile JSON
     output_dir: Optional[str] = None  # Optional output dir for test/debug artifacts
-    
+    # For screen_health_test only: tight row-major BGRA bytes on disk (path + dimensions; see daemon).
+    frame_bgra_path: Optional[str] = None
+    frame_bgra_base64: Optional[str] = None  # legacy; prefer frame_bgra_path
+    frame_width: Optional[int] = None
+    frame_height: Optional[int] = None
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Command":
         """Parse a command from a dictionary."""
@@ -202,6 +207,10 @@ class Command:
             player_num=data.get("player_num"),
             profile=data.get("profile"),
             output_dir=data.get("output_dir"),
+            frame_bgra_path=data.get("frame_bgra_path"),
+            frame_bgra_base64=data.get("frame_bgra_base64"),
+            frame_width=data.get("frame_width"),
+            frame_height=data.get("frame_height"),
         )
     
     @classmethod

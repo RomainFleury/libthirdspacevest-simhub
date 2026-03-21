@@ -62,8 +62,8 @@ if not exist "node_modules" (
 echo [OK] Starting Electron app...
 echo.
 
-:: Use endlocal with variable pass-through so TSV_PYTHON is available to yarn/Electron
-endlocal & set "TSV_PYTHON=%TSV_PYTHON%" & call yarn dev
+:: Pass TSV_PYTHON out of setlocal; endlocal restores cwd to the script folder, so cd to web before yarn.
+endlocal & set "TSV_PYTHON=%TSV_PYTHON%" & cd /d "%~dp0..\web" & call yarn dev
 
 echo.
 echo App stopped.

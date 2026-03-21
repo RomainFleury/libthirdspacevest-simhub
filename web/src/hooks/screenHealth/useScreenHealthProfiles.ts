@@ -65,16 +65,24 @@ export function useScreenHealthProfiles() {
   }, [localProfiles]);
 
   const saveProfile = useCallback(
-    async (name: string, profile: Record<string, any>): Promise<ScreenHealthLocalProfile | null> => {
+    async (
+      name: string,
+      profile: Record<string, any>,
+      options?: { updateId?: string | null }
+    ): Promise<ScreenHealthLocalProfile | null> => {
       setLoading(true);
       setError(null);
       try {
-        const result = await screenHealthSaveProfile({ name, profile });
+        const updateId = options?.updateId?.trim() || undefined;
+        const result = await screenHealthSaveProfile({
+          name,
+          profile,
+          ...(updateId ? { id: updateId } : {}),
+        });
         if (!result.success) {
           setError(result.error || "Failed to save profile");
           return null;
         }
-        // Refresh the list to include the new profile
         await refreshProfiles();
         return result.profile || null;
       } catch (e) {

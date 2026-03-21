@@ -1004,15 +1004,13 @@ class DaemonBridge extends EventEmitter {
   }
 
   /**
-   * Test a screen health profile once (validate + capture ROI(s) + evaluate).
-   * @param {Object} profile - Profile JSON object (schema_version 0)
-   * @param {string | null | undefined} outputDir - Optional output dir for ROI crops
+   * Run screen_health_test (profile + frame_bgra_path + frame_width + frame_height; raw BGRA bytes on disk).
+   * @param {Object} params - { profile, frame_bgra_path, frame_width, frame_height, output_dir? }
    */
-  async screenHealthTest(profile, outputDir) {
+  async screenHealthTest(params) {
+    const timeoutMs = 120000;
     try {
-      const payload = { profile };
-      if (outputDir) payload.output_dir = outputDir;
-      const response = await this.sendCommand("screen_health_test", payload);
+      const response = await this.sendCommand("screen_health_test", params, timeoutMs);
       return {
         success: response.success ?? false,
         test_result: response.test_result ?? null,

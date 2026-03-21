@@ -24,8 +24,10 @@ CS2 GSI ──────┘
 
 ```bash
 python3 -m modern_third_space.cli daemon start  # Required first!
-cd web && yarn dev                               # Start Electron
+cd web && yarn install && yarn dev               # Node deps + Electron (always from web/)
 ```
+
+The repository root has no `package.json`; never run `yarn` at the repo root.
 
 ### Key Directories
 

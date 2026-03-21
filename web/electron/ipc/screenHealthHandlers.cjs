@@ -7,14 +7,63 @@
  * - screenHealth:getSettings / setSettings / chooseScreenshotsDir
  * - screenHealth:listScreenshots / deleteScreenshot / clearScreenshots
  * - screenHealth:captureCalibrationScreenshot / captureRoiDebugImages
- * - screenHealth:start / stop / status (daemon commands)
+ * - screenHealth:start / stop / status / test (daemon; test uses temp raw BGRA file + path on wire)
  */
 
 const { ipcMain, dialog, desktopCapturer, nativeImage, screen, shell } = require("electron");
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 
 const storage = require("../screenHealthStorage.cjs");
+
+/**
+ * Load calibration screenshot as tight row-major BGRA, write to a temp file for the daemon (TCP JSON stays small).
+ * Daemon reads bytes and deletes the file; caller should also unlink after the RPC returns.
+ */
+function _writeScreenHealthTestBgraTempFile(imagePath) {
+  const trimmed = String(imagePath || "").trim();
+  if (!trimmed) {
+    throw new Error("imagePath is required");
+  }
+  const resolved = path.resolve(trimmed);
+  if (!fs.existsSync(resolved)) {
+    throw new Error(`Screenshot file not found: ${resolved}`);
+  }
+  const image = nativeImage.createFromPath(resolved);
+  if (image.isEmpty()) {
+    throw new Error("Failed to load screenshot image");
+  }
+  const { width, height } = image.getSize();
+  if (width <= 0 || height <= 0) {
+    throw new Error("Invalid image dimensions");
+  }
+  const buf = image.getBitmap();
+  const expected = width * height * 4;
+  let tight = buf;
+  if (buf.length !== expected) {
+    if (buf.length < expected) {
+      throw new Error(`Bitmap size ${buf.length} smaller than expected ${expected} (${width}x${height})`);
+    }
+    const stride = buf.length / height;
+    if (!Number.isInteger(stride)) {
+      throw new Error(`Cannot derive row stride from bitmap length ${buf.length} and height ${height}`);
+    }
+    tight = Buffer.alloc(expected);
+    const rowBytes = width * 4;
+    for (let y = 0; y < height; y++) {
+      buf.copy(tight, y * rowBytes, y * stride, y * stride + rowBytes);
+    }
+  }
+  const tmpName = `tsv-sh-test-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}.bgra`;
+  const tmpPath = path.join(os.tmpdir(), tmpName);
+  fs.writeFileSync(tmpPath, tight);
+  return {
+    frame_bgra_path: tmpPath,
+    frame_width: width,
+    frame_height: height,
+  };
+}
 
 function _getScreenSourceForMonitorIndex(sources, monitorIndex) {
   // monitorIndex is 1-based to match UX.
@@ -346,8 +395,10 @@ function registerScreenHealthHandlers(getDaemonBridge, getMainWindow) {
       if (!profileData.profile || typeof profileData.profile !== "object") {
         return { success: false, error: "profile.profile is required" };
       }
-      // Always create new profile (never updates existing, even if id provided)
+      const updateId =
+        typeof profileData.id === "string" && profileData.id.trim() ? profileData.id.trim() : undefined;
       const saved = storage.upsertProfile({
+        ...(updateId ? { id: updateId } : {}),
         name: profileData.name,
         profile: profileData.profile,
       });
@@ -428,7 +479,8 @@ function registerScreenHealthHandlers(getDaemonBridge, getMainWindow) {
     }
   });
 
-  ipcMain.handle("screenHealth:test", async (_, profile, outputDir) => {
+  ipcMain.handle("screenHealth:test", async (_, profile, imagePath, outputDir) => {
+    let bgraTmp = null;
     try {
       const daemonBridge = getDaemonBridge();
       if (!daemonBridge?.connected) {
@@ -437,9 +489,28 @@ function registerScreenHealthHandlers(getDaemonBridge, getMainWindow) {
       if (!profile || typeof profile !== "object") {
         return { success: false, error: "profile is required" };
       }
-      return await daemonBridge.screenHealthTest(profile, outputDir);
+      const params = { profile };
+      if (outputDir && typeof outputDir === "string" && outputDir.trim()) {
+        params.output_dir = outputDir.trim();
+      }
+      if (imagePath != null && String(imagePath).trim()) {
+        const prep = _writeScreenHealthTestBgraTempFile(String(imagePath));
+        bgraTmp = prep.frame_bgra_path;
+        params.frame_bgra_path = prep.frame_bgra_path;
+        params.frame_width = prep.frame_width;
+        params.frame_height = prep.frame_height;
+      }
+      return await daemonBridge.screenHealthTest(params);
     } catch (e) {
       return { success: false, error: e.message };
+    } finally {
+      if (bgraTmp) {
+        try {
+          fs.unlinkSync(bgraTmp);
+        } catch (_) {
+          /* daemon may have deleted it */
+        }
+      }
     }
   });
 }

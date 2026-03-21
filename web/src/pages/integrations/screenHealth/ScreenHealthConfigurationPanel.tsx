@@ -28,8 +28,9 @@ import { ProfileControlsSection } from "./sections/ProfileControlsSection";
 import { RednessSettings } from "./sections/RednessSettings";
 import { RoiListSection } from "./sections/RoiListSection";
 import { ScreenshotsSection } from "./sections/ScreenshotsSection";
+import { buildScreenHealthDaemonProfile } from "./buildDaemonProfile";
 import { clamp01, clampInt } from "./utils";
-import { screenHealthExportProfile, screenHealthLoadProfile, screenHealthStart, screenHealthTest } from "../../../lib/bridgeApi";
+import { screenHealthExportProfile, screenHealthLoadProfile } from "../../../lib/bridgeApi";
 
 type Props = {
   settings: any;
@@ -41,13 +42,17 @@ type Props = {
   lastCapturedImage: { dataUrl: string; width: number; height: number; filename: string; path: string } | null;
   captureCalibrationScreenshot: (monitorIndex: number) => Promise<any>;
   selectExistingScreenshot?: () => Promise<any>;
-  captureRoiDebugImages: (
-    monitorIndex: number,
-    rois: Array<{ name: string; rect: { x: number; y: number; w: number; h: number } }>
-  ) => Promise<any>;
+  evaluateProfileOnScreenshot: (
+    profile: Record<string, any>,
+    imagePath: string
+  ) => Promise<{ success: boolean; test_result?: Record<string, any> | null; error?: string }>;
   loadFromProfileId?: string;
   profiles?: Array<{ type: "preset" | "local"; id: string; name: string; profile: Record<string, any> }>;
-  onSaveProfile?: (name: string, profile: Record<string, any>) => Promise<any>;
+  onSaveProfile?: (
+    name: string,
+    profile: Record<string, any>,
+    options?: { updateId?: string | null }
+  ) => Promise<any>;
 };
 
 export function ScreenHealthConfigurationPanel(props: Props) {
@@ -84,7 +89,7 @@ function ScreenHealthConfigurationPanelInner(props: Props) {
     lastCapturedImage,
     captureCalibrationScreenshot,
     selectExistingScreenshot,
-    captureRoiDebugImages,
+    evaluateProfileOnScreenshot,
   } = props;
 
   return (
@@ -110,7 +115,10 @@ function ScreenHealthConfigurationPanelInner(props: Props) {
 
       <DetectorSettingsSwitch />
 
-      <RoiListSection captureRoiDebugImages={captureRoiDebugImages} />
+      <RoiListSection
+        lastCapturedImage={lastCapturedImage}
+        evaluateProfileOnScreenshot={evaluateProfileOnScreenshot}
+      />
 
       <ScreenshotsSection
         settings={settings}
@@ -137,7 +145,12 @@ function DraftFromSelectedPresetSync(props: {
 }) {
   const { presets, loadFromProfileId, profiles } = props;
   const profileState = useScreenHealthProfileDraft();
-  const { replaceAll: replaceProfileDraft, setDetectorType, setSelectedPresetId } = useScreenHealthProfileDraftControls();
+  const {
+    replaceAll: replaceProfileDraft,
+    setDetectorType,
+    setSelectedPresetId,
+    setEditingLocalProfileId,
+  } = useScreenHealthProfileDraftControls();
   const { replaceAll: replaceRednessDraft } = useScreenHealthRednessDraftControls();
   const { replaceAll: replaceHealthBarDraft, setColorPickMode } = useScreenHealthHealthBarDraftControls();
   const { replaceAll: replaceHealthNumberDraft } = useScreenHealthHealthNumberDraftControls();
@@ -150,6 +163,7 @@ function DraftFromSelectedPresetSync(props: {
       const profile = profiles.find((p) => p.id === loadFromProfileId);
       if (profile) {
         hasLoadedFromIdRef.current = true;
+        setEditingLocalProfileId(profile.type === "local" ? profile.id : null);
         // Load the profile similar to onLoad in ProfileActionsController
         const p: any = profile.profile;
         replaceProfileDraft({
@@ -260,6 +274,7 @@ function DraftFromSelectedPresetSync(props: {
       const localProfile = profiles.find((p) => p.id === presetId && p.type === "local");
       if (localProfile) {
         lastAppliedPresetIdRef.current = presetId;
+        setEditingLocalProfileId(localProfile.id);
         const p: any = localProfile.profile;
         replaceProfileDraft({
           selectedPresetId: "__custom__",
@@ -468,140 +483,48 @@ function DraftFromSelectedPresetSync(props: {
     replaceHealthBarDraft,
     setColorPickMode,
     replaceHealthNumberDraft,
+    setEditingLocalProfileId,
   ]);
 
   return null;
 }
 
-function ProfileActionsController(props: { 
+function ProfileActionsController(props: {
   presets: Array<{ preset_id: string; profile: any }>;
-  onSaveProfile?: (name: string, profile: Record<string, any>) => Promise<any>;
+  onSaveProfile?: (
+    name: string,
+    profile: Record<string, any>,
+    options?: { updateId?: string | null }
+  ) => Promise<any>;
 }) {
   const { presets, onSaveProfile } = props;
   const profileState = useScreenHealthProfileDraft();
-  const { setProfileName, readDraft: readProfileDraft, replaceAll: replaceProfileDraft } = useScreenHealthProfileDraftControls();
+  const {
+    setProfileName,
+    readDraft: readProfileDraft,
+    replaceAll: replaceProfileDraft,
+    setEditingLocalProfileId,
+    setDetectorType,
+  } = useScreenHealthProfileDraftControls();
   const { readDraft: readRednessDraft } = useScreenHealthRednessDraftControls();
   const { readDraft: readHealthBarDraft, replaceAll: replaceHealthBarDraft, setColorPickMode } = useScreenHealthHealthBarDraftControls();
   const { readDraft: readHealthNumberDraft, replaceAll: replaceHealthNumberDraft } = useScreenHealthHealthNumberDraftControls();
   const { replaceAll: replaceRednessDraft } = useScreenHealthRednessDraftControls();
-  const { setDetectorType } = useScreenHealthProfileDraftControls();
 
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<Record<string, any> | null>(null);
-  const [testError, setTestError] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveSuccessKind, setSaveSuccessKind] = useState<"none" | "update" | "new">("none");
 
-  const buildDaemonProfile = () => {
-    // Snapshot reads: this controller does not subscribe to draft state updates.
-    const profileDraft = readProfileDraft();
-    const redness = readRednessDraft();
-    const hb = readHealthBarDraft();
-    const hn = readHealthNumberDraft();
-    const presetMeta = (presets.find((p) => p.preset_id === profileDraft.selectedPresetId)?.profile as any)?.meta;
-
-    if (profileDraft.detectorType === "health_bar") {
-      const roi = hb.roi ?? { x: 0.1, y: 0.9, w: 0.3, h: 0.03 };
-      return {
-        schema_version: 0,
-        name: profileDraft.profileName,
-        meta: presetMeta,
-        capture: { source: "monitor", monitor_index: profileDraft.monitorIndex, tick_ms: profileDraft.tickMs },
-        detectors: [
-          {
-            type: "health_bar",
-            name: "health_bar",
-            roi: { x: clamp01(roi.x), y: clamp01(roi.y), w: clamp01(roi.w), h: clamp01(roi.h) },
-            orientation: "horizontal",
-            ...(hb.mode === "color_sampling"
-              ? {
-                  color_sampling: {
-                    filled_rgb: hb.filledRgb.map((v) => clampInt(v, 0, 255)),
-                    empty_rgb: hb.emptyRgb.map((v) => clampInt(v, 0, 255)),
-                    tolerance_l1: clampInt(hb.toleranceL1, 0, 765),
-                  },
-                }
-              : {
-                  threshold_fallback: {
-                    mode: hb.fallbackMode,
-                    min: Math.max(0, Math.min(1, hb.fallbackMin)),
-                  },
-                }),
-            hit_on_decrease: {
-              min_drop: Math.max(0, Math.min(1, hb.hitMinDrop)),
-              cooldown_ms: Math.max(0, Math.floor(hb.hitCooldownMs)),
-            },
-          },
-        ],
-      };
-    }
-
-    if (profileDraft.detectorType === "health_number") {
-      const roi = hn.roi ?? { x: 0.05, y: 0.9, w: 0.12, h: 0.06 };
-      return {
-        schema_version: 0,
-        name: profileDraft.profileName,
-        meta: presetMeta,
-        capture: { source: "monitor", monitor_index: profileDraft.monitorIndex, tick_ms: profileDraft.tickMs },
-        detectors: [
-          {
-            type: "health_number",
-            name: "health_number",
-            roi: { x: clamp01(roi.x), y: clamp01(roi.y), w: clamp01(roi.w), h: clamp01(roi.h) },
-            digits: Math.max(1, Math.floor(hn.digits)),
-            preprocess: {
-              invert: Boolean(hn.invert),
-              threshold: Math.max(0, Math.min(1, hn.threshold)),
-              scale: Math.max(1, Math.floor(hn.scale)),
-            },
-            readout: {
-              min: Math.floor(hn.readMin),
-              max: Math.floor(hn.readMax),
-              stable_reads: Math.max(1, Math.floor(hn.stableReads)),
-            },
-            templates: {
-              template_set_id: "learned_v1",
-              hamming_max: Math.max(0, Math.floor(hn.hammingMax)),
-              width: hn.templateSize.w,
-              height: hn.templateSize.h,
-              digits: hn.templates,
-            },
-            hit_on_decrease: {
-              min_drop: Math.max(1, Math.floor(hn.hitMinDrop)),
-              cooldown_ms: Math.max(0, Math.floor(hn.hitCooldownMs)),
-            },
-          },
-        ],
-      };
-    }
-
-    return {
-      schema_version: 0,
-      name: profileDraft.profileName,
-      meta: presetMeta,
-      capture: { source: "monitor", monitor_index: profileDraft.monitorIndex, tick_ms: profileDraft.tickMs },
-      detectors: [
-        {
-          type: "redness_rois",
-          cooldown_ms: redness.cooldownMs,
-          threshold: { min_score: redness.minScore },
-          rois: redness.rois.map((r) => ({
-            name: r.name,
-            direction: r.direction || undefined,
-            rect: {
-              x: clamp01(r.rect.x),
-              y: clamp01(r.rect.y),
-              w: clamp01(r.rect.w),
-              h: clamp01(r.rect.h),
-            },
-          })),
-        },
-      ],
-    };
-  };
+  const buildDaemonProfile = () =>
+    buildScreenHealthDaemonProfile({
+      profileDraft: readProfileDraft(),
+      redness: readRednessDraft(),
+      hb: readHealthBarDraft(),
+      hn: readHealthNumberDraft(),
+      presets,
+    });
 
   const onExport = async () => {
     setExportError(null);
@@ -626,6 +549,7 @@ function ProfileActionsController(props: {
       const p: any = raw?.profile && typeof raw.profile === "object" ? raw.profile : raw;
       if (!p || typeof p !== "object") throw new Error("Invalid profile JSON");
 
+      setEditingLocalProfileId(null);
       // Mark as "custom" so preset auto-sync doesn't overwrite user edits.
       replaceProfileDraft({
         selectedPresetId: "__custom__",
@@ -726,31 +650,11 @@ function ProfileActionsController(props: {
     }
   };
 
-  const onTest = async () => {
-    setTesting(true);
-    setTestError(null);
-    try {
-      const profile = buildDaemonProfile();
-      const result = await screenHealthTest(profile);
-      if (!result.success) {
-        setTestError(result.error || "Test failed");
-        setTestResult(null);
-      } else {
-        setTestResult(result.test_result || null);
-      }
-    } catch (e) {
-      setTestError(e instanceof Error ? e.message : "Test failed");
-      setTestResult(null);
-    } finally {
-      setTesting(false);
-    }
-  };
-
-  const onSave = async () => {
+  const runSave = async (kind: "update" | "new") => {
     if (!onSaveProfile) return;
     setSaving(true);
     setSaveError(null);
-    setSaveSuccess(false);
+    setSaveSuccessKind("none");
     try {
       const profile = buildDaemonProfile();
       const name = profileState.profileName.trim();
@@ -758,11 +662,15 @@ function ProfileActionsController(props: {
         setSaveError("Profile name is required");
         return;
       }
-      // Check for duplicate names (warning only)
-      const saved = await onSaveProfile(name, profile);
+      const updateId = kind === "update" ? profileState.editingLocalProfileId : null;
+      if (kind === "update" && !updateId) {
+        setSaveError("Nothing to update — open a local profile or pick one from Local Profiles.");
+        return;
+      }
+      const saved = await onSaveProfile(name, profile, updateId ? { updateId } : undefined);
       if (saved) {
-        setSaveSuccess(true);
-        setTimeout(() => setSaveSuccess(false), 3000);
+        setSaveSuccessKind(kind);
+        window.setTimeout(() => setSaveSuccessKind("none"), kind === "update" ? 8000 : 4000);
       } else {
         setSaveError("Failed to save profile");
       }
@@ -773,60 +681,39 @@ function ProfileActionsController(props: {
     }
   };
 
+  const isPresetSelected = presets.some((p) => p.preset_id === profileState.selectedPresetId);
+  const canUpdateLocal = Boolean(profileState.editingLocalProfileId);
+  const showUpdate = Boolean(onSaveProfile && canUpdateLocal && !isPresetSelected);
+  const showSaveNewCopy = Boolean(onSaveProfile);
+
   return (
     <div className="space-y-3">
       <ProfileControlsSection
         onLoad={onLoad}
         onExport={onExport}
-        onSave={onSaveProfile ? onSave : undefined}
+        onUpdateProfile={showUpdate ? () => runSave("update") : undefined}
+        onSaveNewCopy={showSaveNewCopy ? () => runSave("new") : undefined}
+        saveNewCopyLabel="Save a new copy"
         saving={saving}
         profileName={profileState.profileName}
         setProfileName={setProfileName}
-        onTest={onTest}
-        testing={testing}
       />
-
-      {(testError || testResult) && (
-        <div className="rounded-xl bg-slate-900/40 p-3 ring-1 ring-white/5 text-sm">
-          <div className="text-white font-medium mb-1">Daemon test result</div>
-          {testError && <div className="text-rose-300 text-xs">{testError}</div>}
-          {testResult && (
-            <div className="text-xs text-slate-300 space-y-1">
-              <div className="font-mono text-slate-400">
-                total_ms={typeof testResult.total_ms === "number" ? testResult.total_ms.toFixed(2) : "?"} output_dir=
-                {typeof testResult.output_dir === "string" ? testResult.output_dir : "(none)"}
-              </div>
-              {Array.isArray(testResult.detectors) && (
-                <div className="space-y-1">
-                  {testResult.detectors.slice(0, 8).map((d: any, idx: number) => (
-                    <div key={idx} className="font-mono text-slate-400">
-                      {d.type}:{d.name}{" "}
-                      {typeof d.score === "number" ? `score=${d.score.toFixed(3)}` : ""}
-                      {typeof d.percent === "number" ? ` percent=${(d.percent * 100).toFixed(1)}%` : ""}
-                      {typeof d.read === "number" ? ` read=${d.read}` : d.read === null ? " read=null" : ""}
-                      {typeof d.image_path === "string" ? ` file=${d.image_path}` : ""}
-                      {typeof d.capture_ms === "number" ? ` cap=${d.capture_ms.toFixed(2)}ms` : ""}
-                      {typeof d.eval_ms === "number" ? ` eval=${d.eval_ms.toFixed(2)}ms` : ""}
-                    </div>
-                  ))}
-                </div>
-              )}
-              {Array.isArray(testResult.errors) && testResult.errors.length > 0 && (
-                <div className="text-amber-200/80">
-                  {testResult.errors.slice(0, 3).map((e: string, i: number) => (
-                    <div key={i}>{e}</div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
 
       {exportError && <div className="text-xs text-rose-300">{exportError}</div>}
       {loadError && <div className="text-xs text-rose-300">{loadError}</div>}
       {saveError && <div className="text-xs text-rose-300">{saveError}</div>}
-      {saveSuccess && <div className="text-xs text-emerald-300">Profile saved successfully!</div>}
+      {saveSuccessKind === "update" && (
+        <div className="text-xs text-emerald-300 space-y-1">
+          <div>Profile updated.</div>
+          <div className="text-slate-400">
+            If Screen Health is running with this profile, stop it on the integration page and start it again to load
+            changes (no automatic restart).
+          </div>
+        </div>
+      )}
+      {saveSuccessKind === "new" && (
+        <div className="text-xs text-emerald-300">New local profile saved (separate copy).</div>
+      )}
     </div>
   );
 }
