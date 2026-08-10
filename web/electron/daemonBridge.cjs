@@ -891,7 +891,7 @@ class DaemonBridge extends EventEmitter {
    * @param {string} [logPath] - Optional path to console.log (auto-detect if not provided)
    * @param {string} [playerName] - Optional player name to filter events
    */
-  async l4d2Start(logPath, playerName) {
+  async l4d2Start(logPath, playerName, solenoidRecoil) {
     try {
       const params = {};
       if (logPath) {
@@ -899,6 +899,9 @@ class DaemonBridge extends EventEmitter {
       }
       if (playerName) {
         params.message = playerName; // Using message field for player name
+      }
+      if (solenoidRecoil && typeof solenoidRecoil === "object") {
+        params.solenoid_recoil = solenoidRecoil;
       }
       const response = await this.sendCommand("l4d2_start", params);
       return {
@@ -1167,6 +1170,63 @@ class DaemonBridge extends EventEmitter {
       };
     } catch (error) {
       return { success: false, error: error.message };
+    }
+  }
+
+  async relayMouseStart(options = {}) {
+    try {
+      const params = {
+        duration_ms: options.durationMs ?? options.duration_ms ?? 40,
+        fire_mode: options.fireMode ?? options.fire_mode ?? "single",
+        fire_rate_rpm: options.fireRateRpm ?? options.fire_rate_rpm ?? 600,
+        burst_count: options.burstCount ?? options.burst_count ?? 3,
+      };
+      const response = await this.sendCommand("relay_mouse_start", params);
+      return {
+        success: response.success ?? response.ok ?? false,
+        running: response.running ?? false,
+        duration_ms: response.duration_ms,
+        fire_mode: response.fire_mode,
+        fire_rate_rpm: response.fire_rate_rpm,
+        burst_count: response.burst_count,
+        interval_ms: response.interval_ms,
+        pulses: response.pulses ?? 0,
+        error: response.message,
+      };
+    } catch (error) {
+      return { success: false, running: false, error: error.message };
+    }
+  }
+
+  async relayMouseStop() {
+    try {
+      const response = await this.sendCommand("relay_mouse_stop");
+      return {
+        success: response.success ?? response.ok ?? true,
+        running: response.running ?? false,
+        error: response.message,
+      };
+    } catch (error) {
+      return { success: false, running: false, error: error.message };
+    }
+  }
+
+  async relayMouseStatus() {
+    try {
+      const response = await this.sendCommand("relay_mouse_status");
+      return {
+        success: true,
+        running: response.running ?? false,
+        duration_ms: response.duration_ms ?? null,
+        fire_mode: response.fire_mode ?? "single",
+        fire_rate_rpm: response.fire_rate_rpm ?? 600,
+        burst_count: response.burst_count ?? 3,
+        interval_ms: response.interval_ms ?? null,
+        pulses: response.pulses ?? 0,
+        error: response.message,
+      };
+    } catch (error) {
+      return { success: false, running: false, pulses: 0, error: error.message };
     }
   }
 }

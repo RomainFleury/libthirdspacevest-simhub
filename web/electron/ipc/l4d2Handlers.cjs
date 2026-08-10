@@ -73,7 +73,11 @@ function registerL4D2Handlers(getMainWindow) {
     if (playerName) {
       l4d2Storage.setL4D2PlayerName(playerName);
     }
-    return await daemon.l4d2Start(logPath, playerName);
+    const solenoid = l4d2Storage.getL4D2SolenoidRecoil();
+    return await daemon.l4d2Start(logPath, playerName, {
+      enabled: solenoid.enabled,
+      duration_ms: solenoid.durationMs,
+    });
   });
 
   // Stop Left 4 Dead 2 integration
@@ -126,9 +130,21 @@ function registerL4D2Handlers(getMainWindow) {
         success: true,
         logPath: l4d2Storage.getL4D2LogPath(),
         playerName: l4d2Storage.getL4D2PlayerName(),
+        solenoidRecoil: l4d2Storage.getL4D2SolenoidRecoil(),
       };
     } catch (error) {
       console.error("Error in l4d2:getSettings:", error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Set Left 4 Dead 2 solenoid recoil settings
+  ipcMain.handle("l4d2:setSolenoidRecoil", async (_, solenoidRecoil) => {
+    try {
+      const saved = l4d2Storage.setL4D2SolenoidRecoil(solenoidRecoil || {});
+      return { success: true, solenoidRecoil: saved };
+    } catch (error) {
+      console.error("Error in l4d2:setSolenoidRecoil:", error);
       return { success: false, error: error.message };
     }
   });

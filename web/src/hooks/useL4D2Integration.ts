@@ -56,6 +56,7 @@ export function useL4D2Integration() {
   const [playerName, setPlayerName] = useState<string>('');
   const [gameDir, setGameDir] = useState<string>('');
   const [modStatus, setModStatus] = useState<ModStatus>({ installed: false });
+  const [solenoidRecoil, setSolenoidRecoil] = useState({ enabled: true, durationMs: 40 });
 
   // Load saved settings
   const loadSettings = useCallback(async () => {
@@ -68,6 +69,9 @@ export function useL4D2Integration() {
         }
         if (result.playerName) {
           setPlayerName(result.playerName);
+        }
+        if (result.solenoidRecoil) {
+          setSolenoidRecoil(result.solenoidRecoil);
         }
       }
       
@@ -289,6 +293,17 @@ export function useL4D2Integration() {
     };
   }, [refreshStatus]);
 
+  const setSolenoidRecoilSettings = useCallback(async (partial: { enabled?: boolean; durationMs?: number }) => {
+    const next = { ...solenoidRecoil, ...partial };
+    setSolenoidRecoil(next);
+    try {
+      // @ts-ignore - window.vestBridge
+      await window.vestBridge?.l4d2SetSolenoidRecoil?.(next);
+    } catch (err) {
+      console.error('Failed to save L4D2 solenoid settings:', err);
+    }
+  }, [solenoidRecoil]);
+
   return {
     status,
     isLoading,
@@ -300,6 +315,8 @@ export function useL4D2Integration() {
     setPlayerName: savePlayerName,
     gameDir,
     modStatus,
+    solenoidRecoil,
+    setSolenoidRecoilSettings,
     refreshStatus,
     start,
     stop,

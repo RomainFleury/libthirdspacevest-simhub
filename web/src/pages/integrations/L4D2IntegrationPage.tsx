@@ -64,6 +64,8 @@ export function L4D2IntegrationPage() {
     setPlayerName,
     gameDir,
     modStatus,
+    solenoidRecoil,
+    setSolenoidRecoilSettings,
     start,
     stop,
     clearEvents,
@@ -196,6 +198,43 @@ export function L4D2IntegrationPage() {
         />
         <p className="text-xs text-slate-500 mt-1">
           Leave empty to receive all damage events
+        </p>
+      </div>
+
+      {/* Solenoid recoil */}
+      <div className="rounded-lg bg-slate-800/60 p-4 ring-1 ring-white/10">
+        <h4 className="text-sm font-medium text-slate-200 mb-2">Solenoid recoil (USB relay)</h4>
+        <label className="flex items-center justify-between gap-3 rounded-lg bg-slate-900/40 border border-slate-700/40 px-3 py-2">
+          <div className="min-w-0">
+            <div className="text-sm text-slate-200">Pulse on weapon_fire</div>
+            <div className="text-xs text-slate-500">
+              Reinstall mod after update so WeaponFire is logged. Connect relay on Relay page.
+            </div>
+          </div>
+          <input
+            type="checkbox"
+            checked={solenoidRecoil.enabled}
+            onChange={(e) => setSolenoidRecoilSettings({ enabled: e.target.checked })}
+            className="h-4 w-4"
+          />
+        </label>
+        <label className="mt-2 block space-y-1.5 max-w-xs">
+          <span className="text-xs text-slate-400">Base pulse (ms)</span>
+          <input
+            type="number"
+            min={25}
+            max={120}
+            value={solenoidRecoil.durationMs}
+            onChange={(e) =>
+              setSolenoidRecoilSettings({
+                durationMs: Math.max(25, Math.min(120, Number(e.target.value) || 40)),
+              })
+            }
+            className="w-full rounded-lg bg-slate-900 border border-slate-600 px-3 py-2 text-sm text-white"
+          />
+        </label>
+        <p className="text-xs text-amber-300/80 mt-2">
+          Stop/Start L4D2 integration after changing these settings.
         </p>
       </div>
     </div>

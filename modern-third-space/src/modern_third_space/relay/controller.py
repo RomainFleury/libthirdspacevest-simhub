@@ -3,6 +3,10 @@ USB LC relay controller for solenoid / recoil prototyping.
 
 Opens a serial port and sends the 4-byte LC protocol frames.
 Pulse helpers turn the relay on briefly then off (safe for solenoids).
+
+Safety:
+- Pulses are clamped to >= 25 ms (hardware often misses OFF below that)
+- Any ON arms a 1.0 s safety timer that forces OFF
 """
 
 from __future__ import annotations
@@ -15,8 +19,11 @@ from typing import Any, Dict, Optional
 
 from .discovery import list_ports
 from .protocol import DEFAULT_ADDRESS, DEFAULT_BAUD, build_frame
+from .recoil import MIN_RECOIL_MS, MAX_ON_MS
 
 logger = logging.getLogger(__name__)
+
+SAFETY_OFF_S = 1.0
 
 
 @dataclass
@@ -42,7 +49,7 @@ class RelayStatus:
 
 
 class RelayController:
-    """Thread-safe USB LC relay controller."""
+    """Thread-safe USB LC relay controller with 1s safety OFF."""
 
     def __init__(self) -> None:
         self._serial = None
@@ -52,6 +59,7 @@ class RelayController:
         self._is_on: bool = False
         self._last_error: Optional[str] = None
         self._lock = threading.RLock()
+        self._safety_timer: Optional[threading.Timer] = None
 
     def status(self) -> RelayStatus:
         with self._lock:
@@ -114,6 +122,7 @@ class RelayController:
     def disconnect(self) -> None:
         """Close the serial port (best-effort OFF first)."""
         with self._lock:
+            self._cancel_safety_off()
             if self._serial is not None:
                 try:
                     if self._is_on:
@@ -129,11 +138,15 @@ class RelayController:
             self._is_on = False
 
     def set(self, on: bool) -> None:
-        """Turn the relay on or off."""
+        """Turn the relay on or off (ON always arms the 1s safety OFF)."""
         with self._lock:
             self._ensure_connected()
             self._write_frame(on)
             self._is_on = on
+            if on:
+                self._arm_safety_off()
+            else:
+                self._cancel_safety_off()
 
     def on(self) -> None:
         self.set(True)
@@ -146,21 +159,58 @@ class RelayController:
         Activate the relay briefly for recoil-style feedback.
 
         Turns ON, waits duration_ms, then turns OFF.
+        Duration is clamped to [MIN_RECOIL_MS, MAX_ON_MS] (25–1000 ms).
+        A 1s safety OFF is armed for the ON window.
         """
-        if duration_ms < 1:
-            raise ValueError(f"duration_ms must be >= 1, got {duration_ms}")
-        if duration_ms > 5000:
-            raise ValueError(f"duration_ms must be <= 5000 for safety, got {duration_ms}")
+        duration_ms = int(duration_ms)
+        if duration_ms < MIN_RECOIL_MS:
+            duration_ms = MIN_RECOIL_MS
+        if duration_ms > MAX_ON_MS:
+            duration_ms = MAX_ON_MS
 
         with self._lock:
             self._ensure_connected()
             self._write_frame(True)
             self._is_on = True
+            self._arm_safety_off()
             try:
                 time.sleep(duration_ms / 1000.0)
             finally:
-                self._write_frame(False)
-                self._is_on = False
+                try:
+                    self._write_frame(False)
+                finally:
+                    self._is_on = False
+                    self._cancel_safety_off()
+
+    def _arm_safety_off(self) -> None:
+        """Schedule a forced OFF after SAFETY_OFF_S (must hold lock)."""
+        self._cancel_safety_off()
+
+        def _fire() -> None:
+            try:
+                with self._lock:
+                    if self._serial is None or not self._is_on:
+                        return
+                    self._write_frame(False)
+                    self._is_on = False
+                    self._safety_timer = None
+                    logger.warning(
+                        "Relay safety OFF after %.1fs — forced de-energize",
+                        SAFETY_OFF_S,
+                    )
+            except Exception as exc:
+                logger.warning("Relay safety OFF failed: %s", exc)
+
+        timer = threading.Timer(SAFETY_OFF_S, _fire)
+        timer.daemon = True
+        self._safety_timer = timer
+        timer.start()
+
+    def _cancel_safety_off(self) -> None:
+        timer = self._safety_timer
+        self._safety_timer = None
+        if timer is not None:
+            timer.cancel()
 
     def _ensure_connected(self) -> None:
         if self._serial is None or not getattr(self._serial, "is_open", False):
@@ -187,4 +237,5 @@ __all__ = [
     "list_ports",
     "DEFAULT_ADDRESS",
     "DEFAULT_BAUD",
+    "SAFETY_OFF_S",
 ]

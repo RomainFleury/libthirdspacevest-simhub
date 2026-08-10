@@ -11,7 +11,8 @@ dependencies = [
   "pyusb>=1.2.1",
   "mss>=9.0.1",
   "bettercam>=1.0.0",
-  "pyserial>=3.5"
+  "pyserial>=3.5",
+  "pynput>=1.7.6"
 ]
 
 [project.optional-dependencies]

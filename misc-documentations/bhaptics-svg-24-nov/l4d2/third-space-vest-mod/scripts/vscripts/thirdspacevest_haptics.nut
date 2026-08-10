@@ -361,9 +361,6 @@ function OnGameEvent_player_death(params) {
     }
 }
 
-// Weapon fire event handler - DISABLED to reduce log spam and resource usage
-// Uncomment this function to re-enable weapon fire event logging
-/*
 function OnGameEvent_weapon_fire(params) {
     if (!("userid" in params)) {
         return;
@@ -384,7 +381,6 @@ function OnGameEvent_weapon_fire(params) {
         });
     }
 }
-*/
 
 function OnGameEvent_item_pickup(params) {
     if (!("userid" in params) || !("item" in params)) {

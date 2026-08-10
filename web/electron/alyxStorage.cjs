@@ -68,9 +68,17 @@ function normalizeEnabledEvents(raw) {
 
 function normalizeSettings(raw) {
   const r = raw && typeof raw === "object" ? raw : {};
+  const solenoid = r.solenoidRecoil && typeof r.solenoidRecoil === "object" ? r.solenoidRecoil : {};
   return {
     logPath: typeof r.logPath === "string" ? r.logPath : null,
     enabledEvents: normalizeEnabledEvents(r.enabledEvents),
+    solenoidRecoil: {
+      enabled: solenoid.enabled !== undefined ? Boolean(solenoid.enabled) : true,
+      durationMs:
+        typeof solenoid.durationMs === "number" && Number.isFinite(solenoid.durationMs)
+          ? Math.max(25, Math.min(120, Math.round(solenoid.durationMs)))
+          : 40,
+    },
   };
 }
 
@@ -148,15 +156,31 @@ function setAlyxEnabledEvents(enabledEvents) {
 
 /**
  * Set multiple Alyx settings at once (partial update).
- * @param {{logPath?: string|null, enabledEvents?: Record<string, boolean>}} partial
+ * @param {{logPath?: string|null, enabledEvents?: Record<string, boolean>, solenoidRecoil?: {enabled?: boolean, durationMs?: number}}} partial
  */
 function setAlyxSettings(partial) {
   const settings = loadAlyxSettings();
   if (partial && typeof partial === "object") {
     if ("logPath" in partial) settings.logPath = partial.logPath ?? null;
     if ("enabledEvents" in partial) settings.enabledEvents = normalizeEnabledEvents(partial.enabledEvents);
+    if ("solenoidRecoil" in partial && partial.solenoidRecoil && typeof partial.solenoidRecoil === "object") {
+      settings.solenoidRecoil = {
+        enabled:
+          partial.solenoidRecoil.enabled !== undefined
+            ? Boolean(partial.solenoidRecoil.enabled)
+            : settings.solenoidRecoil.enabled,
+        durationMs:
+          typeof partial.solenoidRecoil.durationMs === "number"
+            ? Math.max(25, Math.min(120, Math.round(partial.solenoidRecoil.durationMs)))
+            : settings.solenoidRecoil.durationMs,
+      };
+    }
   }
   return saveAlyxSettings(settings);
+}
+
+function getAlyxSolenoidRecoil() {
+  return loadAlyxSettings().solenoidRecoil;
 }
 
 // Export as an object for consistency with other storage modules
@@ -165,6 +189,7 @@ const alyxStorage = {
   setAlyxLogPath,
   getAlyxEnabledEvents,
   setAlyxEnabledEvents,
+  getAlyxSolenoidRecoil,
   setAlyxSettings,
   loadAlyxSettings,
   saveAlyxSettings,

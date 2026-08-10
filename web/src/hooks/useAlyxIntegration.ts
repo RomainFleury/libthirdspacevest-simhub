@@ -12,6 +12,7 @@ import {
   AlyxStatus,
   AlyxModInfo,
   DaemonEvent,
+  SolenoidRecoilSettings,
 } from "../lib/bridgeApi";
 
 export type AlyxGameEvent = {
@@ -24,6 +25,7 @@ export type AlyxGameEvent = {
 export type AlyxEnabledEvents = Record<string, boolean>;
 
 const MAX_EVENTS = 50; // Max events to keep in history
+const DEFAULT_SOLENOID: SolenoidRecoilSettings = { enabled: true, durationMs: 40 };
 
 export function useAlyxIntegration() {
   const [status, setStatus] = useState<AlyxStatus>({
@@ -38,6 +40,7 @@ export function useAlyxIntegration() {
   const [modInfo, setModInfo] = useState<AlyxModInfo | null>(null);
   const [savedLogPath, setSavedLogPath] = useState<string | null>(null);
   const [enabledEvents, setEnabledEvents] = useState<AlyxEnabledEvents | null>(null);
+  const [solenoidRecoil, setSolenoidRecoil] = useState<SolenoidRecoilSettings>(DEFAULT_SOLENOID);
   const [restartRequired, setRestartRequired] = useState(false);
   const eventIdCounter = useRef(0);
 
@@ -76,6 +79,9 @@ export function useAlyxIntegration() {
       if (result.success) {
         setSavedLogPath(result.logPath || null);
         setEnabledEvents(result.enabledEvents || null);
+        if (result.solenoidRecoil) {
+          setSolenoidRecoil(result.solenoidRecoil);
+        }
       }
     } catch (err) {
       console.error("Failed to get Alyx settings:", err);
@@ -220,6 +226,23 @@ export function useAlyxIntegration() {
     }
   }, [enabledEvents, status.running]);
 
+  const setSolenoidRecoilSettings = useCallback(async (partial: Partial<SolenoidRecoilSettings>) => {
+    const next = { ...solenoidRecoil, ...partial };
+    setSolenoidRecoil(next);
+    try {
+      const result = await alyxSetSettings({ solenoidRecoil: next });
+      if (!result.success) {
+        setError(result.error || "Failed to save solenoid settings");
+      } else {
+        setError(null);
+        if (status.running) setRestartRequired(true);
+      }
+    } catch (err) {
+      console.error("Failed to save solenoid settings:", err);
+      setError(err instanceof Error ? err.message : "Failed to save solenoid settings");
+    }
+  }, [solenoidRecoil, status.running]);
+
   return {
     status,
     loading,
@@ -228,6 +251,7 @@ export function useAlyxIntegration() {
     modInfo,
     savedLogPath,
     enabledEvents,
+    solenoidRecoil,
     restartRequired,
     start,
     stop,
@@ -235,6 +259,7 @@ export function useAlyxIntegration() {
     browseLogPath,
     setLogPath,
     setEventEnabled,
+    setSolenoidRecoilSettings,
     refresh: fetchStatus,
   };
 }

@@ -63,7 +63,7 @@ This combination is a good match for pulsed recoil:
 | **Diode** | **1N4007** (1 A, 1000 V, DO-41) | Correct flyback diode for intermittent pulses |
 | **USB LC relay** | Serial 9600 baud | Switches the 12 V circuit via COM/NO |
 
-**Pulse guidance for this coil:** start at **20–40 ms**, then try **50–80 ms** if the hit feels soft. Do **not** hold ON — at 2 A continuous the coil and pack will heat / sag quickly.
+**Pulse guidance for this coil:** start at **25–40 ms**, then try **50–80 ms** if the hit feels soft. Do **not** go below **25 ms** (the LC module often misses OFF under ~20 ms). Do **not** hold ON — software force-OFFs after **1 s**. At 2 A continuous the coil and pack will heat / sag quickly.
 
 **Push-type note:** the plunger extends when energized. Mount so that stroke hits your recoil mass/plate within the 10 mm travel; leave a small air gap at rest so the slug can accelerate.
 
@@ -83,6 +83,14 @@ This combination is a good match for pulsed recoil:
 ```
 
 Optional: 3 A fast-blow fuse on Battery + for extra safety.
+
+### Game integrations (Alyx / L4D2)
+
+Once the Relay page can pulse successfully:
+
+1. Connect the relay on the **Relay** page (keep it connected while playing).
+2. **Alyx** → enable **Solenoid recoil** (default on) → Start integration. Fires on `PlayerShootWeapon` (independent of vest "Weapon Fire" toggle).
+3. **L4D2** → **Reinstall mod** (WeaponFire logging re-enabled) → enable **Solenoid recoil** → Stop/Start integration. Fires on `weapon_fire` with ~80 ms cooldown.
 
 ---
 

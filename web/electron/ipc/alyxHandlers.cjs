@@ -13,7 +13,14 @@ function registerAlyxHandlers(getMainWindow) {
     // Use saved log path if not provided
     const pathToUse = logPath || alyxStorage.getAlyxLogPath();
     const enabledEvents = alyxStorage.getAlyxEnabledEvents();
-    return await daemon.alyxStart(pathToUse, { enabled_events: enabledEvents });
+    const solenoid = alyxStorage.getAlyxSolenoidRecoil();
+    return await daemon.alyxStart(pathToUse, {
+      enabled_events: enabledEvents,
+      solenoid_recoil: {
+        enabled: solenoid.enabled,
+        duration_ms: solenoid.durationMs,
+      },
+    });
   });
 
   // Stop Alyx integration
@@ -72,6 +79,7 @@ function registerAlyxHandlers(getMainWindow) {
         success: true,
         logPath: alyxStorage.getAlyxLogPath(),
         enabledEvents: alyxStorage.getAlyxEnabledEvents(),
+        solenoidRecoil: alyxStorage.getAlyxSolenoidRecoil(),
       };
     } catch (error) {
       console.error("Error in alyx:getSettings:", error);

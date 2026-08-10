@@ -115,7 +115,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     pulse = sub.add_parser("pulse", help="Pulse relay for recoil (on, wait, off)")
     add_port_args(pulse)
-    pulse.add_argument("--ms", type=int, default=40, help="Pulse duration in ms (default 40)")
+    pulse.add_argument(
+        "--ms",
+        type=int,
+        default=40,
+        help="Pulse duration in ms (default 40, min 25, max 1000; safety OFF at 1s)",
+    )
 
     return parser
 

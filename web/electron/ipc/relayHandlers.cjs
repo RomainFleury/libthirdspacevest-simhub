@@ -35,6 +35,21 @@ function registerRelayHandlers() {
     const daemon = getDaemonBridge();
     return await daemon.relayPulse(durationMs);
   });
+
+  ipcMain.handle("relay:mouseStart", async (_event, options) => {
+    const daemon = getDaemonBridge();
+    return await daemon.relayMouseStart(options || {});
+  });
+
+  ipcMain.handle("relay:mouseStop", async () => {
+    const daemon = getDaemonBridge();
+    return await daemon.relayMouseStop();
+  });
+
+  ipcMain.handle("relay:mouseStatus", async () => {
+    const daemon = getDaemonBridge();
+    return await daemon.relayMouseStatus();
+  });
 }
 
 module.exports = {

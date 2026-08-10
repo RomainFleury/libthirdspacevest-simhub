@@ -142,10 +142,16 @@ export type AlyxBrowseResult = {
   error?: string;
 };
 
+export type SolenoidRecoilSettings = {
+  enabled: boolean;
+  durationMs: number;
+};
+
 export type AlyxSettingsResult = {
   success: boolean;
   logPath?: string | null;
   enabledEvents?: Record<string, boolean>;
+  solenoidRecoil?: SolenoidRecoilSettings;
   error?: string;
 };
 
@@ -185,6 +191,9 @@ export type RelayPortInfo = {
   manufacturer?: string | null;
   product?: string | null;
   serial_number?: string | null;
+  vid?: number | null;
+  pid?: number | null;
+  likely_relay?: boolean;
 };
 
 export type RelayStatusInfo = {
@@ -226,6 +235,27 @@ export type RelayPulseResult = {
   success: boolean;
   duration_ms?: number;
   relay?: RelayStatusInfo;
+  error?: string;
+};
+
+export type RelayMouseFireMode = "single" | "burst" | "fullauto";
+
+export type RelayMouseStartOptions = {
+  durationMs?: number;
+  fireMode?: RelayMouseFireMode;
+  fireRateRpm?: number;
+  burstCount?: number;
+};
+
+export type RelayMouseStatusResult = {
+  success: boolean;
+  running: boolean;
+  duration_ms?: number | null;
+  fire_mode?: RelayMouseFireMode | string;
+  fire_rate_rpm?: number;
+  burst_count?: number;
+  interval_ms?: number | null;
+  pulses?: number;
   error?: string;
 };
 
@@ -364,7 +394,11 @@ declare global {
       alyxGetModInfo: () => Promise<AlyxModInfoResult>;
       alyxBrowseLogPath: () => Promise<AlyxBrowseResult>;
       alyxGetSettings: () => Promise<AlyxSettingsResult>;
-      alyxSetSettings: (settings: { logPath?: string | null; enabledEvents?: Record<string, boolean> }) => Promise<{ success: boolean; error?: string }>;
+      alyxSetSettings: (settings: {
+        logPath?: string | null;
+        enabledEvents?: Record<string, boolean>;
+        solenoidRecoil?: Partial<SolenoidRecoilSettings>;
+      }) => Promise<{ success: boolean; error?: string }>;
       alyxSetLogPath: (logPath: string | null) => Promise<{ success: boolean; error?: string }>;
       // Left 4 Dead 2 Integration API
       l4d2Start: (logPath?: string, playerName?: string) => Promise<{
@@ -392,10 +426,14 @@ declare global {
         success: boolean;
         logPath?: string | null;
         playerName?: string | null;
+        solenoidRecoil?: SolenoidRecoilSettings;
         error?: string;
       }>;
       l4d2SetLogPath: (logPath: string | null) => Promise<{ success: boolean; error?: string }>;
       l4d2SetPlayerName: (playerName: string | null) => Promise<{ success: boolean; error?: string }>;
+      l4d2SetSolenoidRecoil: (
+        solenoidRecoil: Partial<SolenoidRecoilSettings>
+      ) => Promise<{ success: boolean; solenoidRecoil?: SolenoidRecoilSettings; error?: string }>;
       // Generic Screen Health Watcher API
       screenHealthExportProfile: (profile: Record<string, any>) => Promise<{
         success: boolean;
@@ -571,6 +609,9 @@ declare global {
       relayStatus: () => Promise<RelayStatusResult>;
       relaySet: (on: boolean) => Promise<RelaySetResult>;
       relayPulse: (durationMs?: number) => Promise<RelayPulseResult>;
+      relayMouseStart: (options?: RelayMouseStartOptions) => Promise<RelayMouseStatusResult>;
+      relayMouseStop: () => Promise<RelayMouseStatusResult>;
+      relayMouseStatus: () => Promise<RelayMouseStatusResult>;
     };
   }
 }
@@ -807,7 +848,11 @@ export async function alyxGetSettings(): Promise<AlyxSettingsResult> {
 /**
  * Set Alyx settings (partial update).
  */
-export async function alyxSetSettings(settings: { logPath?: string | null; enabledEvents?: Record<string, boolean> }): Promise<{ success: boolean; error?: string }> {
+export async function alyxSetSettings(settings: {
+  logPath?: string | null;
+  enabledEvents?: Record<string, boolean>;
+  solenoidRecoil?: Partial<SolenoidRecoilSettings>;
+}): Promise<{ success: boolean; error?: string }> {
   return await ensureBridge().alyxSetSettings(settings);
 }
 
@@ -988,4 +1033,18 @@ export async function relaySet(on: boolean): Promise<RelaySetResult> {
 
 export async function relayPulse(durationMs = 40): Promise<RelayPulseResult> {
   return await ensureBridge().relayPulse(durationMs);
+}
+
+export async function relayMouseStart(
+  options: RelayMouseStartOptions = {}
+): Promise<RelayMouseStatusResult> {
+  return await ensureBridge().relayMouseStart(options);
+}
+
+export async function relayMouseStop(): Promise<RelayMouseStatusResult> {
+  return await ensureBridge().relayMouseStop();
+}
+
+export async function relayMouseStatus(): Promise<RelayMouseStatusResult> {
+  return await ensureBridge().relayMouseStatus();
 }

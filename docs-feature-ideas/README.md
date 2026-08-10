@@ -40,5 +40,6 @@ Examples of how the feature would be used.
 
 ## Existing Feature Ideas
 
-(Feature idea files will be listed here as they are created)
+- **`usb-relay-solenoid-recoil/`** — USB LC relay → solenoid mechanical recoil hardware + daemon/UI
+- **`generic-screen-health-watcher/`** — Screen ROI detectors for hit/health without game mods
 

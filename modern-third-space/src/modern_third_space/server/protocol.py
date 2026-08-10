@@ -81,6 +81,9 @@ class CommandType(Enum):
     RELAY_STATUS = "relay_status"
     RELAY_SET = "relay_set"
     RELAY_PULSE = "relay_pulse"
+    RELAY_MOUSE_START = "relay_mouse_start"
+    RELAY_MOUSE_STOP = "relay_mouse_stop"
+    RELAY_MOUSE_STATUS = "relay_mouse_status"
 
 
 class EventType(Enum):
@@ -139,6 +142,8 @@ class EventType(Enum):
     RELAY_DISCONNECTED = "relay_disconnected"
     RELAY_STATE_CHANGED = "relay_state_changed"
     RELAY_PULSED = "relay_pulsed"
+    RELAY_MOUSE_STARTED = "relay_mouse_started"
+    RELAY_MOUSE_STOPPED = "relay_mouse_stopped"
 
 
 @dataclass
@@ -195,6 +200,10 @@ class Command:
     switch_address: Optional[int] = None  # Relay switch address (default 0x01)
     on: Optional[bool] = None  # Relay on/off for relay_set
     duration_ms: Optional[int] = None  # Pulse duration for relay_pulse
+    solenoid_recoil: Optional[Dict[str, Any]] = None  # {"enabled": bool, "duration_ms": int}
+    fire_mode: Optional[str] = None  # single | burst | fullauto
+    fire_rate_rpm: Optional[int] = None  # rounds per minute
+    burst_count: Optional[int] = None  # shots per burst
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Command":
@@ -234,6 +243,10 @@ class Command:
             switch_address=data.get("switch_address"),
             on=data.get("on"),
             duration_ms=data.get("duration_ms"),
+            solenoid_recoil=data.get("solenoid_recoil"),
+            fire_mode=data.get("fire_mode"),
+            fire_rate_rpm=data.get("fire_rate_rpm"),
+            burst_count=data.get("burst_count"),
         )
     
     @classmethod
@@ -356,6 +369,11 @@ class Response:
     relay: Optional[Dict[str, Any]] = None
     on: Optional[bool] = None
     duration_ms: Optional[int] = None
+    pulses: Optional[int] = None
+    fire_mode: Optional[str] = None
+    fire_rate_rpm: Optional[int] = None
+    burst_count: Optional[int] = None
+    interval_ms: Optional[int] = None
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary, excluding None values."""
@@ -1072,6 +1090,12 @@ def event_relay_state_changed(on: bool, relay: Optional[Dict[str, Any]] = None) 
 def event_relay_pulsed(duration_ms: int, relay: Optional[Dict[str, Any]] = None) -> Event:
     return Event(event=EventType.RELAY_PULSED.value, duration_ms=duration_ms, relay=relay)
 
+def event_relay_mouse_started(duration_ms: int) -> Event:
+    return Event(event=EventType.RELAY_MOUSE_STARTED.value, duration_ms=duration_ms)
+
+def event_relay_mouse_stopped() -> Event:
+    return Event(event=EventType.RELAY_MOUSE_STOPPED.value)
+
 def response_relay_list_ports(
     ports: List[Dict[str, Any]],
     req_id: Optional[str] = None,
@@ -1149,6 +1173,74 @@ def response_relay_pulse(
         ok=success,
         duration_ms=duration_ms,
         relay=relay,
+        message=error,
+    )
+
+def response_relay_mouse_start(
+    success: bool,
+    running: bool = False,
+    duration_ms: Optional[int] = None,
+    fire_mode: Optional[str] = None,
+    fire_rate_rpm: Optional[int] = None,
+    burst_count: Optional[int] = None,
+    interval_ms: Optional[int] = None,
+    pulses: Optional[int] = None,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    return Response(
+        response="relay_mouse_start",
+        req_id=req_id,
+        success=success,
+        ok=success,
+        running=running,
+        duration_ms=duration_ms,
+        fire_mode=fire_mode,
+        fire_rate_rpm=fire_rate_rpm,
+        burst_count=burst_count,
+        interval_ms=interval_ms,
+        pulses=pulses,
+        message=error,
+    )
+
+def response_relay_mouse_stop(
+    success: bool,
+    running: bool = False,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    return Response(
+        response="relay_mouse_stop",
+        req_id=req_id,
+        success=success,
+        ok=success,
+        running=running,
+        message=error,
+    )
+
+def response_relay_mouse_status(
+    running: bool,
+    duration_ms: Optional[int] = None,
+    pulses: Optional[int] = None,
+    fire_mode: Optional[str] = None,
+    fire_rate_rpm: Optional[int] = None,
+    burst_count: Optional[int] = None,
+    interval_ms: Optional[int] = None,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    return Response(
+        response="relay_mouse_status",
+        req_id=req_id,
+        ok=True,
+        success=True,
+        running=running,
+        duration_ms=duration_ms,
+        pulses=pulses,
+        fire_mode=fire_mode,
+        fire_rate_rpm=fire_rate_rpm,
+        burst_count=burst_count,
+        interval_ms=interval_ms,
         message=error,
     )
 

@@ -31,6 +31,11 @@ from ..vest.cell_layout import (
     UPPER_CELLS,
     LOWER_CELLS,
 )
+from ..relay.recoil import (
+    DEFAULT_RECOIL_MS,
+    duration_ms_for_weapon,
+    parse_solenoid_settings,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -707,6 +712,7 @@ class ConsoleLogWatcher:
 # Callback types
 GameEventCallback = Callable[[str, dict], None]
 TriggerCallback = Callable[[int, int], None]
+RecoilCallback = Callable[[int], None]  # duration_ms
 
 
 class L4D2Manager:
@@ -724,6 +730,7 @@ class L4D2Manager:
                       (event_type, params) -> None
         on_trigger: Called to trigger a haptic effect
                    (cell, speed) -> None
+        on_recoil: Called to pulse USB relay solenoid (duration_ms) -> None
     """
     
     # Default paths for console.log
@@ -740,14 +747,20 @@ class L4D2Manager:
         self,
         on_game_event: Optional[GameEventCallback] = None,
         on_trigger: Optional[TriggerCallback] = None,
+        on_recoil: Optional[RecoilCallback] = None,
     ):
         self.on_game_event = on_game_event
         self.on_trigger = on_trigger
+        self.on_recoil = on_recoil
         
         self._log_path: Optional[Path] = None
         self._player_name: Optional[str] = None
         self._watcher: Optional[ConsoleLogWatcher] = None
         self._running = False
+        self._solenoid_recoil_enabled = True
+        self._solenoid_recoil_ms = DEFAULT_RECOIL_MS
+        self._last_recoil_ts = 0.0
+        self._recoil_cooldown_s = 0.08
         
         # Stats
         self._events_received = 0
@@ -786,17 +799,30 @@ class L4D2Manager:
         
         return None
     
-    def start(self, log_path: Optional[str] = None, player_name: Optional[str] = None) -> tuple[bool, Optional[str]]:
+    def start(
+        self,
+        log_path: Optional[str] = None,
+        player_name: Optional[str] = None,
+        solenoid_recoil: Optional[dict] = None,
+    ) -> tuple[bool, Optional[str]]:
         """
         Start watching for L4D2 events.
         
         Args:
             log_path: Path to console.log, or None for auto-detect
             player_name: Optional player name to filter events
+            solenoid_recoil: Optional {"enabled": bool, "duration_ms": int}
             
         Returns:
             (success, error_message)
         """
+        if solenoid_recoil is not None:
+            settings = parse_solenoid_settings({"solenoid_recoil": solenoid_recoil})
+        else:
+            settings = parse_solenoid_settings(None)
+        self._solenoid_recoil_enabled = bool(settings["enabled"])
+        self._solenoid_recoil_ms = int(settings["duration_ms"])
+        self._last_recoil_ts = 0.0
         if self._running:
             return False, "L4D2 integration already running"
         
@@ -857,8 +883,27 @@ class L4D2Manager:
         if self.on_trigger:
             for cell, speed in haptic_commands:
                 self.on_trigger(cell, speed)
+
+        # Solenoid recoil on weapon fire
+        if event.type == "weapon_fire":
+            self._maybe_recoil(event)
         
         # Broadcast event to clients
         if self.on_game_event:
             self.on_game_event(event.type, event.params)
+
+    def _maybe_recoil(self, event: L4D2Event) -> None:
+        """Pulse USB relay solenoid if enabled and past cooldown."""
+        if not self._solenoid_recoil_enabled or not self.on_recoil:
+            return
+        now = time.time()
+        if (now - self._last_recoil_ts) < self._recoil_cooldown_s:
+            return
+        self._last_recoil_ts = now
+        weapon = str(event.params.get("weapon", "") or "")
+        duration_ms = duration_ms_for_weapon(weapon, self._solenoid_recoil_ms)
+        try:
+            self.on_recoil(duration_ms)
+        except Exception as exc:
+            logger.warning("L4D2 solenoid recoil failed: %s", exc)
 

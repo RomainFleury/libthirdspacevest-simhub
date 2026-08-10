@@ -71,6 +71,8 @@ contextBridge.exposeInMainWorld("vestBridge", {
   l4d2GetSettings: () => ipcRenderer.invoke("l4d2:getSettings"),
   l4d2SetLogPath: (logPath) => ipcRenderer.invoke("l4d2:setLogPath", logPath),
   l4d2SetPlayerName: (playerName) => ipcRenderer.invoke("l4d2:setPlayerName", playerName),
+  l4d2SetSolenoidRecoil: (solenoidRecoil) =>
+    ipcRenderer.invoke("l4d2:setSolenoidRecoil", solenoidRecoil),
   l4d2BrowseGameDir: () => ipcRenderer.invoke("l4d2:browseGameDir"),
   l4d2GetGameDir: () => ipcRenderer.invoke("l4d2:getGameDir"),
   l4d2SetGameDir: (gameDir) => ipcRenderer.invoke("l4d2:setGameDir", gameDir),
@@ -140,4 +142,7 @@ contextBridge.exposeInMainWorld("vestBridge", {
   relayStatus: () => ipcRenderer.invoke("relay:status"),
   relaySet: (on) => ipcRenderer.invoke("relay:set", on),
   relayPulse: (durationMs) => ipcRenderer.invoke("relay:pulse", durationMs),
+  relayMouseStart: (options) => ipcRenderer.invoke("relay:mouseStart", options),
+  relayMouseStop: () => ipcRenderer.invoke("relay:mouseStop"),
+  relayMouseStatus: () => ipcRenderer.invoke("relay:mouseStatus"),
 });

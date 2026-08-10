@@ -35,6 +35,11 @@ from ..vest.cell_layout import (
     RIGHT_SIDE,
     UPPER_CELLS,
 )
+from ..relay.recoil import (
+    DEFAULT_RECOIL_MS,
+    duration_ms_for_weapon,
+    parse_solenoid_settings,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -184,17 +189,23 @@ class AlyxHapticsSettings:
     Per-event haptics settings for Alyx.
 
     v1 schema (as passed via daemon command):
-      {"enabled_events": {"PlayerHurt": true, "PlayerShootWeapon": false, ...}}
+      {
+        "enabled_events": {"PlayerHurt": true, "PlayerShootWeapon": false, ...},
+        "solenoid_recoil": {"enabled": true, "duration_ms": 40}
+      }
     """
 
     enabled_events: dict[str, bool]
     cooldown_s: dict[str, float]
     _last_trigger_ts: dict[str, float]
+    solenoid_recoil_enabled: bool = True
+    solenoid_recoil_ms: int = DEFAULT_RECOIL_MS
 
     @classmethod
     def from_payload(cls, payload: Optional[dict]) -> "AlyxHapticsSettings":
         enabled = dict(DEFAULT_ENABLED_EVENTS)
         cooldown_s = dict(DEFAULT_EVENT_COOLDOWN_S)
+        solenoid = parse_solenoid_settings(payload)
 
         if isinstance(payload, dict):
             raw_enabled = payload.get("enabled_events")
@@ -212,7 +223,13 @@ class AlyxHapticsSettings:
                         except Exception:
                             pass
 
-        return cls(enabled_events=enabled, cooldown_s=cooldown_s, _last_trigger_ts={})
+        return cls(
+            enabled_events=enabled,
+            cooldown_s=cooldown_s,
+            _last_trigger_ts={},
+            solenoid_recoil_enabled=bool(solenoid["enabled"]),
+            solenoid_recoil_ms=int(solenoid["duration_ms"]),
+        )
 
     def is_enabled(self, event_type: str) -> bool:
         return bool(self.enabled_events.get(event_type, False))
@@ -542,6 +559,7 @@ class ConsoleLogWatcher:
 # Callback types
 GameEventCallback = Callable[[str, dict], None]
 TriggerCallback = Callable[[int, int], None]
+RecoilCallback = Callable[[int], None]  # duration_ms
 
 
 class AlyxManager:
@@ -559,6 +577,7 @@ class AlyxManager:
                       (event_type, params) -> None
         on_trigger: Called to trigger a haptic effect
                    (cell, speed) -> None
+        on_recoil: Called to pulse USB relay solenoid (duration_ms) -> None
     """
     
     # Default paths for console.log
@@ -575,9 +594,11 @@ class AlyxManager:
         self,
         on_game_event: Optional[GameEventCallback] = None,
         on_trigger: Optional[TriggerCallback] = None,
+        on_recoil: Optional[RecoilCallback] = None,
     ):
         self.on_game_event = on_game_event
         self.on_trigger = on_trigger
+        self.on_recoil = on_recoil
         
         self._log_path: Optional[Path] = None
         self._watcher: Optional[ConsoleLogWatcher] = None
@@ -586,6 +607,7 @@ class AlyxManager:
         # Runtime config/state
         self._haptics_settings: AlyxHapticsSettings = AlyxHapticsSettings.from_payload(None)
         self._primary_is_left: bool = False
+        self._last_recoil_ts: float = 0.0
         
         # Stats
         self._events_received = 0
@@ -709,6 +731,29 @@ class AlyxManager:
         )
         for cell, speed in haptic_commands:
             self._trigger(cell, speed)
+
+        # Independent solenoid recoil on weapon fire (does not require vest toggle)
+        if event.type == "PlayerShootWeapon":
+            self._maybe_recoil(event)
+    
+    def _maybe_recoil(self, event: AlyxEvent) -> None:
+        """Pulse USB relay solenoid if enabled and past cooldown."""
+        st = self._haptics_settings
+        if not st.solenoid_recoil_enabled or not self.on_recoil:
+            return
+
+        cd = float(st.cooldown_s.get("PlayerShootWeapon", 0.08) or 0.08)
+        now = time.time()
+        if (now - self._last_recoil_ts) < cd:
+            return
+        self._last_recoil_ts = now
+
+        weapon = str(event.params.get("weapon", "") or "")
+        duration_ms = duration_ms_for_weapon(weapon, st.solenoid_recoil_ms)
+        try:
+            self.on_recoil(duration_ms)
+        except Exception as exc:
+            logger.warning("Alyx solenoid recoil failed: %s", exc)
     
     def _trigger(self, cell: int, speed: int):
         """Trigger a haptic effect via callback."""

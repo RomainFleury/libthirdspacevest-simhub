@@ -117,8 +117,14 @@ from .protocol import (
     response_relay_status,
     response_relay_set,
     response_relay_pulse,
+    event_relay_mouse_started,
+    event_relay_mouse_stopped,
+    response_relay_mouse_start,
+    response_relay_mouse_stop,
+    response_relay_mouse_status,
 )
 from ..relay import RelayController, list_ports as list_relay_ports, DEFAULT_ADDRESS, DEFAULT_BAUD
+from ..relay.mouse_recoil import MouseRecoilListener
 
 logger = logging.getLogger(__name__)
 
@@ -163,12 +169,14 @@ class VestDaemon:
         self._alyx_manager = AlyxManager(
             on_game_event=self._on_alyx_game_event,
             on_trigger=self._on_alyx_trigger,
+            on_recoil=self._on_solenoid_recoil,
         )
         
         # Left 4 Dead 2 manager
         self._l4d2_manager = L4D2Manager(
             on_game_event=self._on_l4d2_game_event,
             on_trigger=self._on_l4d2_trigger,
+            on_recoil=self._on_solenoid_recoil,
         )
 
         # Generic Screen Health Watcher manager
@@ -179,6 +187,7 @@ class VestDaemon:
 
         # USB LC relay (solenoid / recoil)
         self._relay = RelayController()
+        self._mouse_recoil = MouseRecoilListener(on_pulse=self._on_solenoid_recoil)
         
         self._loop: Optional[asyncio.AbstractEventLoop] = None
     
@@ -223,6 +232,10 @@ class VestDaemon:
             self._alyx_manager.stop()
 
         # Disconnect USB relay if connected
+        try:
+            self._mouse_recoil.stop()
+        except Exception:
+            pass
         try:
             self._relay.disconnect()
         except Exception:
@@ -485,6 +498,15 @@ class VestDaemon:
 
         if cmd_type == CommandType.RELAY_PULSE:
             return await self._cmd_relay_pulse(command)
+
+        if cmd_type == CommandType.RELAY_MOUSE_START:
+            return await self._cmd_relay_mouse_start(command)
+
+        if cmd_type == CommandType.RELAY_MOUSE_STOP:
+            return await self._cmd_relay_mouse_stop(command)
+
+        if cmd_type == CommandType.RELAY_MOUSE_STATUS:
+            return await self._cmd_relay_mouse_status(command)
         
         return response_error(f"Command not implemented: {command.cmd}", command.req_id)
     
@@ -1337,6 +1359,32 @@ class VestDaemon:
                 self._clients.broadcast(event),
                 self._loop,
             )
+
+    def _on_solenoid_recoil(self, duration_ms: int) -> None:
+        """
+        Pulse the USB LC relay for mechanical recoil.
+
+        Called from game-integration watcher threads. No-ops if relay is disconnected.
+        """
+        status = self._relay.status()
+        if not status.connected:
+            return
+        try:
+            from ..relay import clamp_on_ms
+
+            duration_ms = clamp_on_ms(int(duration_ms))
+            self._relay.pulse(duration_ms)
+            if self._loop is not None:
+                from .protocol import event_relay_pulsed
+
+                asyncio.run_coroutine_threadsafe(
+                    self._clients.broadcast(
+                        event_relay_pulsed(int(duration_ms), self._relay.status().to_dict())
+                    ),
+                    self._loop,
+                )
+        except Exception as exc:
+            logger.warning("Solenoid recoil pulse failed: %s", exc)
     
     # -------------------------------------------------------------------------
     # Left 4 Dead 2 commands
@@ -1348,7 +1396,11 @@ class VestDaemon:
         log_path = command.log_path
         player_name = command.message  # Using message field for player name
         
-        success, error = self._l4d2_manager.start(log_path=log_path, player_name=player_name)
+        success, error = self._l4d2_manager.start(
+            log_path=log_path,
+            player_name=player_name,
+            solenoid_recoil=command.solenoid_recoil,
+        )
         
         if success:
             log_path_str = str(self._l4d2_manager.log_path) if self._l4d2_manager.log_path else None
@@ -1856,8 +1908,10 @@ class VestDaemon:
     async def _cmd_relay_disconnect(self, command: Command) -> Response:
         """Close the USB LC relay serial port."""
         try:
+            self._mouse_recoil.stop()
             await asyncio.to_thread(self._relay.disconnect)
             await self._clients.broadcast(event_relay_disconnected())
+            await self._clients.broadcast(event_relay_mouse_stopped())
             return response_relay_disconnect(success=True, req_id=command.req_id)
         except Exception as exc:
             return response_relay_disconnect(
@@ -1906,6 +1960,9 @@ class VestDaemon:
         duration_ms = command.duration_ms if command.duration_ms is not None else 40
 
         try:
+            from ..relay import clamp_on_ms
+
+            duration_ms = clamp_on_ms(duration_ms)
             await asyncio.to_thread(self._relay.pulse, duration_ms)
             status = self._relay.status().to_dict()
             await self._clients.broadcast(event_relay_pulsed(duration_ms, status))
@@ -1922,6 +1979,80 @@ class VestDaemon:
                 error=str(exc),
                 req_id=command.req_id,
             )
+
+    async def _cmd_relay_mouse_start(self, command: Command) -> Response:
+        """Start global left-click → solenoid pulse listening."""
+        if not self._relay.status().connected:
+            return response_relay_mouse_start(
+                success=False,
+                running=False,
+                error="Relay is not connected — connect on the Relay page first",
+                req_id=command.req_id,
+            )
+
+        from ..relay import clamp_on_ms
+
+        duration_ms = clamp_on_ms(
+            command.duration_ms if command.duration_ms is not None else 40
+        )
+        fire_mode = command.fire_mode or "single"
+        fire_rate_rpm = (
+            command.fire_rate_rpm if command.fire_rate_rpm is not None else 600
+        )
+        burst_count = command.burst_count if command.burst_count is not None else 3
+
+        success, error = await asyncio.to_thread(
+            self._mouse_recoil.start,
+            duration_ms,
+            fire_mode,
+            fire_rate_rpm,
+            burst_count,
+        )
+        st = self._mouse_recoil.status()
+        if success:
+            await self._clients.broadcast(event_relay_mouse_started(duration_ms))
+            return response_relay_mouse_start(
+                success=True,
+                running=True,
+                duration_ms=st.get("duration_ms"),
+                fire_mode=st.get("fire_mode"),
+                fire_rate_rpm=st.get("fire_rate_rpm"),
+                burst_count=st.get("burst_count"),
+                interval_ms=st.get("interval_ms"),
+                pulses=st.get("pulses"),
+                req_id=command.req_id,
+            )
+        return response_relay_mouse_start(
+            success=False,
+            running=False,
+            error=error,
+            req_id=command.req_id,
+        )
+
+    async def _cmd_relay_mouse_stop(self, command: Command) -> Response:
+        """Stop global click-based recoil listening."""
+        await asyncio.to_thread(self._mouse_recoil.stop)
+        await self._clients.broadcast(event_relay_mouse_stopped())
+        return response_relay_mouse_stop(
+            success=True,
+            running=False,
+            req_id=command.req_id,
+        )
+
+    async def _cmd_relay_mouse_status(self, command: Command) -> Response:
+        """Return click-based recoil listener status."""
+        st = self._mouse_recoil.status()
+        return response_relay_mouse_status(
+            running=bool(st.get("running")),
+            duration_ms=st.get("duration_ms"),
+            pulses=st.get("pulses"),
+            fire_mode=st.get("fire_mode"),
+            fire_rate_rpm=st.get("fire_rate_rpm"),
+            burst_count=st.get("burst_count"),
+            interval_ms=st.get("interval_ms"),
+            error=st.get("last_error"),
+            req_id=command.req_id,
+        )
 
 
 def run_daemon(

@@ -76,13 +76,14 @@ The mod outputs events to `console.log` in this format:
 |-------|--------|-------------|--------|
 | `PlayerHurt` | `{PlayerHurt\|damage\|attacker\|angle\|damage_type\|victim}` | Player took damage | ✅ Active |
 | `PlayerDeath` | `{PlayerDeath\|killer\|weapon\|victim}` | Player died | ✅ Active |
-| `WeaponFire` | `{WeaponFire\|weapon\|player}` | Player fired weapon | ⏸️ Disabled (too frequent) |
+| `WeaponFire` | `{WeaponFire\|weapon\|player}` | Player fired weapon | ✅ Enabled (for solenoid recoil; rate-limited in daemon) |
 | `HealthPickup` | `{HealthPickup\|item\|player}` | Player picked up health item | ✅ Active |
 | `AmmoPickup` | `{AmmoPickup\|player}` | Player picked up ammo | ✅ Active |
 | `InfectedHit` | `{InfectedHit\|infected\|damage\|attacker}` | Player hit infected | ✅ Active |
 | `PlayerHealed` | `{PlayerHealed\|amount\|player}` | Player was healed | ✅ Active |
 
-**Note:** `WeaponFire` events are currently disabled to reduce log spam and resource usage. The code is preserved in the script (commented out) and can be re-enabled by uncommenting the `OnGameEvent_weapon_fire()` function.
+**Note:** `WeaponFire` events are enabled so the daemon can drive USB-relay solenoid recoil.
+The Python side applies an ~80 ms cooldown so automatic weapons do not flood the relay.
 
 ### Example Output
 

@@ -67,6 +67,37 @@ function setL4D2GameDir(gameDir) {
   saveL4D2Settings(settings);
 }
 
+function getL4D2SolenoidRecoil() {
+  const settings = loadL4D2Settings();
+  const solenoid = settings.solenoidRecoil && typeof settings.solenoidRecoil === "object"
+    ? settings.solenoidRecoil
+    : {};
+  return {
+    enabled: solenoid.enabled !== undefined ? Boolean(solenoid.enabled) : true,
+    durationMs:
+      typeof solenoid.durationMs === "number" && Number.isFinite(solenoid.durationMs)
+        ? Math.max(25, Math.min(120, Math.round(solenoid.durationMs)))
+        : 40,
+  };
+}
+
+function setL4D2SolenoidRecoil(solenoidRecoil) {
+  const settings = loadL4D2Settings();
+  const current = getL4D2SolenoidRecoil();
+  settings.solenoidRecoil = {
+    enabled:
+      solenoidRecoil && solenoidRecoil.enabled !== undefined
+        ? Boolean(solenoidRecoil.enabled)
+        : current.enabled,
+    durationMs:
+      solenoidRecoil && typeof solenoidRecoil.durationMs === "number"
+        ? Math.max(25, Math.min(120, Math.round(solenoidRecoil.durationMs)))
+        : current.durationMs,
+  };
+  saveL4D2Settings(settings);
+  return settings.solenoidRecoil;
+}
+
 module.exports = {
   getL4D2LogPath,
   setL4D2LogPath,
@@ -74,5 +105,7 @@ module.exports = {
   setL4D2PlayerName,
   getL4D2GameDir,
   setL4D2GameDir,
+  getL4D2SolenoidRecoil,
+  setL4D2SolenoidRecoil,
 };
 
