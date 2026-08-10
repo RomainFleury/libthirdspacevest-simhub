@@ -74,6 +74,13 @@ class CommandType(Enum):
     PLAY_EFFECT = "play_effect"
     LIST_EFFECTS = "list_effects"
     STOP_EFFECT = "stop_effect"
+    # USB LC relay (solenoid / recoil)
+    RELAY_LIST_PORTS = "relay_list_ports"
+    RELAY_CONNECT = "relay_connect"
+    RELAY_DISCONNECT = "relay_disconnect"
+    RELAY_STATUS = "relay_status"
+    RELAY_SET = "relay_set"
+    RELAY_PULSE = "relay_pulse"
 
 
 class EventType(Enum):
@@ -127,6 +134,11 @@ class EventType(Enum):
     # Predefined effects
     EFFECT_STARTED = "effect_started"
     EFFECT_COMPLETED = "effect_completed"
+    # USB LC relay (solenoid / recoil)
+    RELAY_CONNECTED = "relay_connected"
+    RELAY_DISCONNECTED = "relay_disconnected"
+    RELAY_STATE_CHANGED = "relay_state_changed"
+    RELAY_PULSED = "relay_pulsed"
 
 
 @dataclass
@@ -177,6 +189,12 @@ class Command:
     frame_bgra_base64: Optional[str] = None  # legacy; prefer frame_bgra_path
     frame_width: Optional[int] = None
     frame_height: Optional[int] = None
+    # USB LC relay params
+    port: Optional[str] = None  # Serial port path (e.g. COM3)
+    baud: Optional[int] = None  # Serial baud rate (default 9600)
+    switch_address: Optional[int] = None  # Relay switch address (default 0x01)
+    on: Optional[bool] = None  # Relay on/off for relay_set
+    duration_ms: Optional[int] = None  # Pulse duration for relay_pulse
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Command":
@@ -211,6 +229,11 @@ class Command:
             frame_bgra_base64=data.get("frame_bgra_base64"),
             frame_width=data.get("frame_width"),
             frame_height=data.get("frame_height"),
+            port=data.get("port"),
+            baud=data.get("baud"),
+            switch_address=data.get("switch_address"),
+            on=data.get("on"),
+            duration_ms=data.get("duration_ms"),
         )
     
     @classmethod
@@ -268,6 +291,11 @@ class Event:
     health_percent: Optional[float] = None
     detector: Optional[str] = None
     health_value: Optional[int] = None
+    # USB LC relay events
+    port: Optional[str] = None
+    on: Optional[bool] = None
+    duration_ms: Optional[int] = None
+    relay: Optional[Dict[str, Any]] = None
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary, excluding None values."""
@@ -323,6 +351,11 @@ class Response:
     # Predefined effects response
     effects: Optional[List[Dict[str, Any]]] = None
     categories: Optional[List[str]] = None
+    # USB LC relay response
+    ports: Optional[List[Dict[str, Any]]] = None
+    relay: Optional[Dict[str, Any]] = None
+    on: Optional[bool] = None
+    duration_ms: Optional[int] = None
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary, excluding None values."""
@@ -1020,5 +1053,102 @@ def response_list_effects(
         req_id=req_id,
         effects=effects,
         categories=categories,
+    )
+
+
+# -------------------------------------------------------------------------
+# USB LC relay (solenoid / recoil)
+# -------------------------------------------------------------------------
+
+def event_relay_connected(relay: Dict[str, Any]) -> Event:
+    return Event(event=EventType.RELAY_CONNECTED.value, relay=relay, port=relay.get("port"))
+
+def event_relay_disconnected() -> Event:
+    return Event(event=EventType.RELAY_DISCONNECTED.value)
+
+def event_relay_state_changed(on: bool, relay: Optional[Dict[str, Any]] = None) -> Event:
+    return Event(event=EventType.RELAY_STATE_CHANGED.value, on=on, relay=relay)
+
+def event_relay_pulsed(duration_ms: int, relay: Optional[Dict[str, Any]] = None) -> Event:
+    return Event(event=EventType.RELAY_PULSED.value, duration_ms=duration_ms, relay=relay)
+
+def response_relay_list_ports(
+    ports: List[Dict[str, Any]],
+    req_id: Optional[str] = None,
+) -> Response:
+    return Response(response="relay_list_ports", req_id=req_id, ok=True, ports=ports)
+
+def response_relay_connect(
+    success: bool,
+    relay: Optional[Dict[str, Any]] = None,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    return Response(
+        response="relay_connect",
+        req_id=req_id,
+        success=success,
+        ok=success,
+        relay=relay,
+        message=error,
+    )
+
+def response_relay_disconnect(
+    success: bool,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    return Response(
+        response="relay_disconnect",
+        req_id=req_id,
+        success=success,
+        ok=success,
+        message=error,
+    )
+
+def response_relay_status(
+    relay: Dict[str, Any],
+    req_id: Optional[str] = None,
+) -> Response:
+    return Response(
+        response="relay_status",
+        req_id=req_id,
+        ok=True,
+        connected=bool(relay.get("connected")),
+        relay=relay,
+    )
+
+def response_relay_set(
+    success: bool,
+    on: Optional[bool] = None,
+    relay: Optional[Dict[str, Any]] = None,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    return Response(
+        response="relay_set",
+        req_id=req_id,
+        success=success,
+        ok=success,
+        on=on,
+        relay=relay,
+        message=error,
+    )
+
+def response_relay_pulse(
+    success: bool,
+    duration_ms: Optional[int] = None,
+    relay: Optional[Dict[str, Any]] = None,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    return Response(
+        response="relay_pulse",
+        req_id=req_id,
+        success=success,
+        ok=success,
+        duration_ms=duration_ms,
+        relay=relay,
+        message=error,
     )
 

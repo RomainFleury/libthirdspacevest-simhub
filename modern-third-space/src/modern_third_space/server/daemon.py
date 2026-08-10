@@ -106,7 +106,19 @@ from .protocol import (
     event_effect_completed,
     response_play_effect,
     response_list_effects,
+    # USB LC relay
+    event_relay_connected,
+    event_relay_disconnected,
+    event_relay_state_changed,
+    event_relay_pulsed,
+    response_relay_list_ports,
+    response_relay_connect,
+    response_relay_disconnect,
+    response_relay_status,
+    response_relay_set,
+    response_relay_pulse,
 )
+from ..relay import RelayController, list_ports as list_relay_ports, DEFAULT_ADDRESS, DEFAULT_BAUD
 
 logger = logging.getLogger(__name__)
 
@@ -164,6 +176,9 @@ class VestDaemon:
             on_game_event=self._on_screen_health_game_event,
             on_trigger=self._on_screen_health_trigger,
         )
+
+        # USB LC relay (solenoid / recoil)
+        self._relay = RelayController()
         
         self._loop: Optional[asyncio.AbstractEventLoop] = None
     
@@ -206,6 +221,12 @@ class VestDaemon:
         # Stop Alyx integration if running
         if self._alyx_manager.is_running:
             self._alyx_manager.stop()
+
+        # Disconnect USB relay if connected
+        try:
+            self._relay.disconnect()
+        except Exception:
+            pass
         
         # Disconnect from all vests
         for device_id in list(self._registry._controllers.keys()):
@@ -445,6 +466,25 @@ class VestDaemon:
         
         if cmd_type == CommandType.STOP_EFFECT:
             return await self._cmd_stop_effect(command)
+
+        # USB LC relay commands
+        if cmd_type == CommandType.RELAY_LIST_PORTS:
+            return await self._cmd_relay_list_ports(command)
+
+        if cmd_type == CommandType.RELAY_CONNECT:
+            return await self._cmd_relay_connect(command)
+
+        if cmd_type == CommandType.RELAY_DISCONNECT:
+            return await self._cmd_relay_disconnect(command)
+
+        if cmd_type == CommandType.RELAY_STATUS:
+            return await self._cmd_relay_status(command)
+
+        if cmd_type == CommandType.RELAY_SET:
+            return await self._cmd_relay_set(command)
+
+        if cmd_type == CommandType.RELAY_PULSE:
+            return await self._cmd_relay_pulse(command)
         
         return response_error(f"Command not implemented: {command.cmd}", command.req_id)
     
@@ -1768,6 +1808,120 @@ class VestDaemon:
         
         await self._clients.broadcast(event_all_stopped())
         return response_ok(command.req_id)
+
+    # -------------------------------------------------------------------------
+    # USB LC relay (solenoid / recoil)
+    # -------------------------------------------------------------------------
+
+    async def _cmd_relay_list_ports(self, command: Command) -> Response:
+        """List available serial ports for the USB LC relay."""
+        try:
+            ports = await asyncio.to_thread(list_relay_ports)
+            return response_relay_list_ports(ports, req_id=command.req_id)
+        except Exception as exc:
+            return response_error(str(exc), command.req_id)
+
+    async def _cmd_relay_connect(self, command: Command) -> Response:
+        """Open the serial port for the USB LC relay module."""
+        if not command.port:
+            return response_relay_connect(
+                success=False,
+                error="port is required",
+                req_id=command.req_id,
+            )
+
+        baud = command.baud if command.baud is not None else DEFAULT_BAUD
+        address = (
+            command.switch_address
+            if command.switch_address is not None
+            else DEFAULT_ADDRESS
+        )
+
+        try:
+            await asyncio.to_thread(self._relay.connect, command.port, baud, address)
+            status = self._relay.status().to_dict()
+            await self._clients.broadcast(event_relay_connected(status))
+            return response_relay_connect(
+                success=True,
+                relay=status,
+                req_id=command.req_id,
+            )
+        except Exception as exc:
+            return response_relay_connect(
+                success=False,
+                error=str(exc),
+                req_id=command.req_id,
+            )
+
+    async def _cmd_relay_disconnect(self, command: Command) -> Response:
+        """Close the USB LC relay serial port."""
+        try:
+            await asyncio.to_thread(self._relay.disconnect)
+            await self._clients.broadcast(event_relay_disconnected())
+            return response_relay_disconnect(success=True, req_id=command.req_id)
+        except Exception as exc:
+            return response_relay_disconnect(
+                success=False,
+                error=str(exc),
+                req_id=command.req_id,
+            )
+
+    async def _cmd_relay_status(self, command: Command) -> Response:
+        """Return current USB LC relay connection status."""
+        return response_relay_status(
+            self._relay.status().to_dict(),
+            req_id=command.req_id,
+        )
+
+    async def _cmd_relay_set(self, command: Command) -> Response:
+        """Turn the USB LC relay on or off."""
+        if command.on is None:
+            return response_relay_set(
+                success=False,
+                error="on is required (true/false)",
+                req_id=command.req_id,
+            )
+
+        try:
+            await asyncio.to_thread(self._relay.set, bool(command.on))
+            status = self._relay.status().to_dict()
+            await self._clients.broadcast(
+                event_relay_state_changed(bool(command.on), status)
+            )
+            return response_relay_set(
+                success=True,
+                on=bool(command.on),
+                relay=status,
+                req_id=command.req_id,
+            )
+        except Exception as exc:
+            return response_relay_set(
+                success=False,
+                error=str(exc),
+                req_id=command.req_id,
+            )
+
+    async def _cmd_relay_pulse(self, command: Command) -> Response:
+        """Pulse the USB LC relay for solenoid recoil feedback."""
+        duration_ms = command.duration_ms if command.duration_ms is not None else 40
+
+        try:
+            await asyncio.to_thread(self._relay.pulse, duration_ms)
+            status = self._relay.status().to_dict()
+            await self._clients.broadcast(event_relay_pulsed(duration_ms, status))
+            return response_relay_pulse(
+                success=True,
+                duration_ms=duration_ms,
+                relay=status,
+                req_id=command.req_id,
+            )
+        except Exception as exc:
+            return response_relay_pulse(
+                success=False,
+                duration_ms=duration_ms,
+                error=str(exc),
+                req_id=command.req_id,
+            )
 
 
 def run_daemon(

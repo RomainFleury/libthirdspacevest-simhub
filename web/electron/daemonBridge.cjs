@@ -1079,6 +1079,96 @@ class DaemonBridge extends EventEmitter {
       return { success: false, error: error.message };
     }
   }
+
+  // -------------------------------------------------------------------------
+  // USB LC relay / solenoid recoil
+  // -------------------------------------------------------------------------
+
+  async relayListPorts() {
+    try {
+      const response = await this.sendCommand("relay_list_ports");
+      return {
+        success: true,
+        ports: response.ports ?? [],
+      };
+    } catch (error) {
+      return { success: false, ports: [], error: error.message };
+    }
+  }
+
+  async relayConnect(port, baud = 9600, switchAddress = 1) {
+    try {
+      const response = await this.sendCommand("relay_connect", {
+        port,
+        baud,
+        switch_address: switchAddress,
+      });
+      return {
+        success: response.success ?? response.ok ?? false,
+        relay: response.relay,
+        error: response.message,
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  async relayDisconnect() {
+    try {
+      const response = await this.sendCommand("relay_disconnect");
+      return {
+        success: response.success ?? response.ok ?? true,
+        error: response.message,
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  async relayStatus() {
+    try {
+      const response = await this.sendCommand("relay_status");
+      return {
+        success: true,
+        connected: response.connected ?? false,
+        relay: response.relay ?? null,
+      };
+    } catch (error) {
+      return { success: false, connected: false, relay: null, error: error.message };
+    }
+  }
+
+  async relaySet(on) {
+    try {
+      const response = await this.sendCommand("relay_set", { on: !!on });
+      return {
+        success: response.success ?? response.ok ?? false,
+        on: response.on,
+        relay: response.relay,
+        error: response.message,
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  async relayPulse(durationMs = 40) {
+    try {
+      const response = await this.sendCommand(
+        "relay_pulse",
+        { duration_ms: durationMs },
+        Math.max(10000, durationMs + 5000)
+      );
+      return {
+        success: response.success ?? response.ok ?? false,
+        duration_ms: response.duration_ms,
+        relay: response.relay,
+        error: response.message,
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
 }
 
 // Singleton instance

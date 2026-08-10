@@ -178,6 +178,57 @@ export type PlayEffectResult = {
   error?: string;
 };
 
+export type RelayPortInfo = {
+  device: string;
+  description: string;
+  hwid: string;
+  manufacturer?: string | null;
+  product?: string | null;
+  serial_number?: string | null;
+};
+
+export type RelayStatusInfo = {
+  connected: boolean;
+  port?: string | null;
+  baud?: number;
+  address?: number;
+  is_on?: boolean;
+  last_error?: string | null;
+};
+
+export type RelayListPortsResult = {
+  success: boolean;
+  ports: RelayPortInfo[];
+  error?: string;
+};
+
+export type RelayConnectResult = {
+  success: boolean;
+  relay?: RelayStatusInfo;
+  error?: string;
+};
+
+export type RelayStatusResult = {
+  success: boolean;
+  connected: boolean;
+  relay?: RelayStatusInfo | null;
+  error?: string;
+};
+
+export type RelaySetResult = {
+  success: boolean;
+  on?: boolean;
+  relay?: RelayStatusInfo;
+  error?: string;
+};
+
+export type RelayPulseResult = {
+  success: boolean;
+  duration_ms?: number;
+  relay?: RelayStatusInfo;
+  error?: string;
+};
+
 // -------------------------------------------------------------------------
 // Generic Screen Health Watcher types
 // -------------------------------------------------------------------------
@@ -509,6 +560,17 @@ declare global {
       playEffect: (effectName: string) => Promise<PlayEffectResult>;
       listEffectsLibrary: () => Promise<EffectsListResult>;
       stopEffect: () => Promise<{ success: boolean; error?: string }>;
+      // USB LC relay / solenoid recoil
+      relayListPorts: () => Promise<RelayListPortsResult>;
+      relayConnect: (
+        port: string,
+        baud?: number,
+        switchAddress?: number
+      ) => Promise<RelayConnectResult>;
+      relayDisconnect: () => Promise<{ success: boolean; error?: string }>;
+      relayStatus: () => Promise<RelayStatusResult>;
+      relaySet: (on: boolean) => Promise<RelaySetResult>;
+      relayPulse: (durationMs?: number) => Promise<RelayPulseResult>;
     };
   }
 }
@@ -894,4 +956,36 @@ export async function screenHealthDeleteProfile(profileId: string): Promise<Scre
  */
 export async function screenHealthGetProfile(profileId: string): Promise<ScreenHealthGetProfileResult> {
   return await ensureBridge().screenHealthGetProfile(profileId);
+}
+
+// -------------------------------------------------------------------------
+// USB LC relay / solenoid recoil
+// -------------------------------------------------------------------------
+
+export async function relayListPorts(): Promise<RelayListPortsResult> {
+  return await ensureBridge().relayListPorts();
+}
+
+export async function relayConnect(
+  port: string,
+  baud = 9600,
+  switchAddress = 1
+): Promise<RelayConnectResult> {
+  return await ensureBridge().relayConnect(port, baud, switchAddress);
+}
+
+export async function relayDisconnect(): Promise<{ success: boolean; error?: string }> {
+  return await ensureBridge().relayDisconnect();
+}
+
+export async function relayStatus(): Promise<RelayStatusResult> {
+  return await ensureBridge().relayStatus();
+}
+
+export async function relaySet(on: boolean): Promise<RelaySetResult> {
+  return await ensureBridge().relaySet(on);
+}
+
+export async function relayPulse(durationMs = 40): Promise<RelayPulseResult> {
+  return await ensureBridge().relayPulse(durationMs);
 }

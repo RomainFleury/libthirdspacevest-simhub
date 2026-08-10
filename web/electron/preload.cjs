@@ -131,4 +131,13 @@ contextBridge.exposeInMainWorld("vestBridge", {
   modsDownloadFile: (modId, fileName) => ipcRenderer.invoke("mods:downloadFile", modId, fileName),
   modsOpenFolder: (modId) => ipcRenderer.invoke("mods:openFolder", modId),
   modsGetReadme: (modId) => ipcRenderer.invoke("mods:getReadme", modId),
+
+  // USB LC relay / solenoid recoil
+  relayListPorts: () => ipcRenderer.invoke("relay:listPorts"),
+  relayConnect: (port, baud, switchAddress) =>
+    ipcRenderer.invoke("relay:connect", port, baud, switchAddress),
+  relayDisconnect: () => ipcRenderer.invoke("relay:disconnect"),
+  relayStatus: () => ipcRenderer.invoke("relay:status"),
+  relaySet: (on) => ipcRenderer.invoke("relay:set", on),
+  relayPulse: (durationMs) => ipcRenderer.invoke("relay:pulse", durationMs),
 });

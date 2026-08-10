@@ -15,6 +15,7 @@ const { registerEffectsHandlers } = require("./effectsHandlers.cjs");
 const { registerScreenHealthHandlers } = require("./screenHealthHandlers.cjs");
 const { registerMultiVestHandlers } = require("./multiVestHandlers.cjs");
 const { registerModsHandlers } = require("./modsHandlers.cjs");
+const { registerRelayHandlers } = require("./relayHandlers.cjs");
 
 /**
  * Register all IPC handlers.
@@ -50,6 +51,9 @@ function registerAllHandlers(getDaemonBridge, getMainWindow, reconnectToDaemon) 
   // Bundled game mods handlers
   registerModsHandlers(getMainWindow);
 
+  // USB LC relay / solenoid recoil
+  registerRelayHandlers();
+
   console.log("✓ IPC handlers registered");
 }
 
@@ -61,5 +65,6 @@ module.exports = {
   registerAlyxHandlers,
   registerEffectsHandlers,
   registerScreenHealthHandlers,
+  registerRelayHandlers,
 };
 

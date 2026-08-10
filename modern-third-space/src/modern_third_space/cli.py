@@ -352,6 +352,28 @@ def _cs2_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_relay(args: argparse.Namespace) -> int:
+    """Handle relay subcommands (standalone serial, no daemon required)."""
+    from .relay_cli import main as relay_main
+
+    action = getattr(args, "relay_action", None)
+    if not action:
+        print("Usage: relay {list,connect,on,off,pulse}")
+        return 1
+
+    # Rebuild argv for relay_cli
+    argv = [action]
+    if getattr(args, "port", None):
+        argv.extend(["--port", args.port])
+    if getattr(args, "baud", None) is not None and action != "list":
+        argv.extend(["--baud", str(args.baud)])
+    if getattr(args, "address", None) is not None and action != "list":
+        argv.extend(["--address", str(args.address)])
+    if action == "pulse" and getattr(args, "ms", None) is not None:
+        argv.extend(["--ms", str(args.ms)])
+    return relay_main(argv)
+
+
 COMMANDS: Dict[str, Any] = {
     "status": _cmd_status,
     "trigger": _cmd_trigger,
@@ -362,6 +384,7 @@ COMMANDS: Dict[str, Any] = {
     "connect": _cmd_connect,
     "daemon": _cmd_daemon,
     "cs2": _cmd_cs2,
+    "relay": _cmd_relay,
 }
 
 
@@ -457,6 +480,32 @@ def build_parser() -> argparse.ArgumentParser:
     cs2_status = cs2_sub.add_parser("status", help="Check CS2 GSI status")
     cs2_status.add_argument("--gsi-port", type=int, default=3000, help="GSI server port")
     cs2_status.add_argument("--daemon-host", type=str, default="127.0.0.1", help="Vest daemon host")
+
+    # -------------------------------------------------------------------------
+    # USB LC relay / solenoid recoil
+    # -------------------------------------------------------------------------
+    relay = sub.add_parser("relay", help="USB LC relay / solenoid recoil (standalone serial)")
+    relay_sub = relay.add_subparsers(dest="relay_action")
+
+    relay_sub.add_parser("list", help="List serial ports")
+
+    def _add_relay_port_args(p: argparse.ArgumentParser) -> None:
+        p.add_argument("--port", required=True, help="Serial port (e.g. COM3)")
+        p.add_argument("--baud", type=int, default=9600, help="Baud rate (default 9600)")
+        p.add_argument("--address", type=int, default=1, help="Switch address (default 1)")
+
+    relay_connect = relay_sub.add_parser("connect", help="Open port and report status")
+    _add_relay_port_args(relay_connect)
+
+    relay_on = relay_sub.add_parser("on", help="Turn relay ON")
+    _add_relay_port_args(relay_on)
+
+    relay_off = relay_sub.add_parser("off", help="Turn relay OFF")
+    _add_relay_port_args(relay_off)
+
+    relay_pulse = relay_sub.add_parser("pulse", help="Pulse relay for recoil")
+    _add_relay_port_args(relay_pulse)
+    relay_pulse.add_argument("--ms", type=int, default=40, help="Pulse duration in ms")
     
     return parser
 
@@ -480,6 +529,8 @@ def main(argv: list[str] | None = None) -> int:
     if command == "daemon":
         return handler(args)
     if command == "cs2":
+        return handler(args)
+    if command == "relay":
         return handler(args)
     
     # Commands that need a controller
