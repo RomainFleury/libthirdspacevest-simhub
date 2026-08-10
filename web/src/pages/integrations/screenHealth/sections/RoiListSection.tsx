@@ -6,6 +6,7 @@ import { useScreenHealthProfileDraft, useScreenHealthProfileDraftControls } from
 import { useScreenHealthRednessDraft, useScreenHealthRednessDraftControls } from "../draft/RednessDraftContext";
 import { useScreenHealthHealthBarDraft, useScreenHealthHealthBarDraftControls } from "../draft/HealthBarDraftContext";
 import { useScreenHealthHealthNumberDraft, useScreenHealthHealthNumberDraftControls } from "../draft/HealthNumberDraftContext";
+import { useScreenHealthRecoilDraftControls } from "../draft/RecoilDraftContext";
 import { clamp01 } from "../utils";
 import type { RoiRect } from "../draft/types";
 
@@ -49,6 +50,7 @@ export function RoiListSection(props: {
   const { readDraft: readHealthBarDraft, setRoi: setHealthBarRoi } = useScreenHealthHealthBarDraftControls();
   const hn = useScreenHealthHealthNumberDraft();
   const { readDraft: readHealthNumberDraft, setRoi: setHealthNumberRoi } = useScreenHealthHealthNumberDraftControls();
+  const { readDraft: readRecoilDraft } = useScreenHealthRecoilDraftControls();
 
   const [evaluating, setEvaluating] = useState(false);
   const [evalError, setEvalError] = useState<string | null>(null);
@@ -83,6 +85,7 @@ export function RoiListSection(props: {
         redness: readRednessDraft(),
         hb: readHealthBarDraft(),
         hn: readHealthNumberDraft(),
+        recoil: readRecoilDraft(),
         presets: PRESETS,
       });
       const result = await evaluateProfileOnScreenshot(daemonProfile, imagePath);

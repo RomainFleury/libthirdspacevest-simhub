@@ -183,6 +183,7 @@ class VestDaemon:
         self._screen_health_manager = ScreenHealthManager(
             on_game_event=self._on_screen_health_game_event,
             on_trigger=self._on_screen_health_trigger,
+            on_recoil=self._on_solenoid_recoil,
         )
 
         # USB LC relay (solenoid / recoil)

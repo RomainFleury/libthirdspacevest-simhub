@@ -81,8 +81,10 @@ def test_manager_cooldown_prevents_hit_spam(monkeypatch):
             # Always return pure red ROI (score=1)
             return bytes([0, 0, 255, 255] * (width * height))
 
-    # Replace the mss backend with our fake.
-    monkeypatch.setattr(shm, "_MSSCaptureBackend", FakeCapture)
+        def capture_multiple_bgra(self, regions):
+            return [self.capture_bgra(l, t, w, h) for l, t, w, h in regions]
+
+    monkeypatch.setattr(shm, "_create_capture_backend", lambda *, monitor_index: FakeCapture(monitor_index))
 
     events = []
 
@@ -127,7 +129,10 @@ def test_profile_allows_meta_and_rejects_invalid_direction(monkeypatch):
         def capture_bgra(self, left: int, top: int, width: int, height: int) -> bytes:
             return bytes([0, 0, 0, 255] * (width * height))
 
-    monkeypatch.setattr(shm, "_MSSCaptureBackend", FakeCapture)
+        def capture_multiple_bgra(self, regions):
+            return [self.capture_bgra(l, t, w, h) for l, t, w, h in regions]
+
+    monkeypatch.setattr(shm, "_create_capture_backend", lambda *, monitor_index: FakeCapture(monitor_index))
 
     manager = shm.ScreenHealthManager(on_game_event=lambda *_: None, on_trigger=lambda *_: None)
 
@@ -202,7 +207,10 @@ def test_manager_health_bar_hit_on_decrease(monkeypatch):
                     raw.extend(px(filled if x < filled_cols else empty))
             return bytes(raw)
 
-    monkeypatch.setattr(shm, "_MSSCaptureBackend", FakeCapture)
+        def capture_multiple_bgra(self, regions):
+            return [self.capture_bgra(l, t, w, h) for l, t, w, h in regions]
+
+    monkeypatch.setattr(shm, "_create_capture_backend", lambda *, monitor_index: FakeCapture(monitor_index))
 
     events = []
 
@@ -399,6 +407,44 @@ def test_health_number_try_read_rejects_value_outside_range():
     bits = _render_digits_bits("555", templates, w, h)
     manager = shm.ScreenHealthManager(on_game_event=lambda *_: None, on_trigger=lambda *_: None)
     assert manager._health_number_try_read(bits, bw=3 * w, bh=h, hn=hn) is None
+
+
+def test_parse_profile_recoil_ammo_number():
+    manager = shm.ScreenHealthManager()
+    profile = {
+        "schema_version": 0,
+        "name": "with_recoil",
+        "capture": {"monitor_index": 1, "tick_ms": 50},
+        "detectors": [
+            {
+                "type": "redness_rois",
+                "cooldown_ms": 200,
+                "threshold": {"min_score": 0.35},
+                "rois": [{"name": "r1", "rect": {"x": 0, "y": 0, "w": 0.1, "h": 0.1}}],
+            }
+        ],
+        "recoil": {
+            "type": "ammo_number",
+            "duration_ms": 45,
+            "roi": {"x": 0.8, "y": 0.9, "w": 0.08, "h": 0.04},
+            "digits": 2,
+            "preprocess": {"invert": False, "threshold": 0.6, "scale": 2},
+            "readout": {"min": 0, "max": 99, "stable_reads": 1},
+            "hit_on_decrease": {"min_drop": 1, "cooldown_ms": 50},
+            "templates": {
+                "template_set_id": "t",
+                "hamming_max": 120,
+                "width": 2,
+                "height": 2,
+                "digits": {"0": "0000", "1": "1111"},
+            },
+        },
+    }
+    parsed = manager._parse_profile(profile)
+    assert len(parsed.ammo_numbers) == 1
+    assert parsed.ammo_numbers[0].name == "ammo_number"
+    assert parsed.recoil_duration_ms == 45
+    assert parsed.ammo_numbers[0].templates is not None
 
 
 def test_debug_write_bmp_bgra_writes_valid_header(tmp_path):

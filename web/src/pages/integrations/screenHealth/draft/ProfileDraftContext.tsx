@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, useRef, useState } from "react";
-import type { DetectorType } from "./types";
+import type { CanvasEditTarget, DetectorType } from "./types";
 
 type ProfileDraftState = {
   selectedPresetId: string;
@@ -9,6 +9,8 @@ type ProfileDraftState = {
   tickMs: number;
   /** When set, "Update" overwrites this local profile id; cleared for presets / JSON load. */
   editingLocalProfileId: string | null;
+  /** Calibration canvas drag target (damage detector vs recoil ammo ROI). */
+  canvasEditTarget: CanvasEditTarget;
 };
 
 type StateCtx = ProfileDraftState;
@@ -20,6 +22,7 @@ type ActionsCtx = {
   setMonitorIndex: (v: number) => void;
   setTickMs: (v: number) => void;
   setEditingLocalProfileId: (v: string | null) => void;
+  setCanvasEditTarget: (v: CanvasEditTarget) => void;
   replaceAll: (next: Partial<ProfileDraftState>) => void;
   readDraft: () => ProfileDraftState;
 };
@@ -35,6 +38,7 @@ export function ScreenHealthProfileDraftProvider(props: { defaultPresetId: strin
     monitorIndex: 1,
     tickMs: 50,
     editingLocalProfileId: null,
+    canvasEditTarget: "detector",
   };
   const [state, setState] = useState<ProfileDraftState>(initial);
   const stateRef = useRef<ProfileDraftState>(initial);
@@ -55,6 +59,7 @@ export function ScreenHealthProfileDraftProvider(props: { defaultPresetId: strin
       setMonitorIndex: (v) => setStateAndRef((p) => ({ ...p, monitorIndex: v })),
       setTickMs: (v) => setStateAndRef((p) => ({ ...p, tickMs: v })),
       setEditingLocalProfileId: (v) => setStateAndRef((p) => ({ ...p, editingLocalProfileId: v })),
+      setCanvasEditTarget: (v) => setStateAndRef((p) => ({ ...p, canvasEditTarget: v })),
       replaceAll: (next) => setStateAndRef((p) => ({ ...p, ...next })),
       readDraft: () => stateRef.current,
     };

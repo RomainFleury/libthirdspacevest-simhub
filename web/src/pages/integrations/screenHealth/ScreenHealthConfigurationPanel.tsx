@@ -15,20 +15,28 @@ import {
   useScreenHealthProfileDraft,
 } from "./draft/ProfileDraftContext";
 import {
+  ScreenHealthRecoilDraftProvider,
+  useScreenHealthRecoilDraft,
+  useScreenHealthRecoilDraftControls,
+} from "./draft/RecoilDraftContext";
+import {
   ScreenHealthRednessDraftProvider,
   useScreenHealthRednessDraftControls,
 } from "./draft/RednessDraftContext";
 import { CalibrationCanvasSection } from "./sections/CalibrationCanvasSection";
 import { CaptureSettingsSection } from "./sections/CaptureSettingsSection";
 import { DetectorSelectionSection } from "./sections/DetectorSelectionSection";
+import { AmmoNumberRecoilSettings } from "./sections/AmmoNumberRecoilSettings";
 import { HealthBarSettings } from "./sections/HealthBarSettings";
 import { HealthNumberSettings } from "./sections/HealthNumberSettings";
 import { PresetProfilesSection } from "./sections/PresetProfilesSection";
 import { ProfileControlsSection } from "./sections/ProfileControlsSection";
+import { RecoilSelectionSection } from "./sections/RecoilSelectionSection";
 import { RednessSettings } from "./sections/RednessSettings";
 import { RoiListSection } from "./sections/RoiListSection";
 import { ScreenshotsSection } from "./sections/ScreenshotsSection";
 import { buildScreenHealthDaemonProfile } from "./buildDaemonProfile";
+import { recoilDraftFromProfile } from "./recoilFromProfile";
 import { clamp01, clampInt } from "./utils";
 import { screenHealthExportProfile, screenHealthLoadProfile } from "../../../lib/bridgeApi";
 
@@ -64,14 +72,16 @@ export function ScreenHealthConfigurationPanel(props: Props) {
       <ScreenHealthRednessDraftProvider>
         <ScreenHealthHealthBarDraftProvider>
           <ScreenHealthHealthNumberDraftProvider>
-            <ScreenHealthCalibrationProvider dataUrl={dataUrl}>
-              <DraftFromSelectedPresetSync 
-                presets={SCREEN_HEALTH_PRESETS as any} 
-                loadFromProfileId={props.loadFromProfileId}
-                profiles={props.profiles}
-              />
-              <ScreenHealthConfigurationPanelInner {...props} />
-            </ScreenHealthCalibrationProvider>
+            <ScreenHealthRecoilDraftProvider>
+              <ScreenHealthCalibrationProvider dataUrl={dataUrl}>
+                <DraftFromSelectedPresetSync
+                  presets={SCREEN_HEALTH_PRESETS as any}
+                  loadFromProfileId={props.loadFromProfileId}
+                  profiles={props.profiles}
+                />
+                <ScreenHealthConfigurationPanelInner {...props} />
+              </ScreenHealthCalibrationProvider>
+            </ScreenHealthRecoilDraftProvider>
           </ScreenHealthHealthNumberDraftProvider>
         </ScreenHealthHealthBarDraftProvider>
       </ScreenHealthRednessDraftProvider>
@@ -115,6 +125,9 @@ function ScreenHealthConfigurationPanelInner(props: Props) {
 
       <DetectorSettingsSwitch />
 
+      <RecoilSelectionSection />
+      <RecoilSettingsSwitch />
+
       <RoiListSection
         lastCapturedImage={lastCapturedImage}
         evaluateProfileOnScreenshot={evaluateProfileOnScreenshot}
@@ -138,6 +151,12 @@ function DetectorSettingsSwitch() {
   return <HealthNumberSettings />;
 }
 
+function RecoilSettingsSwitch() {
+  const recoil = useScreenHealthRecoilDraft();
+  if (recoil.recoilType !== "ammo_number") return null;
+  return <AmmoNumberRecoilSettings />;
+}
+
 function DraftFromSelectedPresetSync(props: { 
   presets: Array<{ preset_id: string; display_name: string; profile: any }>;
   loadFromProfileId?: string;
@@ -154,8 +173,13 @@ function DraftFromSelectedPresetSync(props: {
   const { replaceAll: replaceRednessDraft } = useScreenHealthRednessDraftControls();
   const { replaceAll: replaceHealthBarDraft, setColorPickMode } = useScreenHealthHealthBarDraftControls();
   const { replaceAll: replaceHealthNumberDraft } = useScreenHealthHealthNumberDraftControls();
+  const { replaceAll: replaceRecoilDraft } = useScreenHealthRecoilDraftControls();
   const lastAppliedPresetIdRef = useRef<string | null>(null);
   const hasLoadedFromIdRef = useRef(false);
+
+  const applyRecoil = (p: any) => {
+    replaceRecoilDraft(recoilDraftFromProfile(p));
+  };
 
   // Load from profile ID on mount if specified
   useEffect(() => {
@@ -205,6 +229,7 @@ function DraftFromSelectedPresetSync(props: {
             calibrationError: null,
             testResult: null,
           });
+          applyRecoil(p);
           setColorPickMode(null);
           return;
         }
@@ -240,6 +265,7 @@ function DraftFromSelectedPresetSync(props: {
             hitCooldownMs: Number(hbD.hit_on_decrease?.cooldown_ms ?? 150),
             colorPickMode: null,
           });
+          applyRecoil(p);
           setColorPickMode(null);
           return;
         }
@@ -259,10 +285,11 @@ function DraftFromSelectedPresetSync(props: {
             },
           })),
         });
+        applyRecoil(p);
         setColorPickMode(null);
       }
     }
-  }, [loadFromProfileId, profiles, replaceProfileDraft, setDetectorType, replaceHealthNumberDraft, replaceHealthBarDraft, replaceRednessDraft, setColorPickMode]);
+  }, [loadFromProfileId, profiles, replaceProfileDraft, setDetectorType, replaceHealthNumberDraft, replaceHealthBarDraft, replaceRednessDraft, replaceRecoilDraft, setColorPickMode]);
 
   useEffect(() => {
     const presetId = profileState.selectedPresetId;
@@ -315,6 +342,7 @@ function DraftFromSelectedPresetSync(props: {
             calibrationError: null,
             testResult: null,
           });
+          applyRecoil(p);
           setColorPickMode(null);
           return;
         }
@@ -350,6 +378,7 @@ function DraftFromSelectedPresetSync(props: {
             hitCooldownMs: Number(hbD.hit_on_decrease?.cooldown_ms ?? 150),
             colorPickMode: null,
           });
+          applyRecoil(p);
           setColorPickMode(null);
           return;
         }
@@ -369,6 +398,7 @@ function DraftFromSelectedPresetSync(props: {
             },
           })),
         });
+        applyRecoil(p);
         setColorPickMode(null);
         return;
       }
@@ -420,6 +450,7 @@ function DraftFromSelectedPresetSync(props: {
         calibrationError: null,
         testResult: null,
       });
+      applyRecoil(p);
       setColorPickMode(null);
       return;
     }
@@ -455,6 +486,7 @@ function DraftFromSelectedPresetSync(props: {
         hitCooldownMs: Number(hbD.hit_on_decrease?.cooldown_ms ?? 150),
         colorPickMode: null,
       });
+      applyRecoil(p);
       return;
     }
 
@@ -473,6 +505,7 @@ function DraftFromSelectedPresetSync(props: {
         },
       })),
     });
+    applyRecoil(p);
     setColorPickMode(null);
   }, [
     presets,
@@ -483,6 +516,7 @@ function DraftFromSelectedPresetSync(props: {
     replaceHealthBarDraft,
     setColorPickMode,
     replaceHealthNumberDraft,
+    replaceRecoilDraft,
     setEditingLocalProfileId,
   ]);
 
@@ -510,6 +544,11 @@ function ProfileActionsController(props: {
   const { readDraft: readHealthBarDraft, replaceAll: replaceHealthBarDraft, setColorPickMode } = useScreenHealthHealthBarDraftControls();
   const { readDraft: readHealthNumberDraft, replaceAll: replaceHealthNumberDraft } = useScreenHealthHealthNumberDraftControls();
   const { replaceAll: replaceRednessDraft } = useScreenHealthRednessDraftControls();
+  const { readDraft: readRecoilDraft, replaceAll: replaceRecoilDraft } = useScreenHealthRecoilDraftControls();
+
+  const applyRecoil = (p: any) => {
+    replaceRecoilDraft(recoilDraftFromProfile(p));
+  };
 
   const [exportError, setExportError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -523,6 +562,7 @@ function ProfileActionsController(props: {
       redness: readRednessDraft(),
       hb: readHealthBarDraft(),
       hn: readHealthNumberDraft(),
+      recoil: readRecoilDraft(),
       presets,
     });
 
@@ -590,6 +630,7 @@ function ProfileActionsController(props: {
           calibrationError: null,
           testResult: null,
         });
+        applyRecoil(p);
         setColorPickMode(null);
         return;
       }
@@ -625,6 +666,7 @@ function ProfileActionsController(props: {
           hitCooldownMs: Number(hbD.hit_on_decrease?.cooldown_ms ?? 150),
           colorPickMode: null,
         });
+        applyRecoil(p);
         setColorPickMode(null);
         return;
       }
@@ -644,6 +686,7 @@ function ProfileActionsController(props: {
           },
         })),
       });
+      applyRecoil(p);
       setColorPickMode(null);
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : "Failed to load profile");

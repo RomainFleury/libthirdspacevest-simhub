@@ -22,7 +22,7 @@ import struct
 import threading
 import time
 from pathlib import Path
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
@@ -495,6 +495,8 @@ class ScreenHealthProfile:
     redness_detector: Optional[RednessDetectorConfig]
     health_bars: List[HealthBarDetector]
     health_numbers: List[HealthNumberDetector]
+    ammo_numbers: List[HealthNumberDetector] = field(default_factory=list)
+    recoil_duration_ms: int = 40
     debug: Optional[ScreenHealthDebugConfig] = None
 
 
@@ -546,6 +548,7 @@ class ScreenHealthManager:
     Callbacks:
     - on_game_event(event_type: str, params: dict)
     - on_trigger(cell: int, speed: int)
+    - on_recoil(duration_ms: int)  # USB relay / solenoid pulse
     """
 
     _BATCH_CAPTURE_FAIL_LOG_INTERVAL_S = 10.0
@@ -554,9 +557,11 @@ class ScreenHealthManager:
         self,
         on_game_event: Optional[Callable[[str, Dict[str, Any]], None]] = None,
         on_trigger: Optional[Callable[[int, int], None]] = None,
+        on_recoil: Optional[Callable[[int], None]] = None,
     ) -> None:
         self._on_game_event = on_game_event
         self._on_trigger = on_trigger
+        self._on_recoil = on_recoil
 
         self._thread: Optional[threading.Thread] = None
         self._stop_evt = threading.Event()
@@ -577,6 +582,7 @@ class ScreenHealthManager:
         self.events_received = 0
         self.last_event_ts: Optional[float] = None
         self.last_hit_ts: Optional[float] = None
+        self.last_recoil_ts: Optional[float] = None
 
         # Cooldown state
         self._last_hit_by_roi: Dict[str, float] = {}
@@ -638,6 +644,7 @@ class ScreenHealthManager:
             "events_received": self.events_received,
             "last_event_ts": self.last_event_ts,
             "last_hit_ts": self.last_hit_ts,
+            "last_recoil_ts": self.last_recoil_ts,
             "debug_log_values": self._debug_log_values,
             "debug_save_roi_images": self._debug_save_roi_images,
             "debug_save_dir": str(self._debug_save_dir) if self._debug_save_dir else None,
@@ -736,6 +743,19 @@ class ScreenHealthManager:
             left, top, w, h = normalized_rect_to_pixels(hn.rect, frame_w, frame_h)
             all_regions.append(("health_number", hn, hn.name, left, top, w, h))
 
+        for an in parsed.ammo_numbers:
+            if an.templates is None:
+                detectors_out.append(
+                    {
+                        "type": "ammo_number",
+                        "name": an.name,
+                        "error": "missing templates",
+                    }
+                )
+                continue
+            left, top, w, h = normalized_rect_to_pixels(an.rect, frame_w, frame_h)
+            all_regions.append(("ammo_number", an, an.name, left, top, w, h))
+
         # Single batch capture for all regions
         if not all_regions:
             total_ms = (time.perf_counter() - t0) * 1000.0
@@ -816,7 +836,7 @@ class ScreenHealthManager:
                     }
                 )
 
-            elif detector_type == "health_number":
+            elif detector_type in ("health_number", "ammo_number"):
                 hn = detector_obj
                 bits, bw, bh = binarize_bgra_to_bitmap(
                     raw,
@@ -831,7 +851,7 @@ class ScreenHealthManager:
 
                 detectors_out.append(
                     {
-                        "type": "health_number",
+                        "type": detector_type,
                         "name": hn.name,
                         "rect_px": {"left": left, "top": top, "w": w, "h": h},
                         "read": int(value) if value is not None else None,
@@ -839,7 +859,7 @@ class ScreenHealthManager:
                         "hamming_max": int(hn.templates.hamming_max),
                         "capture_ms": cap_ms,
                         "eval_ms": eval_ms,
-                        "image_path": save_crop("health_number", hn.name, raw, w, h),
+                        "image_path": save_crop(detector_type, hn.name, raw, w, h),
                     }
                 )
 
@@ -871,6 +891,7 @@ class ScreenHealthManager:
         self.events_received = 0
         self.last_event_ts = None
         self.last_hit_ts = None
+        self.last_recoil_ts = None
 
         # Cooldowns
         self._last_hit_by_roi.clear()
@@ -1053,6 +1074,13 @@ class ScreenHealthManager:
         cell = int(random.choice(list(ALL_CELLS)))
         self._on_trigger(cell, speed)
 
+    def _trigger_recoil(self, duration_ms: int) -> None:
+        """Pulse USB relay / solenoid (no vest)."""
+        if not self._on_recoil:
+            return
+        self.last_recoil_ts = time.time()
+        self._on_recoil(int(duration_ms))
+
     def _run_loop(self) -> None:
         assert self._profile is not None
         profile = self._profile
@@ -1101,6 +1129,15 @@ class ScreenHealthManager:
                     continue  # Can't run OCR without templates
                 left, top, w, h = normalized_rect_to_pixels(hn.rect, frame_w, frame_h)
                 all_regions.append(("health_number", hn, hn.name, left, top, w, h))
+
+            # Ammo numbers → solenoid recoil (independent channel)
+            for an in profile.ammo_numbers:
+                if self._stop_evt.is_set():
+                    break
+                if an.templates is None:
+                    continue
+                left, top, w, h = normalized_rect_to_pixels(an.rect, frame_w, frame_h)
+                all_regions.append(("ammo_number", an, an.name, left, top, w, h))
 
             # Single batch capture for all regions
             if not all_regions:
@@ -1334,9 +1371,10 @@ class ScreenHealthManager:
                     # Map intensity to drop, but keep within [0,1]
                     self._trigger_hit(intensity=max(0.0, min(1.0, drop)))
 
-                # Health number OCR (Phase D)
-                elif detector_type == "health_number":
+                # Health / ammo number OCR (Phase D + recoil)
+                elif detector_type in ("health_number", "ammo_number"):
                     hn = detector_obj
+                    is_ammo = detector_type == "ammo_number"
                     bits, bw, bh = binarize_bgra_to_bitmap(
                         raw_bgra,
                         w,
@@ -1410,7 +1448,7 @@ class ScreenHealthManager:
                     if last_emitted is None or last_emitted != value:
                         self._last_health_value_emitted[hn.name] = value
                         self._emit_game_event(
-                            "health_value",
+                            "ammo_value" if is_ammo else "health_value",
                             {
                                 "detector": hn.name,
                                 "value": value,
@@ -1428,17 +1466,20 @@ class ScreenHealthManager:
                         continue
 
                     now = time.time()
-                    key = f"health_number:{hn.name}"
+                    key = f"{'ammo_number' if is_ammo else 'health_number'}:{hn.name}"
                     last_hit = self._last_hit_by_roi.get(key, 0.0)
                     if (now - last_hit) * 1000.0 < hn.hit_on_decrease.cooldown_ms:
                         continue
 
                     self._last_hit_by_roi[key] = now
-                    self.last_hit_ts = now
+                    if is_ammo:
+                        self.last_recoil_ts = now
+                    else:
+                        self.last_hit_ts = now
 
                     saved = self._debug_maybe_save_roi(
-                        key=f"health_number_hit:{hn.name}",
-                        kind="health_number_hit",
+                        key=f"{'ammo_number' if is_ammo else 'health_number'}_hit:{hn.name}",
+                        kind="ammo_number_hit" if is_ammo else "health_number_hit",
                         name=hn.name,
                         raw_bgra=raw_bgra,
                         width=w,
@@ -1448,7 +1489,8 @@ class ScreenHealthManager:
                     )
                     if self._debug_log_values:
                         logger.info(
-                            "[screen_health] HIT health_number detector=%s prev=%s now=%s drop=%s saved=%s",
+                            "[screen_health] %s detector=%s prev=%s now=%s drop=%s saved=%s",
+                            "RECOIL ammo_number" if is_ammo else "HIT health_number",
                             hn.name,
                             int(prev_val),
                             int(value),
@@ -1456,19 +1498,33 @@ class ScreenHealthManager:
                             saved,
                         )
 
-                    self._emit_game_event(
-                        "hit_recorded",
-                        {
-                            "roi": hn.name,
-                            "direction": None,
-                            "score": max(0.0, min(1.0, float(drop_i) / 25.0)),
-                            "source": "health_number",
-                            "value": value,
-                            "prev_value": int(prev_val),
-                            "drop": drop_i,
-                        },
-                    )
-                    self._trigger_hit(intensity=max(0.0, min(1.0, float(drop_i) / 25.0)))
+                    if is_ammo:
+                        self._emit_game_event(
+                            "recoil_fired",
+                            {
+                                "roi": hn.name,
+                                "source": "ammo_number",
+                                "value": value,
+                                "prev_value": int(prev_val),
+                                "drop": drop_i,
+                                "duration_ms": int(profile.recoil_duration_ms),
+                            },
+                        )
+                        self._trigger_recoil(profile.recoil_duration_ms)
+                    else:
+                        self._emit_game_event(
+                            "hit_recorded",
+                            {
+                                "roi": hn.name,
+                                "direction": None,
+                                "score": max(0.0, min(1.0, float(drop_i) / 25.0)),
+                                "source": "health_number",
+                                "value": value,
+                                "prev_value": int(prev_val),
+                                "drop": drop_i,
+                            },
+                        )
+                        self._trigger_hit(intensity=max(0.0, min(1.0, float(drop_i) / 25.0)))
 
             elapsed = time.time() - loop_start
             sleep_for = tick_s - elapsed
@@ -1630,97 +1686,22 @@ class ScreenHealthManager:
                 continue
 
             if d_type == "health_number":
-                name_raw = d.get("name") or "health_number"
-                name = str(name_raw)
-
-                roi = d.get("roi")
-                if not isinstance(roi, dict):
-                    raise ValueError("health_number.roi is required")
-                rect = NormalizedRect(
-                    x=float(roi.get("x", 0)),
-                    y=float(roi.get("y", 0)),
-                    w=float(roi.get("w", 0)),
-                    h=float(roi.get("h", 0)),
-                )
-                rect.validate()
-
-                digits = int(d.get("digits", 0))
-                if digits < 1:
-                    raise ValueError("health_number.digits must be >= 1")
-
-                preprocess_data = d.get("preprocess")
-                if not isinstance(preprocess_data, dict):
-                    raise ValueError("health_number.preprocess is required")
-                preprocess = HealthNumberPreprocess(
-                    invert=bool(preprocess_data.get("invert", False)),
-                    threshold=float(preprocess_data.get("threshold", 0.6)),
-                    scale=int(preprocess_data.get("scale", 1)),
-                )
-                preprocess.validate()
-
-                readout_data = d.get("readout")
-                if not isinstance(readout_data, dict):
-                    raise ValueError("health_number.readout is required")
-                readout = HealthNumberReadout(
-                    min_value=int(readout_data.get("min", 0)),
-                    max_value=int(readout_data.get("max", 999)),
-                    stable_reads=int(readout_data.get("stable_reads", 1)),
-                )
-                readout.validate()
-
-                hod_data = d.get("hit_on_decrease")
-                if not isinstance(hod_data, dict):
-                    raise ValueError("health_number.hit_on_decrease is required")
-                hit_on_decrease = HealthNumberHitOnDecrease(
-                    min_drop=int(hod_data.get("min_drop", 1)),
-                    cooldown_ms=int(hod_data.get("cooldown_ms", 150)),
-                )
-                hit_on_decrease.validate()
-
-                templates: Optional[HealthNumberTemplates] = None
-                templates_data = d.get("templates")
-                if isinstance(templates_data, dict):
-                    t_id = str(templates_data.get("template_set_id") or "learned_v1")
-                    hamming_max = int(templates_data.get("hamming_max", 120))
-                    t_w = int(templates_data.get("width", 0))
-                    t_h = int(templates_data.get("height", 0))
-                    digits_map = templates_data.get("digits")
-                    parsed_digits: Dict[str, List[int]] = {}
-                    if isinstance(digits_map, dict) and t_w > 0 and t_h > 0:
-                        expected = t_w * t_h
-                        for k, v in digits_map.items():
-                            kk = str(k)
-                            if isinstance(v, str):
-                                if len(v) != expected:
-                                    continue
-                                parsed_digits[kk] = [1 if ch == "1" else 0 for ch in v]
-                            elif isinstance(v, list) and len(v) == expected:
-                                parsed_digits[kk] = [1 if int(x) else 0 for x in v]
-                    if parsed_digits:
-                        templates = HealthNumberTemplates(
-                            template_set_id=t_id,
-                            hamming_max=hamming_max,
-                            width=t_w,
-                            height=t_h,
-                            digits=parsed_digits,
-                        )
-                        templates.validate()
-
-                hn = HealthNumberDetector(
-                    name=name,
-                    rect=rect,
-                    digits=digits,
-                    preprocess=preprocess,
-                    readout=readout,
-                    hit_on_decrease=hit_on_decrease,
-                    templates=templates,
-                )
-                hn.validate()
-                health_numbers.append(hn)
+                health_numbers.append(self._parse_health_number_detector(d))
                 continue
 
         if redness_detector is None and not health_bars and not health_numbers:
             raise ValueError("profile.detectors must include at least one supported detector")
+
+        ammo_numbers: List[HealthNumberDetector] = []
+        recoil_duration_ms = 40
+        recoil_data = data.get("recoil")
+        if isinstance(recoil_data, dict) and str(recoil_data.get("type") or "") == "ammo_number":
+            recoil_duration_ms = max(1, int(recoil_data.get("duration_ms", 40)))
+            # Reuse health_number schema fields (roi/digits/preprocess/...)
+            ammo_dict = dict(recoil_data)
+            ammo_dict["type"] = "health_number"
+            ammo_dict["name"] = str(recoil_data.get("name") or "ammo_number")
+            ammo_numbers.append(self._parse_health_number_detector(ammo_dict))
 
         return ScreenHealthProfile(
             schema_version=schema_version,
@@ -1730,8 +1711,99 @@ class ScreenHealthManager:
             redness_detector=redness_detector,
             health_bars=health_bars,
             health_numbers=health_numbers,
+            ammo_numbers=ammo_numbers,
+            recoil_duration_ms=recoil_duration_ms,
             debug=debug_cfg,
         )
+
+    def _parse_health_number_detector(self, d: Dict[str, Any]) -> HealthNumberDetector:
+        name_raw = d.get("name") or "health_number"
+        name = str(name_raw)
+
+        roi = d.get("roi")
+        if not isinstance(roi, dict):
+            raise ValueError("health_number.roi is required")
+        rect = NormalizedRect(
+            x=float(roi.get("x", 0)),
+            y=float(roi.get("y", 0)),
+            w=float(roi.get("w", 0)),
+            h=float(roi.get("h", 0)),
+        )
+        rect.validate()
+
+        digits = int(d.get("digits", 0))
+        if digits < 1:
+            raise ValueError("health_number.digits must be >= 1")
+
+        preprocess_data = d.get("preprocess")
+        if not isinstance(preprocess_data, dict):
+            raise ValueError("health_number.preprocess is required")
+        preprocess = HealthNumberPreprocess(
+            invert=bool(preprocess_data.get("invert", False)),
+            threshold=float(preprocess_data.get("threshold", 0.6)),
+            scale=int(preprocess_data.get("scale", 1)),
+        )
+        preprocess.validate()
+
+        readout_data = d.get("readout")
+        if not isinstance(readout_data, dict):
+            raise ValueError("health_number.readout is required")
+        readout = HealthNumberReadout(
+            min_value=int(readout_data.get("min", 0)),
+            max_value=int(readout_data.get("max", 999)),
+            stable_reads=int(readout_data.get("stable_reads", 1)),
+        )
+        readout.validate()
+
+        hod_data = d.get("hit_on_decrease")
+        if not isinstance(hod_data, dict):
+            raise ValueError("health_number.hit_on_decrease is required")
+        hit_on_decrease = HealthNumberHitOnDecrease(
+            min_drop=int(hod_data.get("min_drop", 1)),
+            cooldown_ms=int(hod_data.get("cooldown_ms", 150)),
+        )
+        hit_on_decrease.validate()
+
+        templates: Optional[HealthNumberTemplates] = None
+        templates_data = d.get("templates")
+        if isinstance(templates_data, dict):
+            t_id = str(templates_data.get("template_set_id") or "learned_v1")
+            hamming_max = int(templates_data.get("hamming_max", 120))
+            t_w = int(templates_data.get("width", 0))
+            t_h = int(templates_data.get("height", 0))
+            digits_map = templates_data.get("digits")
+            parsed_digits: Dict[str, List[int]] = {}
+            if isinstance(digits_map, dict) and t_w > 0 and t_h > 0:
+                expected = t_w * t_h
+                for k, v in digits_map.items():
+                    kk = str(k)
+                    if isinstance(v, str):
+                        if len(v) != expected:
+                            continue
+                        parsed_digits[kk] = [1 if ch == "1" else 0 for ch in v]
+                    elif isinstance(v, list) and len(v) == expected:
+                        parsed_digits[kk] = [1 if int(x) else 0 for x in v]
+            if parsed_digits:
+                templates = HealthNumberTemplates(
+                    template_set_id=t_id,
+                    hamming_max=hamming_max,
+                    width=t_w,
+                    height=t_h,
+                    digits=parsed_digits,
+                )
+                templates.validate()
+
+        hn = HealthNumberDetector(
+            name=name,
+            rect=rect,
+            digits=digits,
+            preprocess=preprocess,
+            readout=readout,
+            hit_on_decrease=hit_on_decrease,
+            templates=templates,
+        )
+        hn.validate()
+        return hn
 
     def _health_number_try_read(self, bits: List[int], bw: int, bh: int, hn: HealthNumberDetector) -> Optional[int]:
         assert hn.templates is not None

@@ -2,7 +2,8 @@ import { useCallback, useMemo, useState } from "react";
 import { useScreenHealthCalibration } from "../draft/CalibrationContext";
 import { useScreenHealthHealthBarDraft, useScreenHealthHealthBarDraftControls } from "../draft/HealthBarDraftContext";
 import { useScreenHealthHealthNumberDraft, useScreenHealthHealthNumberDraftControls } from "../draft/HealthNumberDraftContext";
-import { useScreenHealthProfileDraft } from "../draft/ProfileDraftContext";
+import { useScreenHealthProfileDraft, useScreenHealthProfileDraftControls } from "../draft/ProfileDraftContext";
+import { useScreenHealthRecoilDraft, useScreenHealthRecoilDraftControls } from "../draft/RecoilDraftContext";
 import { useScreenHealthRednessDraft, useScreenHealthRednessDraftControls } from "../draft/RednessDraftContext";
 import { clamp01, clampInt } from "../utils";
 
@@ -10,14 +11,18 @@ export function CalibrationCanvasSection(props: { lastCapturedImage: { dataUrl: 
   const { lastCapturedImage } = props;
   const { imgContainerRef, offscreenCanvasRef, imageLoadedRef } = useScreenHealthCalibration();
   const profile = useScreenHealthProfileDraft();
+  const { setCanvasEditTarget } = useScreenHealthProfileDraftControls();
   const redness = useScreenHealthRednessDraft();
   const { setRois } = useScreenHealthRednessDraftControls();
   const hb = useScreenHealthHealthBarDraft();
   const { setRoi: setHealthBarRoi, setFilledRgb, setEmptyRgb, setColorPickMode } = useScreenHealthHealthBarDraftControls();
   const hn = useScreenHealthHealthNumberDraft();
   const { setRoi: setHealthNumberRoi } = useScreenHealthHealthNumberDraftControls();
+  const recoil = useScreenHealthRecoilDraft();
+  const { setRoi: setRecoilRoi } = useScreenHealthRecoilDraftControls();
 
   const detectorType = profile.detectorType;
+  const editingRecoil = profile.canvasEditTarget === "recoil" && recoil.recoilType === "ammo_number";
 
   const [drawing, setDrawing] = useState<{ startX: number; startY: number; curX: number; curY: number } | null>(null);
 
@@ -80,10 +85,23 @@ export function CalibrationCanvasSection(props: { lastCapturedImage: { dataUrl: 
     if (w < 5 || h < 5) return;
 
     const newRect = { x: clamp01(x1 / rect.width), y: clamp01(y1 / rect.height), w: clamp01(w / rect.width), h: clamp01(h / rect.height) };
+    if (editingRecoil) {
+      setRecoilRoi(newRect);
+      return;
+    }
     if (detectorType === "health_bar") setHealthBarRoi(newRect);
     else if (detectorType === "health_number") setHealthNumberRoi(newRect);
     else setRois((prev) => [...prev, { name: `roi_${prev.length + 1}`, direction: "", rect: newRect }]);
-  }, [drawing, detectorType, imgContainerRef, setHealthBarRoi, setHealthNumberRoi, setRois]);
+  }, [
+    drawing,
+    detectorType,
+    editingRecoil,
+    imgContainerRef,
+    setHealthBarRoi,
+    setHealthNumberRoi,
+    setRecoilRoi,
+    setRois,
+  ]);
 
   const cursor = hb.colorPickMode ? "copy" : "crosshair";
   const overlays = useMemo(() => {
@@ -94,15 +112,33 @@ export function CalibrationCanvasSection(props: { lastCapturedImage: { dataUrl: 
 
   if (!lastCapturedImage) return null;
 
+  const detectorHint =
+    detectorType === "health_bar"
+      ? "Drag on the image to set the Health Bar ROI."
+      : detectorType === "health_number"
+        ? "Drag on the image to set the Health Number ROI."
+        : "Drag on the image to add ROIs.";
+
   return (
     <div className="space-y-3">
       <div className="text-sm text-slate-400">
-        {detectorType === "health_bar"
-          ? "Drag on the image to set the Health Bar ROI. (Saved config will be sent to the daemon when you click Start.)"
-          : detectorType === "health_number"
-            ? "Drag on the image to set the Health Number ROI. (Saved config will be sent to the daemon when you click Start.)"
-            : "Drag on the image to add ROIs. (Saved ROIs will be sent to the daemon when you click Start.)"}
+        {editingRecoil
+          ? "Drag on the image to set the Recoil ammo ROI (amber). Saved config is sent when you click Start."
+          : `${detectorHint} (Saved config will be sent to the daemon when you click Start.)`}
       </div>
+      {recoil.recoilType === "ammo_number" && (
+        <div className="flex flex-wrap gap-3 items-center">
+          <label className="text-sm text-slate-400">Drawing applies to</label>
+          <select
+            value={profile.canvasEditTarget}
+            onChange={(e) => setCanvasEditTarget(e.target.value as "detector" | "recoil")}
+            className="rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
+          >
+            <option value="detector">Damage detector</option>
+            <option value="recoil">Recoil ammo</option>
+          </select>
+        </div>
+      )}
       <div
         ref={imgContainerRef}
         className="relative w-full overflow-hidden rounded-xl ring-1 ring-white/10 bg-slate-900/30"
@@ -155,6 +191,19 @@ export function CalibrationCanvasSection(props: { lastCapturedImage: { dataUrl: 
           />
         )}
 
+        {recoil.recoilType === "ammo_number" && recoil.roi && (
+          <div
+            className="absolute border-2 border-amber-400/80 bg-amber-400/10"
+            style={{
+              left: `${recoil.roi.x * 100}%`,
+              top: `${recoil.roi.y * 100}%`,
+              width: `${recoil.roi.w * 100}%`,
+              height: `${recoil.roi.h * 100}%`,
+            }}
+            title="recoil_ammo"
+          />
+        )}
+
         {drawing && (
           <div
             className="absolute border-2 border-blue-400/80 bg-blue-400/10"
@@ -170,4 +219,3 @@ export function CalibrationCanvasSection(props: { lastCapturedImage: { dataUrl: 
     </div>
   );
 }
-
