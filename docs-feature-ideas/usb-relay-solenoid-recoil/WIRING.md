@@ -52,6 +52,40 @@ When software sends **ON**, the relay closes **COM ↔ NO**. That completes *you
 
 ---
 
+## Your verified kit (JF-0826B)
+
+This combination is a good match for pulsed recoil:
+
+| Part | Spec | Notes |
+|------|------|--------|
+| **Solenoid** | JF-0826B, **DC 12 V**, **2 A**, push, 20 N / 10 mm | Voltage matches the pack; 2 A is within a 3 A max pack for **short pulses** |
+| **Battery bank** | 12–12.6 V out, **1–3 A max**, 2800 mAh | Use as solenoid supply only — not USB power |
+| **Diode** | **1N4007** (1 A, 1000 V, DO-41) | Correct flyback diode for intermittent pulses |
+| **USB LC relay** | Serial 9600 baud | Switches the 12 V circuit via COM/NO |
+
+**Pulse guidance for this coil:** start at **20–40 ms**, then try **50–80 ms** if the hit feels soft. Do **not** hold ON — at 2 A continuous the coil and pack will heat / sag quickly.
+
+**Push-type note:** the plunger extends when energized. Mount so that stroke hits your recoil mass/plate within the 10 mm travel; leave a small air gap at rest so the slug can accelerate.
+
+```
+  Battery +  ──────┬─────────────── Solenoid lead A
+                   │
+                   │   1N4007 stripe (cathode) on + side
+                   │        │
+                   │     [diode]
+                   │        │
+                   │   1N4007 anode on return side
+                   │
+  Battery −  ─── Relay COM
+  Relay NO   ─── Solenoid lead B
+
+  PC USB ─── LC relay module (control only)
+```
+
+Optional: 3 A fast-blow fuse on Battery + for extra safety.
+
+---
+
 ## Wiring diagram (recommended)
 
 Use the relay as a **low-side or high-side switch** in series with the solenoid. Most DIY setups switch the **positive** feed with COM/NO.
