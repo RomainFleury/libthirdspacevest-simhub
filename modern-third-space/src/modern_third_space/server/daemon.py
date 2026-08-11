@@ -96,6 +96,8 @@ from .protocol import (
     event_screen_health_hit,
     event_screen_health_health,
     event_screen_health_value,
+    event_screen_health_ammo_value,
+    event_screen_health_recoil,
     event_screen_health_debug,
     response_screen_health_start,
     response_screen_health_stop,
@@ -1646,13 +1648,18 @@ class VestDaemon:
                             f"[screen_health_test] health_bar name={name} mode={d.get('mode')} "
                             f"percent={d.get('percent')} cap_ms={cap_ms} eval_ms={eval_ms} image={d.get('image_path')}"
                         )
-                    elif dtype == "health_number":
+                    elif dtype in ("health_number", "ammo_number"):
                         if d.get("error"):
-                            line = f"[screen_health_test] health_number name={name} error={d.get('error')}"
+                            line = (
+                                f"[screen_health_test] {dtype} name={name} error={d.get('error')} "
+                                f"engine={d.get('engine')} cap_ms={cap_ms} eval_ms={eval_ms}"
+                            )
                         else:
                             line = (
-                                f"[screen_health_test] health_number name={name} read={d.get('read')} digits={d.get('digits')} "
-                                f"hamming_max={d.get('hamming_max')} cap_ms={cap_ms} eval_ms={eval_ms} image={d.get('image_path')}"
+                                f"[screen_health_test] {dtype} name={name} read={d.get('read')} "
+                                f"ocr_text={d.get('ocr_text')!r} digits={d.get('digits')} "
+                                f"engine={d.get('engine')} rect={d.get('rect_px')} "
+                                f"cap_ms={cap_ms} eval_ms={eval_ms} image={d.get('image_path')}"
                             )
                     else:
                         line = f"[screen_health_test] detector type={dtype} name={name} cap_ms={cap_ms} eval_ms={eval_ms}"
@@ -1710,6 +1717,18 @@ class VestDaemon:
             detector = params.get("detector")
             value = int(params.get("value") or 0)
             event = event_screen_health_value(health_value=value, detector=detector)
+        elif event_type == "ammo_value":
+            detector = params.get("detector")
+            value = int(params.get("value") or 0)
+            event = event_screen_health_ammo_value(ammo_value=value, detector=detector)
+        elif event_type == "recoil_fired":
+            event = event_screen_health_recoil(
+                roi=params.get("roi"),
+                value=params.get("value"),
+                prev_value=params.get("prev_value"),
+                drop=params.get("drop"),
+                duration_ms=params.get("duration_ms"),
+            )
         elif event_type == "debug":
             detector = params.get("detector")
             event = event_screen_health_debug(params=params, detector=detector)

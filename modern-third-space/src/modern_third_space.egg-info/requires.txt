@@ -1,6 +1,16 @@
 pyusb>=1.2.1
 mss>=9.0.1
 bettercam>=1.0.0
+pyserial>=3.5
+pynput>=1.7.6
+winrt-runtime~=3.2
+winrt-Windows.Foundation~=3.2
+winrt-Windows.Foundation.Collections~=3.2
+winrt-Windows.Globalization~=3.2
+winrt-Windows.Graphics.Imaging~=3.2
+winrt-Windows.Media.Ocr~=3.2
+winrt-Windows.Security.Cryptography~=3.2
+winrt-Windows.Storage.Streams~=3.2
 
 [dev]
 ruff>=0.7.0

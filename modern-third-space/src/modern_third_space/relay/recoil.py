@@ -14,6 +14,71 @@ MIN_RECOIL_MS = 25  # Below ~20–25 ms the LC module often misses OFF
 MAX_RECOIL_MS = 120  # UI/game tuning cap for recoil feel
 MAX_ON_MS = 1000  # Hard cap — safety timer also forces OFF at 1.0 s
 
+# L4D2 weapon_fire / classname tokens that should not pulse the solenoid.
+# Event strings are usually without the "weapon_" prefix (e.g. "melee", "pipe_bomb").
+_NO_RECOIL_WEAPONS = frozenset(
+    {
+        # Melee slot (all bats/axes/katanas report as "melee")
+        "melee",
+        # Specific melee classnames / subtypes (if logged that way)
+        "baseball_bat",
+        "cricket_bat",
+        "crowbar",
+        "electric_guitar",
+        "fireaxe",
+        "frying_pan",
+        "golfclub",
+        "katana",
+        "knife",
+        "machete",
+        "pitchfork",
+        "shovel",
+        "tonfa",
+        "riotshield",
+        "guandao",
+        "sword",
+        # Chainsaw
+        "chainsaw",
+        # Throwables / explosive "grenades"
+        "molotov",
+        "pipe_bomb",
+        "pipebomb",
+        "vomitjar",
+        "vomit_jar",
+        "bile_jar",
+    }
+)
+
+
+def normalize_weapon_key(weapon: Optional[str]) -> str:
+    """Lowercase weapon id with optional 'weapon_' prefix stripped."""
+    w = (weapon or "").strip().lower().replace("-", "_").replace(" ", "_")
+    if w.startswith("weapon_"):
+        w = w[len("weapon_") :]
+    return w
+
+
+def should_pulse_recoil_for_weapon(weapon: Optional[str]) -> bool:
+    """
+    Return False for weapons that should not trigger mechanical recoil.
+
+    Used by L4D2 (and safe to call elsewhere): skips melee, chainsaw, and grenades.
+    Unknown / empty weapon names still pulse (fail open for guns we haven't listed).
+    """
+    key = normalize_weapon_key(weapon)
+    if not key or key == "unknown":
+        return True
+    if key in _NO_RECOIL_WEAPONS:
+        return False
+    # Substring guards for odd classname variants
+    if "chainsaw" in key:
+        return False
+    if key.endswith("_melee") or key.startswith("melee_"):
+        return False
+    if any(k in key for k in ("molotov", "pipe_bomb", "vomitjar")):
+        return False
+    return True
+
 
 def clamp_duration_ms(duration_ms: int) -> int:
     return max(MIN_RECOIL_MS, min(MAX_RECOIL_MS, int(duration_ms)))
@@ -30,7 +95,7 @@ def duration_ms_for_weapon(weapon: Optional[str], default_ms: int = DEFAULT_RECO
 
     Longer for slow heavy weapons; shorter for automatic fire.
     """
-    w = (weapon or "").lower()
+    w = normalize_weapon_key(weapon)
     if any(k in w for k in ("shotgun", "shell", "autoshotgun", "pumpshotgun", "chrome", "spas")):
         return clamp_duration_ms(max(default_ms, 70))
     if any(k in w for k in ("sniper", "hunting", "military", "awp", "scout", "magnum")):

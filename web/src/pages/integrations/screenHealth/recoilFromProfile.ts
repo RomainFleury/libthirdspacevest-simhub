@@ -25,25 +25,9 @@ export function recoilDraftFromProfile(p: any): Partial<RecoilDraftState> {
       w: Number(r.roi?.w ?? 0.08),
       h: Number(r.roi?.h ?? 0.04),
     },
-    digits: Number(r.digits ?? 2),
-    invert: Boolean(r.preprocess?.invert ?? false),
-    threshold: Number(r.preprocess?.threshold ?? 0.6),
-    scale: Number(r.preprocess?.scale ?? 2),
-    readMin: Number(r.readout?.min ?? 0),
-    readMax: Number(r.readout?.max ?? 99),
-    stableReads: Number(r.readout?.stable_reads ?? 1),
+    stableReads: Number(r.readout?.stable_reads ?? 2),
     hitMinDrop: Number(r.hit_on_decrease?.min_drop ?? 1),
     hitCooldownMs: Number(r.hit_on_decrease?.cooldown_ms ?? 50),
-    hammingMax: Number(r.templates?.hamming_max ?? 120),
-    templateSize: {
-      w: Number(r.templates?.width ?? 16),
-      h: Number(r.templates?.height ?? 24),
-    },
-    templates: (r.templates?.digits && typeof r.templates.digits === "object" ? r.templates.digits : {}) as Record<
-      string,
-      string
-    >,
-    learnValue: "",
     calibrationError: null,
     testResult: null,
   };

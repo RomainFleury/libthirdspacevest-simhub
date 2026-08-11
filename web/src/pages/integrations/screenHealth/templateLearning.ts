@@ -187,6 +187,7 @@ export function tryReadDigitValueFromCanvas(args: TryReadArgs): { value: number 
 
     let bestDigit: string | null = null;
     let bestDist = Number.POSITIVE_INFINITY;
+    let secondDist = Number.POSITIVE_INFINITY;
     for (const dch of Object.keys(templates)) {
       const tmpl = templates[dch];
       if (typeof tmpl !== "string" || tmpl.length !== expectedLen) continue;
@@ -196,13 +197,30 @@ export function tryReadDigitValueFromCanvas(args: TryReadArgs): { value: number 
         dist += norm[k] === tb ? 0 : 1;
       }
       if (dist < bestDist) {
+        secondDist = bestDist;
         bestDist = dist;
         bestDigit = dch;
+      } else if (dist < secondDist) {
+        secondDist = dist;
       }
+    }
+
+    const ink = norm.reduce((a, b) => a + (b ? 1 : 0), 0);
+    if (ink < Math.max(2, Math.floor(expectedLen / 50)) || ink > expectedLen - Math.max(2, Math.floor(expectedLen / 50))) {
+      return { value: null, reason: `Digit ${i + 1} looks empty/solid (background?)` };
     }
 
     if (!bestDigit || bestDist > hammingMax) {
       return { value: null, reason: `No match for digit ${i + 1} (bestDist=${bestDist})` };
+    }
+    if (bestDist > 0 && Number.isFinite(secondDist)) {
+      const margin = Math.max(8, Math.floor(expectedLen / 32));
+      if (secondDist - bestDist < margin) {
+        return {
+          value: null,
+          reason: `Ambiguous digit ${i + 1} (best=${bestDist}, second=${secondDist}, need gap≥${margin})`,
+        };
+      }
     }
     digitsOut += bestDigit;
   }

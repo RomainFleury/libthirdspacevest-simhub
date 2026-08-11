@@ -49,7 +49,7 @@ function pickPreferredPort(ports: RelayPortInfo[], current: string): string {
   return ports[0]?.device ?? "";
 }
 
-export function RelayPage() {
+export function RecoilPage() {
   const [ports, setPorts] = useState<RelayPortInfo[]>([]);
   const [selectedPort, setSelectedPort] = useState("");
   const [baud, setBaud] = useState(DEFAULT_BAUD);
@@ -102,7 +102,7 @@ export function RelayPage() {
     try {
       const result = await relayListPorts();
       if (!result.success) {
-        setError(result.error || "Failed to list USB relay ports");
+        setError(result.error || "Failed to list USB recoil ports");
         setPorts([]);
         return;
       }
@@ -196,11 +196,11 @@ export function RelayPage() {
     try {
       const result = await relaySet(on);
       if (!result.success) {
-        setError(result.error || `Failed to turn relay ${on ? "ON" : "OFF"}`);
+        setError(result.error || `Failed to turn output ${on ? "ON" : "OFF"}`);
         return;
       }
       setRelay(result.relay ?? null);
-      setMessage(`Relay ${on ? "ON" : "OFF"}`);
+      setMessage(`Output ${on ? "ON" : "OFF"}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -232,7 +232,7 @@ export function RelayPage() {
     try {
       if (enable) {
         if (!connected) {
-          setError("Connect the USB relay before enabling click recoil");
+          setError("Connect the USB recoil device before enabling click recoil");
           return;
         }
         const result = await relayMouseStart(mouseOptions());
@@ -277,9 +277,9 @@ export function RelayPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <header>
-        <h1 className="text-2xl md:text-3xl font-bold text-white">Relay / Recoil</h1>
+        <h1 className="text-2xl md:text-3xl font-bold text-white">Recoil</h1>
         <p className="mt-2 text-sm md:text-base text-slate-400">
-          Test the USB LC relay module that drives a solenoid for mechanical recoil feedback.
+          Connect the USB LC module that drives a solenoid for mechanical recoil feedback.
           Prefer short pulses — solenoids overheat if left energized.
         </p>
       </header>
@@ -288,7 +288,7 @@ export function RelayPage() {
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-sm uppercase tracking-wide text-slate-400">Connection</p>
-            <h2 className="text-xl font-semibold text-white">USB Relay</h2>
+            <h2 className="text-xl font-semibold text-white">USB device</h2>
             <p className="mt-1 text-sm text-slate-400">
               Plugs in over USB; Windows exposes it as a COM port (USB serial).
             </p>

@@ -4,6 +4,7 @@ src/modern_third_space/__init__.py
 src/modern_third_space/cli.py
 src/modern_third_space/legacy_adapter.py
 src/modern_third_space/presets.py
+src/modern_third_space/relay_cli.py
 src/modern_third_space.egg-info/PKG-INFO
 src/modern_third_space.egg-info/SOURCES.txt
 src/modern_third_space.egg-info/dependency_links.txt
@@ -16,6 +17,12 @@ src/modern_third_space/integrations/cs2_gsi.py
 src/modern_third_space/integrations/registry.py
 src/modern_third_space/legacy_port/__init__.py
 src/modern_third_space/legacy_port/thirdspace.py
+src/modern_third_space/relay/__init__.py
+src/modern_third_space/relay/controller.py
+src/modern_third_space/relay/discovery.py
+src/modern_third_space/relay/mouse_recoil.py
+src/modern_third_space/relay/protocol.py
+src/modern_third_space/relay/recoil.py
 src/modern_third_space/server/__init__.py
 src/modern_third_space/server/alyx_manager.py
 src/modern_third_space/server/client_manager.py
@@ -27,6 +34,7 @@ src/modern_third_space/server/lifecycle.py
 src/modern_third_space/server/player_manager.py
 src/modern_third_space/server/protocol.py
 src/modern_third_space/server/screen_health_manager.py
+src/modern_third_space/server/screen_ocr.py
 src/modern_third_space/server/vest_registry.py
 src/modern_third_space/vest/__init__.py
 src/modern_third_space/vest/cell_layout.py
@@ -44,6 +52,9 @@ tests/test_game_player_mapping.py
 tests/test_game_player_mapping_manual.py
 tests/test_player_manager.py
 tests/test_player_manager_manual.py
+tests/test_recoil_weapon_filter.py
+tests/test_relay_protocol.py
 tests/test_screen_health_manager.py
+tests/test_screen_ocr.py
 tests/test_vest_registry.py
 tests/test_vest_registry_manual.py

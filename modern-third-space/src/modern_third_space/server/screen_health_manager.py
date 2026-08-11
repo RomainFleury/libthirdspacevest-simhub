@@ -442,15 +442,19 @@ class HealthNumberDetector:
     hit_on_decrease: HealthNumberHitOnDecrease
     templates: Optional[HealthNumberTemplates] = None
     name: str = "health_number"
+    # "templates" = taught bitmasks; "windows_ocr" = Windows.Media.Ocr (ammo recoil)
+    engine: str = "templates"
 
     def validate(self) -> None:
         self.rect.validate()
         if not isinstance(self.digits, int) or self.digits < 1:
             raise ValueError("health_number.digits must be an int >= 1")
+        if self.engine not in ("templates", "windows_ocr"):
+            raise ValueError("health_number.engine must be 'templates' or 'windows_ocr'")
         self.preprocess.validate()
         self.readout.validate()
         self.hit_on_decrease.validate()
-        if self.templates is not None:
+        if self.engine == "templates" and self.templates is not None:
             self.templates.validate()
         if not isinstance(self.name, str) or not self.name:
             raise ValueError("health_number.name must be a non-empty string")
@@ -744,7 +748,7 @@ class ScreenHealthManager:
             all_regions.append(("health_number", hn, hn.name, left, top, w, h))
 
         for an in parsed.ammo_numbers:
-            if an.templates is None:
+            if an.engine == "templates" and an.templates is None:
                 detectors_out.append(
                     {
                         "type": "ammo_number",
@@ -838,30 +842,66 @@ class ScreenHealthManager:
 
             elif detector_type in ("health_number", "ammo_number"):
                 hn = detector_obj
-                bits, bw, bh = binarize_bgra_to_bitmap(
-                    raw,
-                    w,
-                    h,
-                    threshold=hn.preprocess.threshold,
-                    invert=hn.preprocess.invert,
-                    scale=hn.preprocess.scale,
-                )
-                value = self._health_number_try_read(bits, bw, bh, hn)
-                eval_ms = (time.perf_counter() - eval0) * 1000.0
+                if detector_type == "ammo_number" and getattr(hn, "engine", "templates") == "windows_ocr":
+                    ocr_text = ""
+                    try:
+                        value, ocr_text = self._ammo_try_read_windows_ocr(raw, w, h, hn)
+                        ocr_err = None
+                    except Exception as e:
+                        value = None
+                        ocr_err = str(e)
+                    eval_ms = (time.perf_counter() - eval0) * 1000.0
+                    logger.info(
+                        "[screen_health_test] windows_ocr name=%s rect=%sx%s read=%s text=%r err=%s eval_ms=%.2f",
+                        hn.name,
+                        w,
+                        h,
+                        value,
+                        ocr_text,
+                        ocr_err,
+                        eval_ms,
+                    )
+                    detectors_out.append(
+                        {
+                            "type": detector_type,
+                            "name": hn.name,
+                            "engine": "windows_ocr",
+                            "rect_px": {"left": left, "top": top, "w": w, "h": h},
+                            "read": int(value) if value is not None else None,
+                            "ocr_text": ocr_text,
+                            "digits": int(hn.digits),
+                            "error": ocr_err,
+                            "capture_ms": cap_ms,
+                            "eval_ms": eval_ms,
+                            "image_path": save_crop(detector_type, hn.name, raw, w, h),
+                        }
+                    )
+                else:
+                    bits, bw, bh = binarize_bgra_to_bitmap(
+                        raw,
+                        w,
+                        h,
+                        threshold=hn.preprocess.threshold,
+                        invert=hn.preprocess.invert,
+                        scale=hn.preprocess.scale,
+                    )
+                    value = self._health_number_try_read(bits, bw, bh, hn)
+                    eval_ms = (time.perf_counter() - eval0) * 1000.0
 
-                detectors_out.append(
-                    {
-                        "type": detector_type,
-                        "name": hn.name,
-                        "rect_px": {"left": left, "top": top, "w": w, "h": h},
-                        "read": int(value) if value is not None else None,
-                        "digits": int(hn.digits),
-                        "hamming_max": int(hn.templates.hamming_max),
-                        "capture_ms": cap_ms,
-                        "eval_ms": eval_ms,
-                        "image_path": save_crop(detector_type, hn.name, raw, w, h),
-                    }
-                )
+                    detectors_out.append(
+                        {
+                            "type": detector_type,
+                            "name": hn.name,
+                            "engine": getattr(hn, "engine", "templates"),
+                            "rect_px": {"left": left, "top": top, "w": w, "h": h},
+                            "read": int(value) if value is not None else None,
+                            "digits": int(hn.digits),
+                            "hamming_max": int(hn.templates.hamming_max) if hn.templates else None,
+                            "capture_ms": cap_ms,
+                            "eval_ms": eval_ms,
+                            "image_path": save_crop(detector_type, hn.name, raw, w, h),
+                        }
+                    )
 
         total_ms = (time.perf_counter() - t0) * 1000.0
         result = {
@@ -1134,7 +1174,7 @@ class ScreenHealthManager:
             for an in profile.ammo_numbers:
                 if self._stop_evt.is_set():
                     break
-                if an.templates is None:
+                if an.engine == "templates" and an.templates is None:
                     continue
                 left, top, w, h = normalized_rect_to_pixels(an.rect, frame_w, frame_h)
                 all_regions.append(("ammo_number", an, an.name, left, top, w, h))
@@ -1375,16 +1415,35 @@ class ScreenHealthManager:
                 elif detector_type in ("health_number", "ammo_number"):
                     hn = detector_obj
                     is_ammo = detector_type == "ammo_number"
-                    bits, bw, bh = binarize_bgra_to_bitmap(
-                        raw_bgra,
-                        w,
-                        h,
-                        threshold=hn.preprocess.threshold,
-                        invert=hn.preprocess.invert,
-                        scale=hn.preprocess.scale,
-                    )
-
-                    value = self._health_number_try_read(bits, bw, bh, hn)
+                    if is_ammo and getattr(hn, "engine", "templates") == "windows_ocr":
+                        try:
+                            value, ocr_text = self._ammo_try_read_windows_ocr(raw_bgra, w, h, hn)
+                            if value is None and should_periodic_log:
+                                logger.info(
+                                    "[screen_health] windows_ocr no-read detector=%s size=%sx%s text=%r",
+                                    hn.name,
+                                    w,
+                                    h,
+                                    ocr_text,
+                                )
+                        except Exception as e:
+                            if should_periodic_log:
+                                logger.warning(
+                                    "[screen_health] windows_ocr failed detector=%s err=%s",
+                                    hn.name,
+                                    e,
+                                )
+                            continue
+                    else:
+                        bits, bw, bh = binarize_bgra_to_bitmap(
+                            raw_bgra,
+                            w,
+                            h,
+                            threshold=hn.preprocess.threshold,
+                            invert=hn.preprocess.invert,
+                            scale=hn.preprocess.scale,
+                        )
+                        value = self._health_number_try_read(bits, bw, bh, hn)
                     if should_periodic_log:
                         logger.info(
                             "[screen_health] health_number detector=%s read=%s stable_reads=%s",
@@ -1697,10 +1756,21 @@ class ScreenHealthManager:
         recoil_data = data.get("recoil")
         if isinstance(recoil_data, dict) and str(recoil_data.get("type") or "") == "ammo_number":
             recoil_duration_ms = max(1, int(recoil_data.get("duration_ms", 40)))
-            # Reuse health_number schema fields (roi/digits/preprocess/...)
             ammo_dict = dict(recoil_data)
             ammo_dict["type"] = "health_number"
             ammo_dict["name"] = str(recoil_data.get("name") or "ammo_number")
+            # Default ammo recoil to Windows OCR (no digit teaching)
+            if "engine" not in ammo_dict:
+                ammo_dict["engine"] = "windows_ocr"
+            # Variable-width ammo (1–3); keep schema digits field as an upper bound only
+            if str(ammo_dict.get("engine") or "") == "windows_ocr":
+                ammo_dict["digits"] = 3
+                readout = ammo_dict.get("readout") if isinstance(ammo_dict.get("readout"), dict) else {}
+                ammo_dict["readout"] = {
+                    "min": 0,
+                    "max": 999,
+                    "stable_reads": int(readout.get("stable_reads", 2)),
+                }
             ammo_numbers.append(self._parse_health_number_detector(ammo_dict))
 
         return ScreenHealthProfile(
@@ -1719,6 +1789,7 @@ class ScreenHealthManager:
     def _parse_health_number_detector(self, d: Dict[str, Any]) -> HealthNumberDetector:
         name_raw = d.get("name") or "health_number"
         name = str(name_raw)
+        engine = str(d.get("engine") or "templates")
 
         roi = d.get("roi")
         if not isinstance(roi, dict):
@@ -1736,13 +1807,16 @@ class ScreenHealthManager:
             raise ValueError("health_number.digits must be >= 1")
 
         preprocess_data = d.get("preprocess")
-        if not isinstance(preprocess_data, dict):
+        if isinstance(preprocess_data, dict):
+            preprocess = HealthNumberPreprocess(
+                invert=bool(preprocess_data.get("invert", False)),
+                threshold=float(preprocess_data.get("threshold", 0.6)),
+                scale=int(preprocess_data.get("scale", 1)),
+            )
+        elif engine == "windows_ocr":
+            preprocess = HealthNumberPreprocess(invert=False, threshold=0.6, scale=1)
+        else:
             raise ValueError("health_number.preprocess is required")
-        preprocess = HealthNumberPreprocess(
-            invert=bool(preprocess_data.get("invert", False)),
-            threshold=float(preprocess_data.get("threshold", 0.6)),
-            scale=int(preprocess_data.get("scale", 1)),
-        )
         preprocess.validate()
 
         readout_data = d.get("readout")
@@ -1766,7 +1840,7 @@ class ScreenHealthManager:
 
         templates: Optional[HealthNumberTemplates] = None
         templates_data = d.get("templates")
-        if isinstance(templates_data, dict):
+        if engine != "windows_ocr" and isinstance(templates_data, dict):
             t_id = str(templates_data.get("template_set_id") or "learned_v1")
             hamming_max = int(templates_data.get("hamming_max", 120))
             t_w = int(templates_data.get("width", 0))
@@ -1801,9 +1875,33 @@ class ScreenHealthManager:
             readout=readout,
             hit_on_decrease=hit_on_decrease,
             templates=templates,
+            engine=engine,
         )
         hn.validate()
         return hn
+
+    def _ammo_try_read_windows_ocr(
+        self, raw_bgra: bytes, width: int, height: int, hn: HealthNumberDetector
+    ) -> Tuple[Optional[int], str]:
+        from .screen_ocr import read_ammo_value_from_bgra
+
+        value, text = read_ammo_value_from_bgra(
+            raw_bgra,
+            width,
+            height,
+            min_value=int(hn.readout.min_value),
+            max_value=int(hn.readout.max_value),
+        )
+        if self._debug_log_values:
+            logger.info(
+                "[screen_health] windows_ocr detector=%s size=%sx%s text=%r value=%s",
+                hn.name,
+                width,
+                height,
+                text,
+                value,
+            )
+        return value, text
 
     def _health_number_try_read(self, bits: List[int], bw: int, bh: int, hn: HealthNumberDetector) -> Optional[int]:
         assert hn.templates is not None
@@ -1830,16 +1928,31 @@ class ScreenHealthManager:
             # Resize to template size
             norm = _resize_bitmap_nearest(slice_bits, slice_w, bh, hn.templates.width, hn.templates.height)
 
+            # Reject empty / solid slices (usually background eating the digit)
+            ink = sum(1 for b in norm if b)
+            nbits = hn.templates.width * hn.templates.height
+            if ink < max(2, nbits // 50) or ink > nbits - max(2, nbits // 50):
+                return None
+
             best_digit: Optional[str] = None
             best_dist: Optional[int] = None
+            second_dist: Optional[int] = None
             for dch, tmpl in hn.templates.digits.items():
-                dist = hamming_distance_bits(norm, tmpl, n=hn.templates.width * hn.templates.height)
+                dist = hamming_distance_bits(norm, tmpl, n=nbits)
                 if best_dist is None or dist < best_dist:
+                    second_dist = best_dist
                     best_dist = dist
                     best_digit = dch
+                elif second_dist is None or dist < second_dist:
+                    second_dist = dist
 
             if best_digit is None or best_dist is None or best_dist > hn.templates.hamming_max:
                 return None
+            # Reject ambiguous near-ties (skip when exact match)
+            if best_dist > 0 and second_dist is not None:
+                margin = max(8, nbits // 32)
+                if (second_dist - best_dist) < margin:
+                    return None
             digits_str += best_digit
 
         if not digits_str:

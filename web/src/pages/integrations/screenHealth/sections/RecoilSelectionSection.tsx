@@ -10,9 +10,10 @@ export function RecoilSelectionSection() {
 
   return (
     <div className="space-y-2">
-      <h3 className="text-sm font-semibold text-white">Recoil (solenoid)</h3>
+      <h3 className="text-sm font-semibold text-white">Recoil</h3>
       <p className="text-xs text-slate-500">
-        Independent of Detector — ammo digit decreases pulse the USB relay. Connect the relay on the Relay page first.
+        Independent of Detector — ammo decreases (Windows OCR) pulse the solenoid. Connect the device on the Recoil page
+        first.
       </p>
       <div className="flex flex-wrap gap-3 items-center">
         <label className="text-sm text-slate-400">Type</label>

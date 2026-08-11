@@ -120,6 +120,10 @@ export function ScreenHealthIntegrationPage() {
       detector: e.detector,
       health_percent: e.health_percent,
       health_value: e.health_value,
+      ammo_value: e.ammo_value,
+      prev_value: e.prev_value,
+      drop: e.drop,
+      duration_ms: e.duration_ms,
       debug_kind: e.debug_kind,
       debug: e.debug,
     },
@@ -132,6 +136,10 @@ export function ScreenHealthIntegrationPage() {
     const detector = e.params?.detector as string | undefined;
     const hp = e.params?.health_percent as number | undefined;
     const hv = e.params?.health_value as number | undefined;
+    const ammo = e.params?.ammo_value as number | undefined;
+    const prev = e.params?.prev_value as number | undefined;
+    const drop = e.params?.drop as number | undefined;
+    const durationMs = e.params?.duration_ms as number | undefined;
     const dk = e.params?.debug_kind as string | undefined;
     const dbg = e.params?.debug as Record<string, unknown> | undefined;
     const parts = [];
@@ -140,6 +148,10 @@ export function ScreenHealthIntegrationPage() {
     if (typeof score === "number") parts.push(`score=${score.toFixed(3)}`);
     if (typeof hp === "number") parts.push(`hp=${(hp * 100).toFixed(1)}%`);
     if (typeof hv === "number") parts.push(`hv=${hv}`);
+    if (typeof ammo === "number") parts.push(`ammo=${ammo}`);
+    if (typeof prev === "number") parts.push(`prev=${prev}`);
+    if (typeof drop === "number") parts.push(`drop=${drop}`);
+    if (typeof durationMs === "number") parts.push(`ms=${durationMs}`);
     if (detector) parts.push(`det=${detector}`);
     if (dk) parts.push(`kind=${dk}`);
     if (dbg && typeof dbg.saved_filename === "string") parts.push(`file=${dbg.saved_filename}`);

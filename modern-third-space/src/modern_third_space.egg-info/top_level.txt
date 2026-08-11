@@ -1,1 +1,2 @@
+debug_logs
 modern_third_space

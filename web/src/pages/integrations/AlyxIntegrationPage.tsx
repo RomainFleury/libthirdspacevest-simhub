@@ -168,13 +168,13 @@ export function AlyxIntegrationPage() {
 
       <div className="pt-2 border-t border-slate-700/60">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium text-slate-200">Solenoid recoil (USB relay)</h3>
+          <h3 className="text-sm font-medium text-slate-200">Solenoid recoil</h3>
           <span className="text-xs text-slate-500">Independent of vest Weapon Fire</span>
         </div>
         <label className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-slate-900/40 border border-slate-700/40 px-3 py-2">
           <div className="min-w-0">
             <div className="text-sm text-slate-200">Pulse on PlayerShootWeapon</div>
-            <div className="text-xs text-slate-500">Requires relay connected on Relay page</div>
+            <div className="text-xs text-slate-500">Requires device connected on Recoil page</div>
           </div>
           <input
             type="checkbox"

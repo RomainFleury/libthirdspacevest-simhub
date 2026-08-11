@@ -444,7 +444,8 @@ def test_parse_profile_recoil_ammo_number():
     assert len(parsed.ammo_numbers) == 1
     assert parsed.ammo_numbers[0].name == "ammo_number"
     assert parsed.recoil_duration_ms == 45
-    assert parsed.ammo_numbers[0].templates is not None
+    assert parsed.ammo_numbers[0].engine == "windows_ocr"
+    assert parsed.ammo_numbers[0].templates is None
 
 
 def test_debug_write_bmp_bgra_writes_valid_header(tmp_path):

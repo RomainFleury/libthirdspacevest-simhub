@@ -16,6 +16,7 @@ from .recoil import (
     clamp_on_ms,
     duration_ms_for_weapon,
     parse_solenoid_settings,
+    should_pulse_recoil_for_weapon,
 )
 
 __all__ = [
@@ -34,4 +35,5 @@ __all__ = [
     "clamp_on_ms",
     "duration_ms_for_weapon",
     "parse_solenoid_settings",
+    "should_pulse_recoil_for_weapon",
 ]

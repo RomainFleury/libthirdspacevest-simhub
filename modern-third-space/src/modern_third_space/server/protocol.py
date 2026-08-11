@@ -134,6 +134,7 @@ class EventType(Enum):
     SCREEN_HEALTH_HEALTH = "screen_health_health"
     SCREEN_HEALTH_VALUE = "screen_health_value"
     SCREEN_HEALTH_DEBUG = "screen_health_debug"
+    SCREEN_HEALTH_RECOIL = "screen_health_recoil"
     # Predefined effects
     EFFECT_STARTED = "effect_started"
     EFFECT_COMPLETED = "effect_completed"
@@ -954,6 +955,46 @@ def event_screen_health_value(health_value: int, detector: Optional[str] = None)
         event_type="health_value",
         health_value=int(health_value),
         detector=detector,
+    )
+
+
+def event_screen_health_ammo_value(ammo_value: int, detector: Optional[str] = None) -> Event:
+    """Ammo counter OCR readout (Screen Health recoil channel)."""
+    return Event(
+        event=EventType.SCREEN_HEALTH_VALUE.value,
+        event_type="ammo_value",
+        health_value=int(ammo_value),
+        detector=detector,
+    )
+
+
+def event_screen_health_recoil(
+    *,
+    roi: Optional[str] = None,
+    value: Optional[int] = None,
+    prev_value: Optional[int] = None,
+    drop: Optional[int] = None,
+    duration_ms: Optional[int] = None,
+) -> Event:
+    """Ammo decrease → solenoid recoil pulse."""
+    params: Dict[str, Any] = {}
+    if roi is not None:
+        params["roi"] = roi
+    if value is not None:
+        params["value"] = int(value)
+    if prev_value is not None:
+        params["prev_value"] = int(prev_value)
+    if drop is not None:
+        params["drop"] = int(drop)
+    if duration_ms is not None:
+        params["duration_ms"] = int(duration_ms)
+    return Event(
+        event=EventType.SCREEN_HEALTH_RECOIL.value,
+        event_type="recoil_fired",
+        detector=roi,
+        health_value=int(value) if value is not None else None,
+        duration_ms=int(duration_ms) if duration_ms is not None else None,
+        params=params or None,
     )
 
 

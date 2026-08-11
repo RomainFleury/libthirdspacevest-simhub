@@ -126,7 +126,10 @@ function ScreenHealthConfigurationPanelInner(props: Props) {
       <DetectorSettingsSwitch />
 
       <RecoilSelectionSection />
-      <RecoilSettingsSwitch />
+      <RecoilSettingsSwitch
+        lastCapturedImage={lastCapturedImage}
+        evaluateProfileOnScreenshot={evaluateProfileOnScreenshot}
+      />
 
       <RoiListSection
         lastCapturedImage={lastCapturedImage}
@@ -151,10 +154,21 @@ function DetectorSettingsSwitch() {
   return <HealthNumberSettings />;
 }
 
-function RecoilSettingsSwitch() {
+function RecoilSettingsSwitch(props: {
+  lastCapturedImage: { path: string } | null;
+  evaluateProfileOnScreenshot: (
+    profile: Record<string, any>,
+    imagePath: string
+  ) => Promise<{ success: boolean; test_result?: Record<string, any> | null; error?: string }>;
+}) {
   const recoil = useScreenHealthRecoilDraft();
   if (recoil.recoilType !== "ammo_number") return null;
-  return <AmmoNumberRecoilSettings />;
+  return (
+    <AmmoNumberRecoilSettings
+      lastCapturedImage={props.lastCapturedImage}
+      evaluateProfileOnScreenshot={props.evaluateProfileOnScreenshot}
+    />
+  );
 }
 
 function DraftFromSelectedPresetSync(props: { 

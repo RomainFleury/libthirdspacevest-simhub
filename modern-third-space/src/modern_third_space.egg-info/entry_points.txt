@@ -1,2 +1,3 @@
 [console_scripts]
 modern-third-space = modern_third_space.cli:main
+modern-third-space-relay = modern_third_space.relay_cli:main

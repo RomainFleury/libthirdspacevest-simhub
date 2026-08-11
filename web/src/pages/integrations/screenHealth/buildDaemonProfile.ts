@@ -47,18 +47,9 @@ export type RecoilDraftSnapshot = {
   recoilType: "off" | "ammo_number";
   durationMs: number;
   roi: { x: number; y: number; w: number; h: number } | null;
-  digits: number;
-  invert: boolean;
-  threshold: number;
-  scale: number;
-  readMin: number;
-  readMax: number;
   stableReads: number;
   hitMinDrop: number;
   hitCooldownMs: number;
-  hammingMax: number;
-  templateSize: { w: number; h: number };
-  templates: Record<string, unknown>;
 };
 
 function attachRecoil(profile: Record<string, any>, recoil?: RecoilDraftSnapshot): Record<string, any> {
@@ -70,25 +61,15 @@ function attachRecoil(profile: Record<string, any>, recoil?: RecoilDraftSnapshot
     ...profile,
     recoil: {
       type: "ammo_number",
+      engine: "windows_ocr",
       duration_ms: Math.max(25, Math.floor(recoil.durationMs)),
       roi: { x: clamp01(roi.x), y: clamp01(roi.y), w: clamp01(roi.w), h: clamp01(roi.h) },
-      digits: Math.max(1, Math.floor(recoil.digits)),
-      preprocess: {
-        invert: Boolean(recoil.invert),
-        threshold: Math.max(0, Math.min(1, recoil.threshold)),
-        scale: Math.max(1, Math.floor(recoil.scale)),
-      },
+      // Schema placeholder only — Windows OCR accepts variable 1–3 digit ammo
+      digits: 3,
       readout: {
-        min: Math.floor(recoil.readMin),
-        max: Math.floor(recoil.readMax),
+        min: 0,
+        max: 999,
         stable_reads: Math.max(1, Math.floor(recoil.stableReads)),
-      },
-      templates: {
-        template_set_id: "learned_v1",
-        hamming_max: Math.max(0, Math.floor(recoil.hammingMax)),
-        width: recoil.templateSize.w,
-        height: recoil.templateSize.h,
-        digits: recoil.templates,
       },
       hit_on_decrease: {
         min_drop: Math.max(1, Math.floor(recoil.hitMinDrop)),

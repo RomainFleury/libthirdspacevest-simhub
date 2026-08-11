@@ -35,6 +35,7 @@ from ..relay.recoil import (
     DEFAULT_RECOIL_MS,
     duration_ms_for_weapon,
     parse_solenoid_settings,
+    should_pulse_recoil_for_weapon,
 )
 
 logger = logging.getLogger(__name__)
@@ -896,11 +897,13 @@ class L4D2Manager:
         """Pulse USB relay solenoid if enabled and past cooldown."""
         if not self._solenoid_recoil_enabled or not self.on_recoil:
             return
+        weapon = str(event.params.get("weapon", "") or "")
+        if not should_pulse_recoil_for_weapon(weapon):
+            return
         now = time.time()
         if (now - self._last_recoil_ts) < self._recoil_cooldown_s:
             return
         self._last_recoil_ts = now
-        weapon = str(event.params.get("weapon", "") or "")
         duration_ms = duration_ms_for_weapon(weapon, self._solenoid_recoil_ms)
         try:
             self.on_recoil(duration_ms)

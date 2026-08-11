@@ -6,7 +6,7 @@ import { DebugPage } from "./pages/DebugPage";
 import { MiniGamesPage } from "./pages/MiniGamesPage";
 import { GamePage } from "./pages/GamePage";
 import { VestsPage } from "./pages/VestsPage";
-import { RelayPage } from "./pages/RelayPage";
+import { RecoilPage } from "./pages/RecoilPage";
 
 function App() {
   return (
@@ -17,7 +17,8 @@ function App() {
           <Route path="games" element={<GamesPage />} />
           <Route path="games/:gameId/*" element={<IntegrationPage />} />
           <Route path="debug" element={<DebugPage />} />
-          <Route path="relay" element={<RelayPage />} />
+          <Route path="recoil" element={<RecoilPage />} />
+          <Route path="relay" element={<Navigate to="/recoil" replace />} />
           <Route path="vests" element={<VestsPage />} />
           <Route path="mini-games" element={<MiniGamesPage />} />
           <Route path="mini-games/:gameId" element={<GamePage />} />

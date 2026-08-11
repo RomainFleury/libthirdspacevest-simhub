@@ -94,16 +94,44 @@ export function useScreenHealthDaemonEvents(opts: { setStatus: React.Dispatch<Re
         return;
       }
       if (event.event === "screen_health_value") {
+        const isAmmo = event.event_type === "ammo_value";
+        const value = typeof event.health_value === "number" ? event.health_value : undefined;
         const newEvent: ScreenHealthGameEvent = {
           id: `sh-${++eventIdCounter.current}`,
-          type: "health_value",
+          type: isAmmo ? "ammo_value" : "health_value",
           ts: event.ts * 1000,
           detector: (event.detector as string | undefined) ?? null,
-          health_value: typeof event.health_value === "number" ? event.health_value : undefined,
+          health_value: isAmmo ? undefined : value,
+          ammo_value: isAmmo ? value : undefined,
         };
         pendingEventsRef.current.push(newEvent);
         pendingStatusRef.current.delta += 1;
         pendingStatusRef.current.last_event_ts = event.ts;
+        scheduleFlush();
+        return;
+      }
+      if (event.event === "screen_health_recoil") {
+        const params = (event.params || {}) as Record<string, unknown>;
+        const newEvent: ScreenHealthGameEvent = {
+          id: `sh-${++eventIdCounter.current}`,
+          type: "recoil_fired",
+          ts: event.ts * 1000,
+          roi: (typeof params.roi === "string" ? params.roi : null) ?? (event.detector as string | undefined) ?? null,
+          detector: (event.detector as string | undefined) ?? null,
+          ammo_value: typeof params.value === "number" ? params.value : typeof event.health_value === "number" ? event.health_value : undefined,
+          prev_value: typeof params.prev_value === "number" ? params.prev_value : undefined,
+          drop: typeof params.drop === "number" ? params.drop : undefined,
+          duration_ms:
+            typeof params.duration_ms === "number"
+              ? params.duration_ms
+              : typeof event.duration_ms === "number"
+                ? event.duration_ms
+                : undefined,
+        };
+        pendingEventsRef.current.push(newEvent);
+        pendingStatusRef.current.delta += 1;
+        pendingStatusRef.current.last_event_ts = event.ts;
+        pendingStatusRef.current.last_hit_ts = event.ts;
         scheduleFlush();
         return;
       }

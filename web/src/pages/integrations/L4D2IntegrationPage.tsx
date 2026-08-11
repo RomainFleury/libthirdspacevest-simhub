@@ -203,12 +203,13 @@ export function L4D2IntegrationPage() {
 
       {/* Solenoid recoil */}
       <div className="rounded-lg bg-slate-800/60 p-4 ring-1 ring-white/10">
-        <h4 className="text-sm font-medium text-slate-200 mb-2">Solenoid recoil (USB relay)</h4>
+        <h4 className="text-sm font-medium text-slate-200 mb-2">Solenoid recoil</h4>
         <label className="flex items-center justify-between gap-3 rounded-lg bg-slate-900/40 border border-slate-700/40 px-3 py-2">
           <div className="min-w-0">
             <div className="text-sm text-slate-200">Pulse on weapon_fire</div>
             <div className="text-xs text-slate-500">
-              Reinstall mod after update so WeaponFire is logged. Connect relay on Relay page.
+              Guns only — skips melee, throwables, and chainsaw. Reinstall mod after update so WeaponFire is logged.
+              Connect the device on the Recoil page.
             </div>
           </div>
           <input

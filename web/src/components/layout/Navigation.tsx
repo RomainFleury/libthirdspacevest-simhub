@@ -29,7 +29,7 @@ export function Navigation() {
           Debug
         </NavLink>
         <NavLink
-          to="/relay"
+          to="/recoil"
           className={({ isActive }) =>
             `px-3 md:px-4 py-3 text-sm font-medium transition-all duration-200 whitespace-nowrap ${
               isActive
@@ -38,7 +38,7 @@ export function Navigation() {
             }`
           }
         >
-          Relay
+          Recoil
         </NavLink>
         <NavLink
           to="/vests"

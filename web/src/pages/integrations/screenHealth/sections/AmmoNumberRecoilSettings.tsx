@@ -1,193 +1,105 @@
+import { SCREEN_HEALTH_PRESETS } from "../../../../data/screenHealthPresets";
+import { buildScreenHealthDaemonProfile } from "../buildDaemonProfile";
 import { useScreenHealthRecoilDraft, useScreenHealthRecoilDraftControls } from "../draft/RecoilDraftContext";
-import { useScreenHealthCalibration } from "../draft/CalibrationContext";
-import { learnDigitTemplatesFromCanvas, tryReadDigitValueFromCanvas } from "../templateLearning";
+import { useScreenHealthProfileDraftControls } from "../draft/ProfileDraftContext";
+import { useScreenHealthRednessDraftControls } from "../draft/RednessDraftContext";
+import { useScreenHealthHealthBarDraftControls } from "../draft/HealthBarDraftContext";
+import { useScreenHealthHealthNumberDraftControls } from "../draft/HealthNumberDraftContext";
 
-export function AmmoNumberRecoilSettings() {
+const PRESETS = SCREEN_HEALTH_PRESETS as Array<{ preset_id: string; profile: { meta?: unknown } }>;
+
+export function AmmoNumberRecoilSettings(props: {
+  lastCapturedImage: { path: string } | null;
+  evaluateProfileOnScreenshot: (
+    profile: Record<string, any>,
+    imagePath: string
+  ) => Promise<{ success: boolean; test_result?: Record<string, any> | null; error?: string }>;
+}) {
+  const { lastCapturedImage, evaluateProfileOnScreenshot } = props;
   const state = useScreenHealthRecoilDraft();
   const {
-    setDigits,
-    setThreshold,
-    setScale,
-    setInvert,
-    setReadMin,
-    setReadMax,
     setStableReads,
-    setHammingMax,
-    setTemplateSize,
     setHitMinDrop,
     setHitCooldownMs,
-    setLearnValue,
-    setTemplates,
     setCalibrationError,
     setTestResult,
-    clearTemplates,
+    readDraft: readRecoilDraft,
   } = useScreenHealthRecoilDraftControls();
-  const { getCanvasOrThrow } = useScreenHealthCalibration();
-  const learnedDigits = Object.keys(state.templates).sort().join(", ");
+  const { readDraft: readProfileDraft } = useScreenHealthProfileDraftControls();
+  const { readDraft: readRednessDraft } = useScreenHealthRednessDraftControls();
+  const { readDraft: readHealthBarDraft } = useScreenHealthHealthBarDraftControls();
+  const { readDraft: readHealthNumberDraft } = useScreenHealthHealthNumberDraftControls();
 
-  const onLearn = () => {
+  const onTest = async () => {
     setCalibrationError(null);
     setTestResult(null);
-    if (!state.roi) throw new Error("No ammo number ROI set — draw it on the calibration image");
-    const canvas = getCanvasOrThrow();
-    const digitsCount = Math.max(1, Math.floor(state.digits));
-    const next = learnDigitTemplatesFromCanvas({
-      canvas,
-      roi: state.roi,
-      digitsCount,
-      displayedValue: state.learnValue,
-      threshold: state.threshold,
-      invert: state.invert,
-      scale: state.scale,
-      templateSize: state.templateSize,
-      prevTemplates: state.templates,
-    });
-    setTemplates(next);
-  };
+    if (!state.roi) throw new Error("No ammo ROI set — draw it on the calibration image (Recoil target)");
+    const imagePath = lastCapturedImage?.path?.trim();
+    if (!imagePath) throw new Error("Capture or select a screenshot first");
 
-  const onTest = () => {
-    setCalibrationError(null);
-    setTestResult(null);
-    if (!state.roi) throw new Error("No ammo number ROI set — draw it on the calibration image");
-    const canvas = getCanvasOrThrow();
-    const digitsCount = Math.max(1, Math.floor(state.digits));
-    const result = tryReadDigitValueFromCanvas({
-      canvas,
-      roi: state.roi,
-      digitsCount,
-      threshold: state.threshold,
-      invert: state.invert,
-      scale: state.scale,
-      templateSize: state.templateSize,
-      templates: state.templates,
-      hammingMax: state.hammingMax,
+    const profile = buildScreenHealthDaemonProfile({
+      profileDraft: readProfileDraft(),
+      redness: readRednessDraft(),
+      hb: readHealthBarDraft(),
+      hn: readHealthNumberDraft(),
+      recoil: readRecoilDraft(),
+      presets: PRESETS,
     });
-    setTestResult(result);
-  };
-
-  const p = {
-    ...state,
-    templateW: state.templateSize.w,
-    templateH: state.templateSize.h,
+    const result = await evaluateProfileOnScreenshot(profile, imagePath);
+    if (!result.success) throw new Error(result.error || "OCR test failed");
+    const detectors = (result.test_result?.detectors as any[]) || [];
+    const ammo = detectors.find((d) => d?.type === "ammo_number" || d?.name === "ammo_number");
+    if (!ammo) {
+      setTestResult({ value: null, reason: "No ammo_number result in test output" });
+      return;
+    }
+    if (ammo.error) {
+      setTestResult({ value: null, reason: String(ammo.error) });
+      return;
+    }
+    const ocrText = typeof ammo.ocr_text === "string" ? ammo.ocr_text : "";
+    if (typeof ammo.read === "number") {
+      setTestResult({
+        value: ammo.read,
+        digits: String(ammo.read),
+        reason: ocrText ? `ocr="${ocrText}"` : undefined,
+      });
+    } else {
+      setTestResult({
+        value: null,
+        reason: ocrText
+          ? `OCR text="${ocrText}" but no parseable 1–3 digit ammo number`
+          : "OCR returned empty (draw a tighter ammo ROI, capture a clearer frame, restart daemon)",
+      });
+    }
   };
 
   return (
     <div className="space-y-3">
-      <div className="text-xs text-slate-400">
-        Draw the ammo ROI on the screenshot (set canvas target to Recoil), learn digit templates, then Start. Decrease →
-        solenoid pulse.
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div>
-          <label className="text-sm text-slate-400 block mb-1">Digits</label>
-          <input
-            type="number"
-            min={1}
-            value={p.digits}
-            onChange={(e) => setDigits(parseInt(e.target.value, 10) || 1)}
-            className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
-          />
-        </div>
-        <div>
-          <label className="text-sm text-slate-400 block mb-1">Threshold (0..1)</label>
-          <input
-            type="number"
-            step={0.01}
-            min={0}
-            max={1}
-            value={p.threshold}
-            onChange={(e) => setThreshold(parseFloat(e.target.value) || 0)}
-            className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
-          />
-        </div>
-        <div>
-          <label className="text-sm text-slate-400 block mb-1">Scale (int)</label>
-          <input
-            type="number"
-            min={1}
-            value={p.scale}
-            onChange={(e) => setScale(parseInt(e.target.value, 10) || 1)}
-            className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
-          />
-        </div>
-      </div>
-
-      <div className="flex items-center gap-3">
-        <label className="text-sm text-slate-400">Invert</label>
-        <input type="checkbox" checked={p.invert} onChange={(e) => setInvert(e.target.checked)} className="h-4 w-4" />
+      <div className="text-xs text-slate-400 space-y-1">
+        <p>
+          Uses <span className="text-slate-300">Windows OCR</span> — no digit teaching. Draw a tight ammo ROI, then
+          Start. Reads any 1–3 digit ammo value (so 12 → 9 still works). Windows-only (needs an OCR language pack).
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div>
-          <label className="text-sm text-slate-400 block mb-1">Readout min</label>
-          <input
-            type="number"
-            value={p.readMin}
-            onChange={(e) => setReadMin(parseInt(e.target.value, 10) || 0)}
-            className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
-          />
-        </div>
-        <div>
-          <label className="text-sm text-slate-400 block mb-1">Readout max</label>
-          <input
-            type="number"
-            value={p.readMax}
-            onChange={(e) => setReadMax(parseInt(e.target.value, 10) || 0)}
-            className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
-          />
-        </div>
         <div>
           <label className="text-sm text-slate-400 block mb-1">Stable reads</label>
           <input
             type="number"
             min={1}
-            value={p.stableReads}
+            value={state.stableReads}
             onChange={(e) => setStableReads(parseInt(e.target.value, 10) || 1)}
             className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
           />
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div>
-          <label className="text-sm text-slate-400 block mb-1">Hamming max</label>
-          <input
-            type="number"
-            min={0}
-            value={p.hammingMax}
-            onChange={(e) => setHammingMax(parseInt(e.target.value, 10) || 0)}
-            className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
-          />
-        </div>
-        <div>
-          <label className="text-sm text-slate-400 block mb-1">Template width</label>
-          <input
-            type="number"
-            min={4}
-            value={p.templateW}
-            onChange={(e) => setTemplateSize({ w: Math.max(4, parseInt(e.target.value, 10) || 4), h: state.templateSize.h })}
-            className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
-          />
-        </div>
-        <div>
-          <label className="text-sm text-slate-400 block mb-1">Template height</label>
-          <input
-            type="number"
-            min={4}
-            value={p.templateH}
-            onChange={(e) => setTemplateSize({ w: state.templateSize.w, h: Math.max(4, parseInt(e.target.value, 10) || 4) })}
-            className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
           <label className="text-sm text-slate-400 block mb-1">Min ammo drop</label>
           <input
             type="number"
             min={1}
-            value={p.hitMinDrop}
+            value={state.hitMinDrop}
             onChange={(e) => setHitMinDrop(parseInt(e.target.value, 10) || 1)}
             className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
           />
@@ -197,7 +109,7 @@ export function AmmoNumberRecoilSettings() {
           <input
             type="number"
             min={0}
-            value={p.hitCooldownMs}
+            value={state.hitCooldownMs}
             onChange={(e) => setHitCooldownMs(parseInt(e.target.value, 10) || 0)}
             className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
           />
@@ -205,55 +117,31 @@ export function AmmoNumberRecoilSettings() {
       </div>
 
       <div className="rounded-xl bg-slate-900/40 p-3 ring-1 ring-white/5 space-y-2">
-        <div className="text-sm text-white font-medium">Template learning</div>
-        <div className="text-xs text-slate-400">Draw the ammo digits ROI, type the number shown, then Learn.</div>
-        <div className="flex flex-wrap items-center gap-2">
-          <input
-            value={state.learnValue}
-            onChange={(e) => setLearnValue(e.target.value)}
-            placeholder={`e.g. ${"3".repeat(Math.max(1, Math.floor(p.digits)))}`}
-            className="rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
-          />
-          <button
-            onClick={() => {
+        <div className="text-sm text-white font-medium">Test Windows OCR</div>
+        <div className="text-xs text-slate-400">Runs against the current calibration screenshot via the daemon.</div>
+        <button
+          onClick={() => {
+            void (async () => {
               try {
-                onLearn();
-              } catch (e) {
-                setCalibrationError(e instanceof Error ? e.message : "Failed to learn templates");
-              }
-            }}
-            className="rounded-lg bg-emerald-600/80 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-600"
-          >
-            Learn from screenshot
-          </button>
-          <button
-            onClick={() => {
-              try {
-                onTest();
+                await onTest();
               } catch (e) {
                 setCalibrationError(e instanceof Error ? e.message : "Failed to test OCR");
               }
-            }}
-            className="rounded-lg bg-slate-600/80 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-600"
-          >
-            Test OCR once
-          </button>
-          <button onClick={clearTemplates} className="rounded-lg bg-slate-600/80 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-600">
-            Clear templates
-          </button>
-        </div>
+            })();
+          }}
+          className="rounded-lg bg-emerald-600/80 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-600"
+        >
+          Test OCR once
+        </button>
         {state.calibrationError && <div className="text-xs text-rose-300">{state.calibrationError}</div>}
         {state.testResult && (
           <div className="text-xs text-slate-300">
             Test result:{" "}
             {typeof state.testResult.value === "number"
-              ? `value=${state.testResult.value}`
+              ? `value=${state.testResult.value}${state.testResult.reason ? ` (${state.testResult.reason})` : ""}`
               : `no match${state.testResult.reason ? ` (${state.testResult.reason})` : ""}`}
           </div>
         )}
-        <div className="text-xs text-slate-500">
-          Learned digits: <span className="font-mono text-slate-300">{learnedDigits || "(none)"}</span>
-        </div>
       </div>
     </div>
   );
