@@ -18,6 +18,7 @@ modern-third-space/.venv
 *$py.class
 *.so
 .Python
+*.egg-info/
 
 # Windows local python override
 windows/.env.bat
