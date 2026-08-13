@@ -19,11 +19,15 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 
-:: Check if yarn is available
-where yarn >nul 2>&1
-if %ERRORLEVEL% neq 0 (
-    echo   [SKIP] Yarn not found
-    exit /b 1
+:: Use Corepack Yarn 4.11.0 (setup lives in check-yarn.bat)
+call "%~dp0require-corepack-yarn.bat"
+if errorlevel 1 (
+    echo   [INFO] Yarn 4.11.0 not active, running Yarn setup...
+    call "%~dp0check-yarn.bat"
+    if errorlevel 1 (
+        echo   [SKIP] Yarn not available
+        exit /b 1
+    )
 )
 
 :: Check if web folder exists

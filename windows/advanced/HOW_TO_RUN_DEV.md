@@ -67,9 +67,12 @@ That's it! The script will:
 
 3. **Enable Corepack and run dev**:
    ```powershell
-   corepack enable
+   corepack enable yarn --install-directory "$env:APPDATA\npm"
+   $env:PATH = "$env:APPDATA\npm;" + $env:PATH
    yarn dev
    ```
+
+   Or run `..\check-setup.bat` once, then `yarn dev`.
 
 ## What to Expect
 
@@ -92,7 +95,8 @@ Press `Ctrl + C` in the PowerShell window to stop the server.
 - Try running `.\windows\setup-windows.ps1` first
 
 **"Yarn is not available"**
-- Run: `corepack enable`
+- Run `..\check-setup.bat`
+- Or: `corepack enable yarn --install-directory "$env:APPDATA\npm"`
 
 **Port 5173 already in use**
 - Close any other dev servers running on that port

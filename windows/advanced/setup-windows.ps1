@@ -147,16 +147,40 @@ if ($nodeVersion -notmatch "v$requiredVersion") {
     Write-Success "✓ Node.js version verified: $nodeVersion"
 }
 
-# Step 3: Enable Corepack
+# Step 3: Enable Corepack Yarn 4.11.0 (user-writable shims)
 Write-Info ""
 Write-Info "📦 Step 3: Enabling Corepack for Yarn..."
 
-& corepack enable
+$corepackShims = Join-Path $env:APPDATA "npm"
+if (-not (Test-Path $corepackShims)) {
+    New-Item -ItemType Directory -Force -Path $corepackShims | Out-Null
+}
+$env:PATH = "$corepackShims;$env:PATH"
+
+if (-not (Get-Command corepack -ErrorAction SilentlyContinue)) {
+    Write-Info "   Corepack not found, installing via npm..."
+    & npm install -g corepack
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "❌ Failed to install Corepack"
+        exit 1
+    }
+}
+
+& corepack enable yarn --install-directory $corepackShims
 if ($LASTEXITCODE -ne 0) {
-    Write-Error "❌ Failed to enable Corepack"
+    Write-Error "❌ Failed to enable Corepack Yarn"
     exit 1
 }
-Write-Success "✓ Corepack enabled"
+
+$yarnVersion = (& yarn --version 2>&1 | Select-Object -Last 1).ToString().Trim()
+if ($yarnVersion -ne "4.11.0") {
+    & corepack prepare yarn@4.11.0 --activate
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "❌ Failed to activate Yarn 4.11.0"
+        exit 1
+    }
+}
+Write-Success "✓ Corepack Yarn enabled"
 
 # Verify Yarn is available
 $yarnVersion = & yarn --version 2>&1

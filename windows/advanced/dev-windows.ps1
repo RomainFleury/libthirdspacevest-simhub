@@ -137,15 +137,17 @@ try {
 }
 # -----------------------------------
 
-# Remove old global Yarn from APPDATA npm if present
-$npmYarn = Join-Path $env:APPDATA "npm\yarn.cmd"
-if (Test-Path $npmYarn) {
-    Remove-Item "$env:APPDATA\npm\yarn*" -Force -ErrorAction SilentlyContinue
+# Enable Corepack Yarn 4.11.0 in the user npm dir (do not delete those shims)
+$corepackShims = Join-Path $env:APPDATA "npm"
+if (-not (Test-Path $corepackShims)) {
+    New-Item -ItemType Directory -Force -Path $corepackShims | Out-Null
 }
-
-# Enable Corepack, activate project Yarn version
-& corepack enable 2>&1 | Out-Null
-& corepack prepare yarn@stable --activate 2>&1 | Out-Null
+$env:PATH = $corepackShims + ";" + $env:PATH
+& corepack enable yarn --install-directory $corepackShims 2>&1 | Out-Null
+$yarnVersion = (& yarn --version 2>&1 | Select-Object -Last 1).ToString().Trim()
+if ($yarnVersion -ne "4.11.0") {
+    & corepack prepare yarn@4.11.0 --activate 2>&1 | Out-Null
+}
 
 # Step 3: Verify Yarn
 $yarnVersion = & yarn --version 2>&1

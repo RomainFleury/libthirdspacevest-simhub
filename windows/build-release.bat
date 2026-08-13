@@ -7,7 +7,7 @@ setlocal EnableDelayedExpansion
 :: Prerequisites:
 ::   - Python 3.14+ (in PATH)
 ::   - Node.js 18+ (in PATH)
-::   - Yarn (install via: corepack enable)
+::   - Yarn 4.11.0 (run check-setup.bat)
 ::
 :: Output:
 ::   web/release/<yyyy-MM-dd_HH-mm_xxxxxxxx>/Third Space Vest Setup 1.0.0.exe
@@ -63,8 +63,12 @@ echo.
 
 :: Step 3: Install Node dependencies
 echo [3/5] Installing Node.js dependencies...
+call "%~dp0setup\require-corepack-yarn.bat"
+if errorlevel 1 (
+    echo [ERROR] Yarn 4.11.0 is required. Run check-setup.bat first.
+    exit /b 1
+)
 cd web
-call corepack enable >nul 2>&1
 call yarn install >nul 2>&1
 echo [OK] Node.js dependencies installed
 echo.

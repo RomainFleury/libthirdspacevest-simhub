@@ -49,13 +49,20 @@ echo [INFO] TSV_PYTHON=%TSV_PYTHON%
 echo        (Electron will use this Python if it needs to start the daemon)
 echo.
 
+:: Yarn 4.11.0 must already be set up (run check-setup.bat)
+call "%~dp0setup\require-corepack-yarn.bat"
+if errorlevel 1 (
+    echo [ERROR] Yarn 4.11.0 is required. Run check-setup.bat first.
+    pause
+    exit /b 1
+)
+
 :: Navigate to web directory
 cd /d "%~dp0..\web"
 
 :: Ensure dependencies
 if not exist "node_modules" (
     echo [WARN] Dependencies not installed. Installing...
-    call corepack enable >nul 2>&1
     call yarn install
 )
 
@@ -63,7 +70,7 @@ echo [OK] Starting Electron app...
 echo.
 
 :: Pass TSV_PYTHON out of setlocal; endlocal restores cwd to the script folder, so cd to web before yarn.
-endlocal & set "TSV_PYTHON=%TSV_PYTHON%" & cd /d "%~dp0..\web" & call yarn dev
+endlocal & set "TSV_PYTHON=%TSV_PYTHON%" & set "PATH=%PATH%" & cd /d "%~dp0..\web" & call yarn dev
 
 echo.
 echo App stopped.

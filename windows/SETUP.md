@@ -34,9 +34,13 @@
 - Restart your computer after installing Node.js
 - Make sure you installed Node.js LTS from nodejs.org
 
-### "yarn is not recognized"  
-- Run `check-setup.bat` again
-- Or open Command Prompt and run: `corepack enable`
+### "yarn is not recognized" or wrong Yarn version (1.x)
+- Run `check-setup.bat` (this is the only script that installs Corepack Yarn)
+- A classic Yarn install in `C:\Program Files (x86)\Yarn` is ignored by the setup scripts
+- Or open Command Prompt and run:
+  `npm install -g corepack`
+  `corepack enable yarn --install-directory "%APPDATA%\npm"`
+  `corepack prepare yarn@4.11.0 --activate`
 
 ### The app window doesn't open
 - Make sure you started the Python daemon first
@@ -64,8 +68,11 @@ cd path\to\libthirdspacevest-simhub\modern-third-space
 pip install -e .
 pip install libusb bettercam
 
-:: Enable Yarn
-corepack enable
+:: Enable Yarn (user-writable shims; avoids Program Files EPERM)
+npm install -g corepack
+corepack enable yarn --install-directory "%APPDATA%\npm"
+corepack prepare yarn@4.11.0 --activate
+set "PATH=%APPDATA%\npm;%PATH%"
 
 :: Go to web folder
 cd ..\web

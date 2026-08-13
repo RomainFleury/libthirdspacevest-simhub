@@ -57,6 +57,14 @@ echo [OK] Node.js and Python found
 echo [INFO] Python: %PYTHON_CMD%
 echo.
 
+::: Yarn 4.11.0 must be on PATH before starting the daemon
+call "%~dp0setup\require-corepack-yarn.bat"
+if errorlevel 1 (
+    echo [ERROR] Yarn 4.11.0 is required. Run check-setup.bat first.
+    pause
+    exit /b 1
+)
+
 ::: Install and validate libusb DLL
 call "%~dp0setup\check-libusb.bat"
 if %ERRORLEVEL% neq 0 (
@@ -90,7 +98,6 @@ cd /d "%~dp0..\web"
 ::: Check if dependencies are installed
 if not exist "node_modules" (
     echo [WARN] Dependencies not installed. Installing...
-    call corepack enable >nul 2>&1
     call yarn install
 )
 
@@ -106,7 +113,7 @@ echo.
 
 ::: Start the app (pass TSV_PYTHON to Electron so it uses same Python for auto-start)
 ::: Note: endlocal restores the working directory to the script folder; cd back to web before yarn.
-endlocal & set "TSV_PYTHON=%TSV_PYTHON%" & cd /d "%~dp0..\web" & call yarn dev
+endlocal & set "TSV_PYTHON=%TSV_PYTHON%" & set "PATH=%PATH%" & cd /d "%~dp0..\web" & call yarn dev
 
 ::: If we get here, the app was stopped
 echo.

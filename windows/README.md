@@ -49,7 +49,9 @@ These are called by `check-setup.bat` but can also be run individually:
 |--------|--------------|
 | `setup/check-python.bat` | Checks Python, helps create `.env.bat` |
 | `setup/check-node.bat` | Checks Node.js installation |
-| `setup/check-yarn.bat` | Checks/installs Yarn |
+| `setup/check-yarn.bat` | Checks/installs Yarn 4.11.0 via Corepack |
+| `setup/use-corepack-yarn.bat` | Internal: enable Corepack Yarn (called only by check-yarn) |
+| `setup/require-corepack-yarn.bat` | Puts Yarn 4.11.0 on PATH; used by start/build scripts |
 | `setup/check-python-packages.bat` | Installs `modern_third_space` package |
 | `setup/check-libusb.bat` | Installs libusb for USB communication |
 | `setup/check-bettercam.bat` | Installs bettercam for Screen Health |

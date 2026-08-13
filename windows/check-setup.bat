@@ -153,5 +153,5 @@ if !CHECKS_FAILED! equ 0 (
     echo.
 )
 
-
-@REM exit
+:: Keep Corepack Yarn shims on PATH for callers (e.g. build-release.bat)
+endlocal & set "PATH=%PATH%"

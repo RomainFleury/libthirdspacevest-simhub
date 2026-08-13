@@ -10,36 +10,28 @@ setlocal EnableDelayedExpansion
 
 echo [CHECK] Checking Yarn installation...
 
-:: Check if yarn is available by trying to get version
+call "%~dp0use-corepack-yarn.bat"
+if errorlevel 1 (
+    echo   [FAIL] Could not enable Corepack Yarn.
+    echo.
+    echo   Corepack is the only supported way to install Yarn.
+    echo   Do NOT use: npm install -g yarn
+    echo   A classic Yarn 1.x install ^(e.g. "C:\Program Files (x86)\Yarn"^) is ignored.
+    echo.
+    exit /b 1
+)
+
 for /f "tokens=*" %%i in ('yarn --version 2^>nul') do set "YARN_VERSION=%%i"
 if not defined YARN_VERSION (
-    echo   [INFO] Yarn not found, attempting to enable via Corepack...
-    
-    :: Try to enable corepack
-    call corepack enable >nul 2>&1
-    if !ERRORLEVEL! neq 0 (
-        echo   [FAIL] Corepack enable failed!
-        echo.
-        echo   Please enable Corepack manually:
-        echo     corepack enable
-        echo.
-        echo   Corepack is the only supported way to install Yarn.
-        echo   Do NOT use: npm install -g yarn
-        echo.
-        exit /b 1
-    )
-    
-    :: Check again after enabling corepack
-    for /f "tokens=*" %%i in ('yarn --version 2^>nul') do set "YARN_VERSION=%%i"
-    if not defined YARN_VERSION (
-        echo   [FAIL] Yarn still not available after enabling Corepack!
-        echo.
-        echo   Please try manually:
-        echo     corepack enable
-        echo     yarn --version
-        echo.
-        exit /b 1
-    )
+    echo   [FAIL] Yarn still not available after enabling Corepack!
+    echo.
+    echo   Please try manually:
+    echo     npm install -g corepack
+    echo     corepack enable yarn --install-directory "%%APPDATA%%\npm"
+    echo     corepack prepare yarn@4.11.0 --activate
+    echo     yarn --version
+    echo.
+    exit /b 1
 )
 
 :: Verify version matches package.json requirement (4.11.0)
@@ -56,8 +48,8 @@ if not "%VERSION_CLEAN%"=="%REQUIRED_VERSION%" (
     echo          Found: %YARN_VERSION%
     echo          Required: %REQUIRED_VERSION% from package.json
     echo.
-    echo   Corepack should automatically use the correct version.
-    echo   Try: corepack enable
+    echo   A global Yarn 1.x install may still be winning on PATH.
+    echo   Try: corepack prepare yarn@%REQUIRED_VERSION% --activate
     echo        cd web
     echo        yarn install
     echo.
@@ -66,4 +58,6 @@ if not "%VERSION_CLEAN%"=="%REQUIRED_VERSION%" (
 
 echo   [OK] Yarn %YARN_VERSION% correct version
 
+:: Keep Corepack shims first on PATH for the rest of check-setup.bat
+endlocal & set "PATH=%PATH%"
 exit /b 0
