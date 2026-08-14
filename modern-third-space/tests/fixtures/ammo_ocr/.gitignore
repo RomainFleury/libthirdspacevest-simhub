@@ -1,0 +1,7 @@
+# Local HUD crops for ammo OCR tests (do not commit game screenshots)
+*.png
+*.jpg
+*.jpeg
+*.bmp
+*.webp
+*.gif

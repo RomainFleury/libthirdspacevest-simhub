@@ -1,5 +1,6 @@
 import type { DetectorType } from "./draft/types";
 import { clamp01, clampInt } from "./utils";
+import type { AmmoOcrEngineId } from "./ammoOcrEngines";
 
 export type ProfileDraftSnapshot = {
   selectedPresetId: string;
@@ -45,6 +46,7 @@ export type HealthNumberDraftSnapshot = {
 
 export type RecoilDraftSnapshot = {
   recoilType: "off" | "ammo_number";
+  ocrEngine?: AmmoOcrEngineId;
   durationMs: number;
   roi: { x: number; y: number; w: number; h: number } | null;
   stableReads: number;
@@ -61,10 +63,10 @@ function attachRecoil(profile: Record<string, any>, recoil?: RecoilDraftSnapshot
     ...profile,
     recoil: {
       type: "ammo_number",
-      engine: "windows_ocr",
+      engine: "daemon",
       duration_ms: Math.max(25, Math.floor(recoil.durationMs)),
       roi: { x: clamp01(roi.x), y: clamp01(roi.y), w: clamp01(roi.w), h: clamp01(roi.h) },
-      // Schema placeholder only — Windows OCR accepts variable 1–3 digit ammo
+          // Schema placeholder only — text OCR accepts variable 1–3 digit ammo
       digits: 3,
       readout: {
         min: 0,

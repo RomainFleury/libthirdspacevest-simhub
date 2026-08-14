@@ -27,6 +27,12 @@ from enum import Enum
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 from ..vest.cell_layout import ALL_CELLS
+from .screen_ocr import (
+    DEFAULT_AMMO_OCR_ENGINE,
+    PROFILE_OCR_DAEMON,
+    TEXT_OCR_ENGINES,
+    uses_text_ocr_engine,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -442,15 +448,16 @@ class HealthNumberDetector:
     hit_on_decrease: HealthNumberHitOnDecrease
     templates: Optional[HealthNumberTemplates] = None
     name: str = "health_number"
-    # "templates" = taught bitmasks; "windows_ocr" = Windows.Media.Ocr (ammo recoil)
+    # "templates" = taught bitmasks; text engines = Windows OCR / RapidOCR (ammo recoil)
     engine: str = "templates"
 
     def validate(self) -> None:
         self.rect.validate()
         if not isinstance(self.digits, int) or self.digits < 1:
             raise ValueError("health_number.digits must be an int >= 1")
-        if self.engine not in ("templates", "windows_ocr"):
-            raise ValueError("health_number.engine must be 'templates' or 'windows_ocr'")
+        allowed = ("templates", PROFILE_OCR_DAEMON) + TEXT_OCR_ENGINES
+        if self.engine not in allowed:
+            raise ValueError(f"health_number.engine must be one of {allowed}")
         self.preprocess.validate()
         self.readout.validate()
         self.hit_on_decrease.validate()
@@ -562,10 +569,12 @@ class ScreenHealthManager:
         on_game_event: Optional[Callable[[str, Dict[str, Any]], None]] = None,
         on_trigger: Optional[Callable[[int, int], None]] = None,
         on_recoil: Optional[Callable[[int], None]] = None,
+        get_ocr_engine: Optional[Callable[[], str]] = None,
     ) -> None:
         self._on_game_event = on_game_event
         self._on_trigger = on_trigger
         self._on_recoil = on_recoil
+        self._get_ocr_engine = get_ocr_engine
 
         self._thread: Optional[threading.Thread] = None
         self._stop_evt = threading.Event()
@@ -842,17 +851,18 @@ class ScreenHealthManager:
 
             elif detector_type in ("health_number", "ammo_number"):
                 hn = detector_obj
-                if detector_type == "ammo_number" and getattr(hn, "engine", "templates") == "windows_ocr":
+                if detector_type == "ammo_number" and uses_text_ocr_engine(getattr(hn, "engine", "templates")):
                     ocr_text = ""
                     try:
-                        value, ocr_text = self._ammo_try_read_windows_ocr(raw, w, h, hn)
+                        value, ocr_text = self._ammo_try_read_text_ocr(raw, w, h, hn)
                         ocr_err = None
                     except Exception as e:
                         value = None
                         ocr_err = str(e)
                     eval_ms = (time.perf_counter() - eval0) * 1000.0
                     logger.info(
-                        "[screen_health_test] windows_ocr name=%s rect=%sx%s read=%s text=%r err=%s eval_ms=%.2f",
+                        "[screen_health_test] %s name=%s rect=%sx%s read=%s text=%r err=%s eval_ms=%.2f",
+                        hn.engine,
                         hn.name,
                         w,
                         h,
@@ -865,7 +875,7 @@ class ScreenHealthManager:
                         {
                             "type": detector_type,
                             "name": hn.name,
-                            "engine": "windows_ocr",
+                            "engine": hn.engine,
                             "rect_px": {"left": left, "top": top, "w": w, "h": h},
                             "read": int(value) if value is not None else None,
                             "ocr_text": ocr_text,
@@ -1415,12 +1425,13 @@ class ScreenHealthManager:
                 elif detector_type in ("health_number", "ammo_number"):
                     hn = detector_obj
                     is_ammo = detector_type == "ammo_number"
-                    if is_ammo and getattr(hn, "engine", "templates") == "windows_ocr":
+                    if is_ammo and uses_text_ocr_engine(getattr(hn, "engine", "templates")):
                         try:
-                            value, ocr_text = self._ammo_try_read_windows_ocr(raw_bgra, w, h, hn)
+                            value, ocr_text = self._ammo_try_read_text_ocr(raw_bgra, w, h, hn)
                             if value is None and should_periodic_log:
                                 logger.info(
-                                    "[screen_health] windows_ocr no-read detector=%s size=%sx%s text=%r",
+                                    "[screen_health] %s no-read detector=%s size=%sx%s text=%r",
+                                    hn.engine,
                                     hn.name,
                                     w,
                                     h,
@@ -1429,7 +1440,8 @@ class ScreenHealthManager:
                         except Exception as e:
                             if should_periodic_log:
                                 logger.warning(
-                                    "[screen_health] windows_ocr failed detector=%s err=%s",
+                                    "[screen_health] %s failed detector=%s err=%s",
+                                    hn.engine,
                                     hn.name,
                                     e,
                                 )
@@ -1759,11 +1771,15 @@ class ScreenHealthManager:
             ammo_dict = dict(recoil_data)
             ammo_dict["type"] = "health_number"
             ammo_dict["name"] = str(recoil_data.get("name") or "ammo_number")
-            # Default ammo recoil to Windows OCR (no digit teaching)
+            # Default: follow the daemon-wide OCR engine (Daemon Settings page)
             if "engine" not in ammo_dict:
-                ammo_dict["engine"] = "windows_ocr"
+                ammo_dict["engine"] = PROFILE_OCR_DAEMON
+            engine_name = str(ammo_dict.get("engine") or PROFILE_OCR_DAEMON)
+            allowed_ammo = ("templates", PROFILE_OCR_DAEMON) + TEXT_OCR_ENGINES
+            if engine_name not in allowed_ammo:
+                raise ValueError(f"recoil.engine must be one of {allowed_ammo}")
             # Variable-width ammo (1–3); keep schema digits field as an upper bound only
-            if str(ammo_dict.get("engine") or "") == "windows_ocr":
+            if uses_text_ocr_engine(engine_name):
                 ammo_dict["digits"] = 3
                 readout = ammo_dict.get("readout") if isinstance(ammo_dict.get("readout"), dict) else {}
                 ammo_dict["readout"] = {
@@ -1813,7 +1829,7 @@ class ScreenHealthManager:
                 threshold=float(preprocess_data.get("threshold", 0.6)),
                 scale=int(preprocess_data.get("scale", 1)),
             )
-        elif engine == "windows_ocr":
+        elif uses_text_ocr_engine(engine):
             preprocess = HealthNumberPreprocess(invert=False, threshold=0.6, scale=1)
         else:
             raise ValueError("health_number.preprocess is required")
@@ -1840,7 +1856,7 @@ class ScreenHealthManager:
 
         templates: Optional[HealthNumberTemplates] = None
         templates_data = d.get("templates")
-        if engine != "windows_ocr" and isinstance(templates_data, dict):
+        if not uses_text_ocr_engine(engine) and isinstance(templates_data, dict):
             t_id = str(templates_data.get("template_set_id") or "learned_v1")
             hamming_max = int(templates_data.get("hamming_max", 120))
             t_w = int(templates_data.get("width", 0))
@@ -1880,10 +1896,22 @@ class ScreenHealthManager:
         hn.validate()
         return hn
 
-    def _ammo_try_read_windows_ocr(
+    def _ammo_try_read_text_ocr(
         self, raw_bgra: bytes, width: int, height: int, hn: HealthNumberDetector
     ) -> Tuple[Optional[int], str]:
-        from .screen_ocr import read_ammo_value_from_bgra
+        from .screen_ocr import is_text_ocr_engine, normalize_text_ocr_engine, read_ammo_value_from_bgra
+
+        engine = str(hn.engine)
+        if self._get_ocr_engine is not None:
+            try:
+                engine = normalize_text_ocr_engine(self._get_ocr_engine())
+            except Exception:
+                if is_text_ocr_engine(engine):
+                    pass
+                else:
+                    engine = DEFAULT_AMMO_OCR_ENGINE
+        elif not is_text_ocr_engine(engine):
+            engine = DEFAULT_AMMO_OCR_ENGINE
 
         value, text = read_ammo_value_from_bgra(
             raw_bgra,
@@ -1891,10 +1919,12 @@ class ScreenHealthManager:
             height,
             min_value=int(hn.readout.min_value),
             max_value=int(hn.readout.max_value),
+            engine=engine,
         )
         if self._debug_log_values:
             logger.info(
-                "[screen_health] windows_ocr detector=%s size=%sx%s text=%r value=%s",
+                "[screen_health] %s detector=%s size=%sx%s text=%r value=%s",
+                engine,
                 hn.name,
                 width,
                 height,

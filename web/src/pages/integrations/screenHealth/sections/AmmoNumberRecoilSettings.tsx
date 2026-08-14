@@ -5,6 +5,9 @@ import { useScreenHealthProfileDraftControls } from "../draft/ProfileDraftContex
 import { useScreenHealthRednessDraftControls } from "../draft/RednessDraftContext";
 import { useScreenHealthHealthBarDraftControls } from "../draft/HealthBarDraftContext";
 import { useScreenHealthHealthNumberDraftControls } from "../draft/HealthNumberDraftContext";
+import { Link } from "react-router-dom";
+import { ocrGetSettings } from "../../../../lib/bridgeApi";
+import { useEffect, useState } from "react";
 
 const PRESETS = SCREEN_HEALTH_PRESETS as Array<{ preset_id: string; profile: { meta?: unknown } }>;
 
@@ -29,6 +32,20 @@ export function AmmoNumberRecoilSettings(props: {
   const { readDraft: readRednessDraft } = useScreenHealthRednessDraftControls();
   const { readDraft: readHealthBarDraft } = useScreenHealthHealthBarDraftControls();
   const { readDraft: readHealthNumberDraft } = useScreenHealthHealthNumberDraftControls();
+  const [activeEngineLabel, setActiveEngineLabel] = useState("Daemon Settings");
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const result = await ocrGetSettings();
+        const active = result.ocr_engines?.find((e) => e.id === result.ocr_engine);
+        if (active?.label) setActiveEngineLabel(active.label);
+        else if (result.ocr_engine) setActiveEngineLabel(result.ocr_engine);
+      } catch {
+        /* daemon may be down */
+      }
+    })();
+  }, []);
 
   const onTest = async () => {
     setCalibrationError(null);
@@ -78,8 +95,11 @@ export function AmmoNumberRecoilSettings(props: {
     <div className="space-y-3">
       <div className="text-xs text-slate-400 space-y-1">
         <p>
-          Uses <span className="text-slate-300">Windows OCR</span> — no digit teaching. Draw a tight ammo ROI, then
-          Start. Reads any 1–3 digit ammo value (so 12 → 9 still works). Windows-only (needs an OCR language pack).
+          Using <span className="text-slate-300">{activeEngineLabel}</span> from{" "}
+          <Link to="/daemon-settings" className="text-blue-400 hover:text-blue-300">
+            Daemon Settings
+          </Link>
+          . Draw a tight ammo ROI, then Test OCR / Start. Reads any 1–3 digit ammo value.
         </p>
       </div>
 
@@ -117,7 +137,7 @@ export function AmmoNumberRecoilSettings(props: {
       </div>
 
       <div className="rounded-xl bg-slate-900/40 p-3 ring-1 ring-white/5 space-y-2">
-        <div className="text-sm text-white font-medium">Test Windows OCR</div>
+        <div className="text-sm text-white font-medium">Test OCR ({activeEngineLabel})</div>
         <div className="text-xs text-slate-400">Runs against the current calibration screenshot via the daemon.</div>
         <button
           onClick={() => {

@@ -42,7 +42,7 @@ export function CaptureSettingsSection(props: {
           />
         </div>
         <div>
-          <label className="text-sm text-slate-400 block mb-1">Tick (ms)</label>
+          <label className="text-sm text-slate-400 block mb-1">Capture interval (ms)</label>
           <input
             type="number"
             min={10}

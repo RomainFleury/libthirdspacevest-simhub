@@ -342,6 +342,27 @@ export type ScreenHealthGetProfileResult = {
   error?: string;
 };
 
+export type OcrEngineInfo = {
+  id: string;
+  label: string;
+  beta?: boolean;
+  group?: string;
+  description?: string;
+  install?: string;
+  offered_in_ui?: boolean;
+  ui_summary?: string;
+  available?: boolean;
+  unavailable_reason?: string | null;
+  active?: boolean;
+};
+
+export type OcrSettingsResult = {
+  success: boolean;
+  ocr_engine?: string;
+  ocr_engines?: OcrEngineInfo[];
+  error?: string;
+};
+
 // Type definition for the Electron bridge API
 declare global {
   interface Window {
@@ -599,6 +620,10 @@ declare global {
       playEffect: (effectName: string) => Promise<PlayEffectResult>;
       listEffectsLibrary: () => Promise<EffectsListResult>;
       stopEffect: () => Promise<{ success: boolean; error?: string }>;
+      ocrListEngines: () => Promise<OcrSettingsResult>;
+      ocrGetSettings: () => Promise<OcrSettingsResult>;
+      ocrSetEngine: (ocrEngine: string) => Promise<OcrSettingsResult>;
+      ocrOpenWindowsLanguageSettings: () => Promise<{ success: boolean; error?: string }>;
       // USB LC relay / solenoid recoil
       relayListPorts: () => Promise<RelayListPortsResult>;
       relayConnect: (
@@ -1002,6 +1027,22 @@ export async function screenHealthDeleteProfile(profileId: string): Promise<Scre
  */
 export async function screenHealthGetProfile(profileId: string): Promise<ScreenHealthGetProfileResult> {
   return await ensureBridge().screenHealthGetProfile(profileId);
+}
+
+export async function ocrListEngines(): Promise<OcrSettingsResult> {
+  return await ensureBridge().ocrListEngines();
+}
+
+export async function ocrGetSettings(): Promise<OcrSettingsResult> {
+  return await ensureBridge().ocrGetSettings();
+}
+
+export async function ocrSetEngine(ocrEngine: string): Promise<OcrSettingsResult> {
+  return await ensureBridge().ocrSetEngine(ocrEngine);
+}
+
+export async function ocrOpenWindowsLanguageSettings(): Promise<{ success: boolean; error?: string }> {
+  return await ensureBridge().ocrOpenWindowsLanguageSettings();
 }
 
 // -------------------------------------------------------------------------

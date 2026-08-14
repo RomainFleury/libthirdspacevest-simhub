@@ -1084,6 +1084,49 @@ class DaemonBridge extends EventEmitter {
   }
 
   // -------------------------------------------------------------------------
+  // Daemon OCR engine (ammo recoil)
+  // -------------------------------------------------------------------------
+
+  async ocrListEngines() {
+    try {
+      const response = await this.sendCommand("ocr_list_engines");
+      return {
+        success: true,
+        ocr_engine: response.ocr_engine,
+        ocr_engines: response.ocr_engines ?? [],
+      };
+    } catch (error) {
+      return { success: false, ocr_engines: [], error: error.message };
+    }
+  }
+
+  async ocrGetSettings() {
+    try {
+      const response = await this.sendCommand("ocr_get_settings");
+      return {
+        success: true,
+        ocr_engine: response.ocr_engine,
+        ocr_engines: response.ocr_engines ?? [],
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  async ocrSetEngine(ocrEngine) {
+    try {
+      const response = await this.sendCommand("ocr_set_engine", { ocr_engine: ocrEngine });
+      return {
+        success: response.success ?? response.ok ?? false,
+        ocr_engine: response.ocr_engine,
+        error: response.message,
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // USB LC relay / solenoid recoil
   // -------------------------------------------------------------------------
 

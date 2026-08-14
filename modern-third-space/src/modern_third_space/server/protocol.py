@@ -70,6 +70,10 @@ class CommandType(Enum):
     SCREEN_HEALTH_STOP = "screen_health_stop"
     SCREEN_HEALTH_STATUS = "screen_health_status"
     SCREEN_HEALTH_TEST = "screen_health_test"
+    # Daemon-wide OCR engine (ammo recoil)
+    OCR_LIST_ENGINES = "ocr_list_engines"
+    OCR_GET_SETTINGS = "ocr_get_settings"
+    OCR_SET_ENGINE = "ocr_set_engine"
     # Predefined effects
     PLAY_EFFECT = "play_effect"
     LIST_EFFECTS = "list_effects"
@@ -205,6 +209,7 @@ class Command:
     fire_mode: Optional[str] = None  # single | burst | fullauto
     fire_rate_rpm: Optional[int] = None  # rounds per minute
     burst_count: Optional[int] = None  # shots per burst
+    ocr_engine: Optional[str] = None  # ammo OCR backend id
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Command":
@@ -248,6 +253,7 @@ class Command:
             fire_mode=data.get("fire_mode"),
             fire_rate_rpm=data.get("fire_rate_rpm"),
             burst_count=data.get("burst_count"),
+            ocr_engine=data.get("ocr_engine"),
         )
     
     @classmethod
@@ -375,6 +381,9 @@ class Response:
     fire_rate_rpm: Optional[int] = None
     burst_count: Optional[int] = None
     interval_ms: Optional[int] = None
+    # Daemon OCR settings
+    ocr_engine: Optional[str] = None
+    ocr_engines: Optional[List[Dict[str, Any]]] = None
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary, excluding None values."""
@@ -1282,6 +1291,52 @@ def response_relay_mouse_status(
         fire_rate_rpm=fire_rate_rpm,
         burst_count=burst_count,
         interval_ms=interval_ms,
+        message=error,
+    )
+
+
+def response_ocr_list_engines(
+    engines: List[Dict[str, Any]],
+    ocr_engine: str,
+    req_id: Optional[str] = None,
+) -> Response:
+    return Response(
+        response="ocr_list_engines",
+        req_id=req_id,
+        ok=True,
+        success=True,
+        ocr_engine=ocr_engine,
+        ocr_engines=engines,
+    )
+
+
+def response_ocr_get_settings(
+    ocr_engine: str,
+    engines: Optional[List[Dict[str, Any]]] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    return Response(
+        response="ocr_get_settings",
+        req_id=req_id,
+        ok=True,
+        success=True,
+        ocr_engine=ocr_engine,
+        ocr_engines=engines,
+    )
+
+
+def response_ocr_set_engine(
+    success: bool,
+    ocr_engine: Optional[str] = None,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    return Response(
+        response="ocr_set_engine",
+        req_id=req_id,
+        success=success,
+        ok=success,
+        ocr_engine=ocr_engine,
         message=error,
     )
 

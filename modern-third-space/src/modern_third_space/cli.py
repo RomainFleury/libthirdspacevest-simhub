@@ -374,6 +374,53 @@ def _cmd_relay(args: argparse.Namespace) -> int:
     return relay_main(argv)
 
 
+def _cmd_ocr(args: argparse.Namespace) -> int:
+    """OCR eval / engine listing (no daemon required)."""
+    from pathlib import Path
+
+    from .server.ocr import list_ocr_engines
+    from .server.ocr.eval import (
+        default_fixture_dir,
+        evaluate_folder,
+        evaluate_repeats,
+        format_eval_table,
+        format_repeat_table,
+        reports_to_json,
+        summaries_to_json,
+    )
+
+    action = getattr(args, "ocr_action", None) or "eval"
+    if action == "engines":
+        for row in list_ocr_engines():
+            mark = "ready" if row["available"] else "missing"
+            print(f"{row['id']:<22} {mark:<8} {row['label']}")
+        return 0
+
+    folder = Path(args.dir) if getattr(args, "dir", None) else default_fixture_dir()
+    engines = [args.engine] if getattr(args, "engine", None) else None
+    repeats = max(1, int(getattr(args, "repeats", 1) or 1))
+    if repeats > 1:
+        summaries = evaluate_repeats(folder, engines=engines, repeats=repeats)
+        if getattr(args, "json", False):
+            print(summaries_to_json(summaries))
+        else:
+            print(format_repeat_table(summaries, folder))
+            if not any(s.images for s in summaries):
+                print(f"No labeled images in {folder} (name files like 12.png).")
+                return 1
+        return 0
+
+    reports = evaluate_folder(folder, engines=engines)
+    if getattr(args, "json", False):
+        print(reports_to_json(reports))
+    else:
+        print(format_eval_table(reports, folder))
+        if not any(r.total for r in reports):
+            print(f"No labeled images in {folder} (name files like 12.png).")
+            return 1
+    return 0
+
+
 COMMANDS: Dict[str, Any] = {
     "status": _cmd_status,
     "trigger": _cmd_trigger,
@@ -385,6 +432,7 @@ COMMANDS: Dict[str, Any] = {
     "daemon": _cmd_daemon,
     "cs2": _cmd_cs2,
     "relay": _cmd_relay,
+    "ocr": _cmd_ocr,
 }
 
 
@@ -506,7 +554,15 @@ def build_parser() -> argparse.ArgumentParser:
     relay_pulse = relay_sub.add_parser("pulse", help="Pulse relay for recoil")
     _add_relay_port_args(relay_pulse)
     relay_pulse.add_argument("--ms", type=int, default=40, help="Pulse duration in ms")
-    
+
+    ocr = sub.add_parser("ocr", help="Ammo OCR eval against HUD crops")
+    ocr_sub = ocr.add_subparsers(dest="ocr_action")
+    ocr_sub.add_parser("engines", help="List OCR backends and whether they are installed")
+    ocr_eval = ocr_sub.add_parser("eval", help="Score engines on tests/fixtures/ammo_ocr")
+    ocr_eval.add_argument("--dir", type=str, default=None, help="Folder of images named like 12.png")
+    ocr_eval.add_argument("--repeats", type=int, default=1, help="Run N times to measure consistency (e.g. 5)")
+    ocr_eval.add_argument("--json", action="store_true", help="Print JSON instead of a table")
+
     return parser
 
 
@@ -531,6 +587,8 @@ def main(argv: list[str] | None = None) -> int:
     if command == "cs2":
         return handler(args)
     if command == "relay":
+        return handler(args)
+    if command == "ocr":
         return handler(args)
     
     # Commands that need a controller

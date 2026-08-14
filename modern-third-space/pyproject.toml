@@ -27,7 +27,24 @@ dependencies = [
 dev = [
   "ruff>=0.7.0",
   "pytest>=7.4.0",
-  "pytest-asyncio>=0.21.0"
+  "pytest-asyncio>=0.21.0",
+  "pillow>=10.0.0",
+]
+ocr-rapid = [
+  "rapidocr>=3.0",
+  "onnxruntime>=1.17",
+]
+ocr-tesseract = [
+  "pytesseract>=0.3.10",
+]
+ocr-cv = [
+  "opencv-python-headless>=4.8,<5",
+]
+ocr-all = [
+  "rapidocr>=3.0",
+  "onnxruntime>=1.17",
+  "pytesseract>=0.3.10",
+  "opencv-python-headless>=4.8,<5",
 ]
 
 [project.scripts]

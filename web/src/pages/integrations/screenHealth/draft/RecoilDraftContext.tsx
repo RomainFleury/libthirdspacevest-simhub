@@ -1,8 +1,10 @@
 import { createContext, useContext, useMemo, useRef, useState } from "react";
 import type { HealthNumberTestResult, RecoilType, RoiRect } from "./types";
+import { DEFAULT_AMMO_OCR_ENGINE, type AmmoOcrEngineId } from "../ammoOcrEngines";
 
 export type RecoilDraftState = {
   recoilType: RecoilType;
+  ocrEngine: AmmoOcrEngineId;
   durationMs: number;
   roi: RoiRect | null;
   stableReads: number;
@@ -16,6 +18,7 @@ type StateCtx = RecoilDraftState;
 
 type ActionsCtx = {
   setRecoilType: (v: RecoilType) => void;
+  setOcrEngine: (v: AmmoOcrEngineId) => void;
   setDurationMs: (v: number) => void;
   setRoi: (v: RoiRect | null) => void;
   setStableReads: (v: number) => void;
@@ -32,6 +35,7 @@ const ActionsC = createContext<ActionsCtx | null>(null);
 
 export const DEFAULT_RECOIL_DRAFT: RecoilDraftState = {
   recoilType: "off",
+  ocrEngine: DEFAULT_AMMO_OCR_ENGINE,
   durationMs: 40,
   roi: null,
   stableReads: 2,
@@ -57,6 +61,7 @@ export function ScreenHealthRecoilDraftProvider(props: { children: React.ReactNo
   const actions = useMemo<ActionsCtx>(() => {
     return {
       setRecoilType: (v) => setStateAndRef((p) => ({ ...p, recoilType: v })),
+      setOcrEngine: (v) => setStateAndRef((p) => ({ ...p, ocrEngine: v })),
       setDurationMs: (v) => setStateAndRef((p) => ({ ...p, durationMs: v })),
       setRoi: (v) => setStateAndRef((p) => ({ ...p, roi: v })),
       setStableReads: (v) => setStateAndRef((p) => ({ ...p, stableReads: v })),

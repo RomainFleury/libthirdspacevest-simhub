@@ -76,7 +76,9 @@ from .protocol import (
 from .cs2_manager import CS2Manager, generate_cs2_config
 from .alyx_manager import AlyxManager, get_mod_info as get_alyx_mod_info
 from .l4d2_manager import L4D2Manager
+from .ocr_settings import load_ocr_settings, save_ocr_settings
 from .screen_health_manager import ScreenHealthManager
+from .screen_ocr import list_ocr_engines, normalize_text_ocr_engine
 from .protocol import (
     event_alyx_started,
     event_alyx_stopped,
@@ -103,6 +105,9 @@ from .protocol import (
     response_screen_health_stop,
     response_screen_health_status,
     response_screen_health_test,
+    response_ocr_list_engines,
+    response_ocr_get_settings,
+    response_ocr_set_engine,
     # Predefined effects
     event_effect_started,
     event_effect_completed,
@@ -182,10 +187,12 @@ class VestDaemon:
         )
 
         # Generic Screen Health Watcher manager
+        self._ocr_settings = load_ocr_settings()
         self._screen_health_manager = ScreenHealthManager(
             on_game_event=self._on_screen_health_game_event,
             on_trigger=self._on_screen_health_trigger,
             on_recoil=self._on_solenoid_recoil,
+            get_ocr_engine=lambda: str(self._ocr_settings.get("engine") or "windows_ocr"),
         )
 
         # USB LC relay (solenoid / recoil)
@@ -472,6 +479,15 @@ class VestDaemon:
 
         if cmd_type == CommandType.SCREEN_HEALTH_TEST:
             return await self._cmd_screen_health_test(command)
+
+        if cmd_type == CommandType.OCR_LIST_ENGINES:
+            return await self._cmd_ocr_list_engines(command)
+
+        if cmd_type == CommandType.OCR_GET_SETTINGS:
+            return await self._cmd_ocr_get_settings(command)
+
+        if cmd_type == CommandType.OCR_SET_ENGINE:
+            return await self._cmd_ocr_set_engine(command)
         
         # Predefined effects commands
         if cmd_type == CommandType.PLAY_EFFECT:
@@ -1689,6 +1705,27 @@ class VestDaemon:
                     frame_file.unlink(missing_ok=True)
                 except OSError:
                     pass
+
+    async def _cmd_ocr_list_engines(self, command: Command) -> Response:
+        active = str(self._ocr_settings.get("engine") or "windows_ocr")
+        engines = list_ocr_engines(active)
+        return response_ocr_list_engines(engines=engines, ocr_engine=active, req_id=command.req_id)
+
+    async def _cmd_ocr_get_settings(self, command: Command) -> Response:
+        active = str(self._ocr_settings.get("engine") or "windows_ocr")
+        engines = list_ocr_engines(active)
+        return response_ocr_get_settings(ocr_engine=active, engines=engines, req_id=command.req_id)
+
+    async def _cmd_ocr_set_engine(self, command: Command) -> Response:
+        raw = (command.ocr_engine or "").strip()
+        if not raw:
+            return response_ocr_set_engine(False, error="ocr_engine is required", req_id=command.req_id)
+        try:
+            engine = normalize_text_ocr_engine(raw)
+            self._ocr_settings = save_ocr_settings(engine)
+        except Exception as e:
+            return response_ocr_set_engine(False, error=str(e), req_id=command.req_id)
+        return response_ocr_set_engine(True, ocr_engine=engine, req_id=command.req_id)
 
     # -------------------------------------------------------------------------
     # Generic Screen Health Watcher callbacks

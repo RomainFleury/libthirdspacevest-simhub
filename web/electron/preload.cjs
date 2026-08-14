@@ -134,6 +134,11 @@ contextBridge.exposeInMainWorld("vestBridge", {
   modsOpenFolder: (modId) => ipcRenderer.invoke("mods:openFolder", modId),
   modsGetReadme: (modId) => ipcRenderer.invoke("mods:getReadme", modId),
 
+  ocrListEngines: () => ipcRenderer.invoke("ocr:listEngines"),
+  ocrGetSettings: () => ipcRenderer.invoke("ocr:getSettings"),
+  ocrSetEngine: (ocrEngine) => ipcRenderer.invoke("ocr:setEngine", ocrEngine),
+  ocrOpenWindowsLanguageSettings: () => ipcRenderer.invoke("ocr:openWindowsLanguageSettings"),
+
   // USB LC relay / solenoid recoil
   relayListPorts: () => ipcRenderer.invoke("relay:listPorts"),
   relayConnect: (port, baud, switchAddress) =>

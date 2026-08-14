@@ -41,6 +41,18 @@ export function Navigation() {
           Recoil
         </NavLink>
         <NavLink
+          to="/daemon-settings"
+          className={({ isActive }) =>
+            `px-3 md:px-4 py-3 text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+              isActive
+                ? "text-blue-400 border-b-2 border-blue-400"
+                : "text-slate-400 hover:text-slate-200"
+            }`
+          }
+        >
+          Daemon
+        </NavLink>
+        <NavLink
           to="/vests"
           className={({ isActive }) =>
             `px-3 md:px-4 py-3 text-sm font-medium transition-all duration-200 whitespace-nowrap ${

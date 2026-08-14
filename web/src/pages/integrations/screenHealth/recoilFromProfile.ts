@@ -1,4 +1,5 @@
 import { DEFAULT_RECOIL_DRAFT, type RecoilDraftState } from "./draft/RecoilDraftContext";
+import { DEFAULT_AMMO_OCR_ENGINE, normalizeAmmoOcrEngine } from "./ammoOcrEngines";
 
 /** Build recoil draft fields from a daemon profile JSON object. */
 export function recoilDraftFromProfile(p: any): Partial<RecoilDraftState> {
@@ -6,6 +7,7 @@ export function recoilDraftFromProfile(p: any): Partial<RecoilDraftState> {
   if (!r || typeof r !== "object" || r.type === "off" || !r.type) {
     return {
       recoilType: "off",
+      ocrEngine: DEFAULT_AMMO_OCR_ENGINE,
       durationMs: DEFAULT_RECOIL_DRAFT.durationMs,
       calibrationError: null,
       testResult: null,
@@ -13,11 +15,12 @@ export function recoilDraftFromProfile(p: any): Partial<RecoilDraftState> {
   }
 
   if (r.type !== "ammo_number") {
-    return { recoilType: "off", calibrationError: null, testResult: null };
+    return { recoilType: "off", ocrEngine: DEFAULT_AMMO_OCR_ENGINE, calibrationError: null, testResult: null };
   }
 
   return {
     recoilType: "ammo_number",
+    ocrEngine: normalizeAmmoOcrEngine(r.engine),
     durationMs: Number(r.duration_ms ?? DEFAULT_RECOIL_DRAFT.durationMs),
     roi: {
       x: Number(r.roi?.x ?? 0),
