@@ -99,7 +99,7 @@ export function AmmoNumberRecoilSettings(props: {
           <Link to="/daemon-settings" className="text-blue-400 hover:text-blue-300">
             Daemon Settings
           </Link>
-          . Draw a tight ammo ROI, then Test OCR / Start. Reads any 1–3 digit ammo value.
+          — the same engine as health-number detectors. Draw a tight ammo ROI, then Test OCR / Start.
         </p>
       </div>
 

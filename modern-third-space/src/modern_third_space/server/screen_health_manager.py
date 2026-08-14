@@ -448,7 +448,7 @@ class HealthNumberDetector:
     hit_on_decrease: HealthNumberHitOnDecrease
     templates: Optional[HealthNumberTemplates] = None
     name: str = "health_number"
-    # "templates" = taught bitmasks; text engines = Windows OCR / RapidOCR (ammo recoil)
+    # "templates" = taught bitmasks (legacy); "daemon" / text engines = Daemon Settings OCR
     engine: str = "templates"
 
     def validate(self) -> None:
@@ -851,7 +851,7 @@ class ScreenHealthManager:
 
             elif detector_type in ("health_number", "ammo_number"):
                 hn = detector_obj
-                if detector_type == "ammo_number" and uses_text_ocr_engine(getattr(hn, "engine", "templates")):
+                if uses_text_ocr_engine(getattr(hn, "engine", "templates")):
                     ocr_text = ""
                     try:
                         value, ocr_text = self._ammo_try_read_text_ocr(raw, w, h, hn)
@@ -1425,7 +1425,7 @@ class ScreenHealthManager:
                 elif detector_type in ("health_number", "ammo_number"):
                     hn = detector_obj
                     is_ammo = detector_type == "ammo_number"
-                    if is_ammo and uses_text_ocr_engine(getattr(hn, "engine", "templates")):
+                    if uses_text_ocr_engine(getattr(hn, "engine", "templates")):
                         try:
                             value, ocr_text = self._ammo_try_read_text_ocr(raw_bgra, w, h, hn)
                             if value is None and should_periodic_log:
@@ -1805,7 +1805,14 @@ class ScreenHealthManager:
     def _parse_health_number_detector(self, d: Dict[str, Any]) -> HealthNumberDetector:
         name_raw = d.get("name") or "health_number"
         name = str(name_raw)
-        engine = str(d.get("engine") or "templates")
+        templates_data = d.get("templates")
+        has_templates = isinstance(templates_data, dict) and bool(templates_data.get("digits"))
+        if d.get("engine"):
+            engine = str(d.get("engine"))
+        elif has_templates:
+            engine = "templates"
+        else:
+            engine = PROFILE_OCR_DAEMON
 
         roi = d.get("roi")
         if not isinstance(roi, dict):
@@ -1855,7 +1862,6 @@ class ScreenHealthManager:
         hit_on_decrease.validate()
 
         templates: Optional[HealthNumberTemplates] = None
-        templates_data = d.get("templates")
         if not uses_text_ocr_engine(engine) and isinstance(templates_data, dict):
             t_id = str(templates_data.get("template_set_id") or "learned_v1")
             hamming_max = int(templates_data.get("hamming_max", 120))

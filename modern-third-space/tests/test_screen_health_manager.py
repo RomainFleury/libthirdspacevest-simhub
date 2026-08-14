@@ -448,6 +448,63 @@ def test_parse_profile_recoil_ammo_number():
     assert parsed.ammo_numbers[0].templates is None
 
 
+def test_parse_profile_health_number_uses_daemon_ocr_without_templates():
+    manager = shm.ScreenHealthManager()
+    parsed = manager._parse_profile(
+        {
+            "schema_version": 0,
+            "name": "hp_ocr",
+            "capture": {"monitor_index": 1, "tick_ms": 50},
+            "detectors": [
+                {
+                    "type": "health_number",
+                    "name": "health_number",
+                    "engine": "daemon",
+                    "roi": {"x": 0.05, "y": 0.9, "w": 0.12, "h": 0.06},
+                    "digits": 3,
+                    "readout": {"min": 0, "max": 300, "stable_reads": 2},
+                    "hit_on_decrease": {"min_drop": 1, "cooldown_ms": 150},
+                }
+            ],
+        }
+    )
+    assert len(parsed.health_numbers) == 1
+    assert parsed.health_numbers[0].engine == "daemon"
+    assert parsed.health_numbers[0].templates is None
+    assert parsed.health_numbers[0].readout.max_value == 300
+
+
+def test_parse_profile_health_number_keeps_templates_when_present():
+    manager = shm.ScreenHealthManager()
+    parsed = manager._parse_profile(
+        {
+            "schema_version": 0,
+            "name": "hp_templates",
+            "capture": {"monitor_index": 1, "tick_ms": 50},
+            "detectors": [
+                {
+                    "type": "health_number",
+                    "roi": {"x": 0.05, "y": 0.9, "w": 0.12, "h": 0.06},
+                    "digits": 1,
+                    "preprocess": {"invert": False, "threshold": 0.6, "scale": 1},
+                    "readout": {"min": 0, "max": 9, "stable_reads": 1},
+                    "hit_on_decrease": {"min_drop": 1, "cooldown_ms": 50},
+                    "templates": {
+                        "template_set_id": "t",
+                        "hamming_max": 0,
+                        "width": 2,
+                        "height": 2,
+                        "digits": {"1": "1100"},
+                    },
+                }
+            ],
+        }
+    )
+    assert parsed.health_numbers[0].engine == "templates"
+    assert parsed.health_numbers[0].templates is not None
+
+
+
 def test_debug_write_bmp_bgra_writes_valid_header(tmp_path):
     manager = shm.ScreenHealthManager(on_game_event=lambda *_: None, on_trigger=lambda *_: None)
     # 2x1 BGRA: [black, white]

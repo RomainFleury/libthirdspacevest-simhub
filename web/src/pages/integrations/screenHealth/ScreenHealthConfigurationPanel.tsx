@@ -123,7 +123,10 @@ function ScreenHealthConfigurationPanelInner(props: Props) {
 
       <CalibrationCanvasSection lastCapturedImage={lastCapturedImage} />
 
-      <DetectorSettingsSwitch />
+      <DetectorSettingsSwitch
+        lastCapturedImage={lastCapturedImage}
+        evaluateProfileOnScreenshot={evaluateProfileOnScreenshot}
+      />
 
       <RecoilSelectionSection />
       <RecoilSettingsSwitch
@@ -147,11 +150,22 @@ function ScreenHealthConfigurationPanelInner(props: Props) {
   );
 }
 
-function DetectorSettingsSwitch() {
+function DetectorSettingsSwitch(props: {
+  lastCapturedImage: { path: string } | null;
+  evaluateProfileOnScreenshot: (
+    profile: Record<string, any>,
+    imagePath: string
+  ) => Promise<{ success: boolean; test_result?: Record<string, any> | null; error?: string }>;
+}) {
   const state = useScreenHealthProfileDraft();
   if (state.detectorType === "redness_rois") return <RednessSettings />;
   if (state.detectorType === "health_bar") return <HealthBarSettings />;
-  return <HealthNumberSettings />;
+  return (
+    <HealthNumberSettings
+      lastCapturedImage={props.lastCapturedImage}
+      evaluateProfileOnScreenshot={props.evaluateProfileOnScreenshot}
+    />
+  );
 }
 
 function RecoilSettingsSwitch(props: {

@@ -79,8 +79,9 @@ export function DaemonSettingsPage() {
       <header>
         <h1 className="text-2xl md:text-3xl font-bold text-white">Daemon Settings</h1>
         <p className="mt-2 text-sm md:text-base text-slate-400">
-          Live recoil uses <span className="text-slate-200">Windows OCR</span> by default. You can override to OpenCV +
-          kNN for a specific game if it reads your HUD better. Other backends stay in the daemon for lab eval only.
+          Live recoil and health-number detectors use <span className="text-slate-200">Windows OCR</span> by
+          default. You can override to OpenCV + kNN if it reads a given HUD better. Other backends stay in the
+          daemon for lab eval only.
         </p>
       </header>
 
@@ -100,7 +101,7 @@ export function DaemonSettingsPage() {
 
       {windowsOcrMissing && (
         <div className="rounded-xl bg-rose-950/40 p-4 ring-1 ring-rose-500/30 space-y-3">
-          <div className="text-sm font-medium text-rose-100">Windows OCR is required for the default ammo reader</div>
+          <div className="text-sm font-medium text-rose-100">Windows OCR is required for the default digit reader</div>
           <p className="text-sm text-rose-200/90">
             The app already includes the Python OCR bindings. Windows still needs an Optical character recognition
             language pack — we cannot ship that inside the installer.

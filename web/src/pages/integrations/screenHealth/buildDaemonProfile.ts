@@ -146,24 +146,13 @@ export function buildScreenHealthDaemonProfile(args: {
           {
             type: "health_number",
             name: "health_number",
+            engine: "daemon",
             roi: { x: clamp01(roi.x), y: clamp01(roi.y), w: clamp01(roi.w), h: clamp01(roi.h) },
             digits: Math.max(1, Math.floor(hn.digits)),
-            preprocess: {
-              invert: Boolean(hn.invert),
-              threshold: Math.max(0, Math.min(1, hn.threshold)),
-              scale: Math.max(1, Math.floor(hn.scale)),
-            },
             readout: {
               min: Math.floor(hn.readMin),
               max: Math.floor(hn.readMax),
               stable_reads: Math.max(1, Math.floor(hn.stableReads)),
-            },
-            templates: {
-              template_set_id: "learned_v1",
-              hamming_max: Math.max(0, Math.floor(hn.hammingMax)),
-              width: hn.templateSize.w,
-              height: hn.templateSize.h,
-              digits: hn.templates,
             },
             hit_on_decrease: {
               min_drop: Math.max(1, Math.floor(hn.hitMinDrop)),
