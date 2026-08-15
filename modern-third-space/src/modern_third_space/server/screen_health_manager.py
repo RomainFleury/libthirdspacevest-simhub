@@ -100,6 +100,27 @@ def normalized_rect_to_pixels(rect: NormalizedRect, frame_w: int, frame_h: int) 
     return left, top, width, height
 
 
+def clamp_crop_rect(
+    left: int, top: int, width: int, height: int, frame_w: int, frame_h: int
+) -> Tuple[int, int, int, int]:
+    """Clamp a pixel crop so it stays inside the actual captured frame."""
+    fw = max(1, int(frame_w))
+    fh = max(1, int(frame_h))
+    l = max(0, min(int(left), fw - 1))
+    t = max(0, min(int(top), fh - 1))
+    w = max(1, min(max(1, int(width)), fw - l))
+    h = max(1, min(max(1, int(height)), fh - t))
+    return l, t, w, h
+
+
+def _as_captured_bgra(item: Any, req_w: int, req_h: int) -> Tuple[bytes, int, int]:
+    """Normalize capture_multiple_bgra output to (bytes, width, height)."""
+    if isinstance(item, tuple) and len(item) >= 3:
+        raw, w, h = item[0], int(item[1]), int(item[2])
+        return bytes(raw), max(1, w), max(1, h)
+    return bytes(item), int(req_w), int(req_h)
+
+
 def redness_score_from_bgra(raw_bgra: bytes, width: int, height: int) -> float:
     """
     Compute a redness score in [0,1] from BGRA bytes.
@@ -534,21 +555,18 @@ def _decode_inline_bgra_base64_to_hwc(b64: str, width: int, height: int) -> Any:
 
 def _crop_bgra_regions_from_hwc(
     frame_hwc: Any, regions: List[Tuple[int, int, int, int]]
-) -> List[bytes]:
-    """Crop (left, top, width, height) from HxWx4 BGRA; row-major bytes per region."""
-    results: List[bytes] = []
+) -> List[Tuple[bytes, int, int]]:
+    """Crop (left, top, width, height) from HxWx4 BGRA; clamp to the real frame size."""
+    results: List[Tuple[bytes, int, int]] = []
     fh, fw = int(frame_hwc.shape[0]), int(frame_hwc.shape[1])
     for left, top, width, height in regions:
-        l, t, w, h = int(left), int(top), int(width), int(height)
-        if w <= 0 or h <= 0:
-            raise ValueError("region width and height must be > 0")
-        if l < 0 or t < 0 or l + w > fw or t + h > fh:
-            raise ValueError(f"region ({l},{t},{w},{h}) out of bounds for frame {fw}x{fh}")
+        l, t, w, h = clamp_crop_rect(left, top, width, height, fw, fh)
         cropped = frame_hwc[t : t + h, l : l + w, :]
         try:
-            results.append(cropped.tobytes(order="C"))
+            raw = cropped.tobytes(order="C")
         except TypeError:
-            results.append(cropped.tobytes())
+            raw = cropped.tobytes()
+        results.append((raw, w, h))
     return results
 
 
@@ -613,6 +631,7 @@ class ScreenHealthManager:
 
         self._last_batch_capture_fail_log_ts: float = 0.0
         self._batch_capture_fail_burst: bool = False
+        self._last_region_fail_log_ts: float = 0.0
 
     @property
     def is_running(self) -> bool:
@@ -744,7 +763,7 @@ class ScreenHealthManager:
 
         # Health number OCR (single read; stability is handled in the continuous loop)
         for hn in parsed.health_numbers:
-            if hn.templates is None:
+            if not uses_text_ocr_engine(getattr(hn, "engine", "templates")) and hn.templates is None:
                 detectors_out.append(
                     {
                         "type": "health_number",
@@ -793,8 +812,12 @@ class ScreenHealthManager:
         cap_ms = (time.perf_counter() - cap0) * 1000.0
 
         # Process all captured regions
-        for (detector_type, detector_obj, name, left, top, w, h), raw in zip(all_regions, captured_data):
+        for (detector_type, detector_obj, name, left, top, req_w, req_h), item in zip(all_regions, captured_data):
             eval0 = time.perf_counter()
+            raw, w, h = _as_captured_bgra(item, req_w, req_h)
+            if len(raw) < w * h * 4:
+                errors.append(f"{detector_type}:{name} crop too small ({len(raw)} bytes for {w}x{h})")
+                continue
 
             if detector_type == "redness":
                 roi = detector_obj
@@ -963,6 +986,7 @@ class ScreenHealthManager:
 
         self._last_batch_capture_fail_log_ts = 0.0
         self._batch_capture_fail_burst = False
+        self._last_region_fail_log_ts = 0.0
 
     def _env_flag(self, name: str) -> bool:
         v = os.getenv(name)
@@ -1115,6 +1139,14 @@ class ScreenHealthManager:
             logger.warning("[screen_health] failed to save roi kind=%s name=%s err=%s", kind, name, str(e))
             return None
 
+    def _log_region_fail(self, detector_type: str, name: str, err: BaseException) -> None:
+        now = time.time()
+        if now - self._last_region_fail_log_ts >= self._BATCH_CAPTURE_FAIL_LOG_INTERVAL_S:
+            logger.error("[screen_health] %s detector=%s failed: %s", detector_type, name, err)
+            self._last_region_fail_log_ts = now
+        else:
+            logger.debug("[screen_health] %s detector=%s failed (throttled): %s", detector_type, name, err)
+
     def _trigger_hit(self, intensity: float) -> None:
         """Trigger a Phase A random-cell haptic."""
         if not self._on_trigger:
@@ -1175,8 +1207,8 @@ class ScreenHealthManager:
             for hn in profile.health_numbers:
                 if self._stop_evt.is_set():
                     break
-                if hn.templates is None:
-                    continue  # Can't run OCR without templates
+                if not uses_text_ocr_engine(getattr(hn, "engine", "templates")) and hn.templates is None:
+                    continue
                 left, top, w, h = normalized_rect_to_pixels(hn.rect, frame_w, frame_h)
                 all_regions.append(("health_number", hn, hn.name, left, top, w, h))
 
@@ -1219,14 +1251,31 @@ class ScreenHealthManager:
                 self._batch_capture_fail_burst = False
 
             # Process all captured regions
-            for (detector_type, detector_obj, name, left, top, w, h), raw_bgra in zip(all_regions, captured_data):
+            for (detector_type, detector_obj, name, left, top, req_w, req_h), item in zip(
+                all_regions, captured_data
+            ):
                 if self._stop_evt.is_set():
                     break
+                raw_bgra, w, h = _as_captured_bgra(item, req_w, req_h)
+                if len(raw_bgra) < w * h * 4:
+                    self._log_region_fail(
+                        detector_type,
+                        name,
+                        ValueError(
+                            f"BGRA crop too small: {len(raw_bgra)} bytes for {w}x{h} "
+                            f"(requested {req_w}x{req_h})"
+                        ),
+                    )
+                    continue
 
                 # Redness ROIs (Phase A)
                 if detector_type == "redness":
                     roi = detector_obj
-                    score = redness_score_from_bgra(raw_bgra, w, h)
+                    try:
+                        score = redness_score_from_bgra(raw_bgra, w, h)
+                    except Exception as e:
+                        self._log_region_fail(detector_type, name, e)
+                        continue
                     if should_periodic_log:
                         logger.info(
                             "[screen_health] redness roi=%s score=%.4f thr=%.4f",
@@ -1302,19 +1351,23 @@ class ScreenHealthManager:
                 elif detector_type == "health_bar":
                     hb = detector_obj
                     percent_raw: Optional[float] = None
-                    if hb.color_sampling is not None:
-                        percent_raw = health_bar_percent_from_bgra(
-                            raw_bgra,
-                            w,
-                            h,
-                            filled_rgb=hb.color_sampling.filled.as_tuple(),
-                            empty_rgb=hb.color_sampling.empty.as_tuple(),
-                            tolerance_l1=hb.color_sampling.tolerance_l1,
-                        )
-                    elif hb.threshold_fallback is not None:
-                        percent_raw = self._health_bar_percent_threshold_fallback(
-                            raw_bgra, w, h, hb.threshold_fallback
-                        )
+                    try:
+                        if hb.color_sampling is not None:
+                            percent_raw = health_bar_percent_from_bgra(
+                                raw_bgra,
+                                w,
+                                h,
+                                filled_rgb=hb.color_sampling.filled.as_tuple(),
+                                empty_rgb=hb.color_sampling.empty.as_tuple(),
+                                tolerance_l1=hb.color_sampling.tolerance_l1,
+                            )
+                        elif hb.threshold_fallback is not None:
+                            percent_raw = self._health_bar_percent_threshold_fallback(
+                                raw_bgra, w, h, hb.threshold_fallback
+                            )
+                    except Exception as e:
+                        self._log_region_fail(detector_type, name, e)
+                        continue
 
                     if percent_raw is None:
                         continue
@@ -2085,31 +2138,30 @@ class _BetterCamCaptureBackend:
             raise RuntimeError("bettercam.create returned None")
         self._cap = cap
 
-        # Determine output geometry; fall back to a one-time full grab if needed.
+        frame = None
+        for _attempt in range(3):
+            frame = self._cap.grab()
+            if frame is not None:
+                break
+            time.sleep(0.1)
+
+        if frame is not None:
+            self._output_h = int(frame.shape[0])
+            self._output_w = int(frame.shape[1])
+            return
+
         res = getattr(getattr(self._cap, "output", None), "resolution", None)
         if isinstance(res, (tuple, list)) and len(res) == 2:
             self._output_w = int(res[0])
             self._output_h = int(res[1])
-        else:
-            # BetterCam may need a moment to initialize during startup - retry a few times
-            # This retry is only for initialization, not for runtime captures
-            frame = None
-            for attempt in range(3):
-                frame = self._cap.grab()
-                if frame is not None:
-                    break
-                time.sleep(0.1)  # Brief delay before retry
-            
-            if frame is None:
-                raise RuntimeError("bettercam grab returned None (capture not available)")
-            self._output_h = int(frame.shape[0])
-            self._output_w = int(frame.shape[1])
+            return
+        raise RuntimeError("bettercam grab returned None (capture not available)")
 
     def get_frame_size(self) -> Tuple[int, int]:
         self._ensure()
         return self._output_w, self._output_h
 
-    def capture_multiple_bgra(self, regions: List[Tuple[int, int, int, int]]) -> List[bytes]:
+    def capture_multiple_bgra(self, regions: List[Tuple[int, int, int, int]]) -> List[Any]:
         """
         Capture multiple regions from a single full frame grab.
         
@@ -2133,24 +2185,9 @@ class _BetterCamCaptureBackend:
         frame = self._cap.grab()
         if frame is None:
             raise RuntimeError("bettercam grab returned None")
-        
-        results: List[bytes] = []
-        for left, top, width, height in regions:
-            l = int(left)
-            t = int(top)
-            w = int(width)
-            h = int(height)
-            
-            # Crop to requested region (frame is HxWx4, so [top:top+h, left:left+w])
-            cropped = frame[t:t+h, l:l+w]
-            
-            # Ensure contiguous bytes in row-major order.
-            try:
-                results.append(cropped.tobytes(order="C"))
-            except TypeError:  # pragma: no cover (older numpy)
-                results.append(cropped.tobytes())
-        
-        return results
+        self._output_h = int(frame.shape[0])
+        self._output_w = int(frame.shape[1])
+        return _crop_bgra_regions_from_hwc(frame, regions)
 
 
 def _create_capture_backend(*, monitor_index: int):

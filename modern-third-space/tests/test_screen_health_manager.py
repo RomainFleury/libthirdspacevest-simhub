@@ -21,6 +21,55 @@ def test_normalized_rect_to_pixels_clamps_to_frame():
     assert h == 10
 
 
+def test_clamp_crop_rect_clips_to_actual_frame():
+    assert shm.clamp_crop_rect(100, 90, 50, 50, 120, 130) == (100, 90, 20, 40)
+
+
+def test_as_captured_bgra_accepts_tuple_and_bytes():
+    raw = b"\x00\x00\xff\xff" * 6
+    assert shm._as_captured_bgra((raw, 3, 2), 10, 10) == (raw, 3, 2)
+    assert shm._as_captured_bgra(raw, 3, 2) == (raw, 3, 2)
+
+
+def test_manager_skips_undersized_capture_without_dying(monkeypatch):
+    class FakeCapture:
+        def __init__(self, monitor_index: int):
+            self.monitor_index = monitor_index
+
+        def get_frame_size(self):
+            return 10, 10
+
+        def capture_multiple_bgra(self, regions):
+            return [b"\x00\x00\xff\xff"]  # 1 pixel; requested ROI is larger
+
+    monkeypatch.setattr(shm, "_create_capture_backend", lambda *, monitor_index: FakeCapture(monitor_index))
+
+    manager = shm.ScreenHealthManager(on_game_event=lambda *_: None, on_trigger=lambda *_: None)
+    ok, err = manager.start(
+        {
+            "schema_version": 0,
+            "name": "undersized",
+            "capture": {"source": "monitor", "monitor_index": 1, "tick_ms": 10},
+            "detectors": [
+                {
+                    "type": "redness_rois",
+                    "cooldown_ms": 200,
+                    "threshold": {"min_score": 0.2},
+                    "rois": [{"name": "roi1", "rect": {"x": 0.0, "y": 0.0, "w": 0.5, "h": 0.5}}],
+                }
+            ],
+        }
+    )
+    assert ok, err
+    try:
+        time.sleep(0.05)
+        assert manager._thread is not None
+        assert manager._thread.is_alive()
+    finally:
+        manager.stop()
+
+
+
 def test_redness_score_from_bgra_expected_value():
     # 2x1 pixels: [pure red, gray]
     # pure red dominance: (255 - max(0,0))/255 = 1
