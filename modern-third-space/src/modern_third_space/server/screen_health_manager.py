@@ -150,6 +150,65 @@ def redness_score_from_bgra(raw_bgra: bytes, width: int, height: int) -> float:
     return max(0.0, min(1.0, total / float(count)))
 
 
+def color_match_score_from_bgra(
+    raw_bgra: bytes,
+    width: int,
+    height: int,
+    *,
+    target_rgb: Tuple[int, int, int],
+    tolerance_l1: int,
+) -> float:
+    """
+    Mean per-pixel match to a target RGB in [0,1].
+
+    Pixel score = max(0, 1 - L1(pixel, target) / max(1, tolerance_l1)).
+    Use this for tinted damage vignettes that are not purely red-dominant.
+    """
+    if width <= 0 or height <= 0:
+        raise ValueError("width and height must be > 0")
+    expected = width * height * 4
+    if len(raw_bgra) < expected:
+        raise ValueError("raw_bgra is smaller than expected for BGRA frame")
+    if tolerance_l1 < 0 or tolerance_l1 > 765:
+        raise ValueError("tolerance_l1 must be in [0, 765]")
+
+    tr, tg, tb = target_rgb
+    denom = float(max(1, int(tolerance_l1)))
+    total = 0.0
+    count = width * height
+    for i in range(0, expected, 4):
+        b = raw_bgra[i]
+        g = raw_bgra[i + 1]
+        r = raw_bgra[i + 2]
+        dist = abs(r - tr) + abs(g - tg) + abs(b - tb)
+        if dist >= denom:
+            continue
+        total += 1.0 - (dist / denom)
+    return max(0.0, min(1.0, total / float(count)))
+
+
+def _parse_vignette_rois(rois_data: Any) -> List[RednessROI]:
+    rois: List[RednessROI] = []
+    for idx, r in enumerate(rois_data):
+        if not isinstance(r, dict):
+            continue
+        r_name = str(r.get("name") or f"roi_{idx}")
+        rect_data = r.get("rect") or r.get("roi")
+        if not isinstance(rect_data, dict):
+            raise ValueError(f"roi '{r_name}': missing rect")
+        rect = NormalizedRect(
+            x=float(rect_data.get("x", 0)),
+            y=float(rect_data.get("y", 0)),
+            w=float(rect_data.get("w", 0)),
+            h=float(rect_data.get("h", 0)),
+        )
+        rect.validate()
+        direction_raw = r.get("direction")
+        direction = DirectionKey(direction_raw) if direction_raw else None
+        rois.append(RednessROI(name=r_name, rect=rect, direction=direction))
+    return rois
+
+
 def health_bar_percent_from_bgra(
     raw_bgra: bytes,
     width: int,
@@ -305,6 +364,29 @@ class RednessROI:
 class RednessDetectorConfig:
     min_score: float = 0.35
     cooldown_ms: int = 200
+
+
+@dataclass(frozen=True)
+class ColorVignetteDetectorConfig:
+    target: "RGB"
+    tolerance_l1: int = 120
+    min_score: float = 0.35
+    cooldown_ms: int = 200
+
+    def validate(self) -> None:
+        self.target.validate()
+        if not isinstance(self.tolerance_l1, int):
+            raise ValueError("color_vignette.tolerance_l1 must be an int")
+        if not (0 <= self.tolerance_l1 <= 765):
+            raise ValueError("color_vignette.tolerance_l1 must be in [0, 765]")
+        if not isinstance(self.min_score, (int, float)):
+            raise ValueError("threshold.min_score must be a number")
+        if not (0.0 <= float(self.min_score) <= 1.0):
+            raise ValueError("threshold.min_score must be in [0,1]")
+        if not isinstance(self.cooldown_ms, int):
+            raise ValueError("detector.cooldown_ms must be an int")
+        if self.cooldown_ms < 0:
+            raise ValueError("detector.cooldown_ms must be >= 0")
 
 
 @dataclass(frozen=True)
@@ -528,6 +610,8 @@ class ScreenHealthProfile:
     health_bars: List[HealthBarDetector]
     health_numbers: List[HealthNumberDetector]
     ammo_numbers: List[HealthNumberDetector] = field(default_factory=list)
+    color_vignette_rois: List[RednessROI] = field(default_factory=list)
+    color_vignette_detector: Optional[ColorVignetteDetectorConfig] = None
     recoil_duration_ms: int = 40
     debug: Optional[ScreenHealthDebugConfig] = None
 
@@ -756,6 +840,11 @@ class ScreenHealthManager:
                 left, top, w, h = normalized_rect_to_pixels(roi.rect, frame_w, frame_h)
                 all_regions.append(("redness", roi, roi.name, left, top, w, h))
 
+        if parsed.color_vignette_detector is not None:
+            for roi in parsed.color_vignette_rois:
+                left, top, w, h = normalized_rect_to_pixels(roi.rect, frame_w, frame_h)
+                all_regions.append(("color_vignette", roi, roi.name, left, top, w, h))
+
         # Health bar
         for hb in parsed.health_bars:
             left, top, w, h = normalized_rect_to_pixels(hb.rect, frame_w, frame_h)
@@ -836,6 +925,39 @@ class ScreenHealthManager:
                         "capture_ms": cap_ms,
                         "eval_ms": eval_ms,
                         "image_path": save_crop("redness", roi.name, raw, w, h),
+                    }
+                )
+
+            elif detector_type == "color_vignette":
+                roi = detector_obj
+                cv = parsed.color_vignette_detector
+                if cv is None:
+                    continue
+                score = float(
+                    color_match_score_from_bgra(
+                        raw,
+                        w,
+                        h,
+                        target_rgb=cv.target.as_tuple(),
+                        tolerance_l1=cv.tolerance_l1,
+                    )
+                )
+                hit = score >= float(cv.min_score)
+                eval_ms = (time.perf_counter() - eval0) * 1000.0
+
+                detectors_out.append(
+                    {
+                        "type": "color_vignette",
+                        "name": roi.name,
+                        "rect_px": {"left": left, "top": top, "w": w, "h": h},
+                        "score": score,
+                        "threshold": float(cv.min_score),
+                        "target_rgb": list(cv.target.as_tuple()),
+                        "tolerance_l1": int(cv.tolerance_l1),
+                        "hit": bool(hit),
+                        "capture_ms": cap_ms,
+                        "eval_ms": eval_ms,
+                        "image_path": save_crop("color_vignette", roi.name, raw, w, h),
                     }
                 )
 
@@ -1196,6 +1318,13 @@ class ScreenHealthManager:
                     left, top, w, h = normalized_rect_to_pixels(roi.rect, frame_w, frame_h)
                     all_regions.append(("redness", roi, roi.name, left, top, w, h))
 
+            if profile.color_vignette_detector is not None:
+                for roi in profile.color_vignette_rois:
+                    if self._stop_evt.is_set():
+                        break
+                    left, top, w, h = normalized_rect_to_pixels(roi.rect, frame_w, frame_h)
+                    all_regions.append(("color_vignette", roi, roi.name, left, top, w, h))
+
             # Health bars (Phase C)
             for hb in profile.health_bars:
                 if self._stop_evt.is_set():
@@ -1343,6 +1472,95 @@ class ScreenHealthManager:
                             "direction": roi.direction.value if roi.direction else None,
                             "score": score,
                             "source": "redness_rois",
+                        },
+                    )
+                    self._trigger_hit(intensity=score)
+
+                elif detector_type == "color_vignette":
+                    roi = detector_obj
+                    cv = profile.color_vignette_detector
+                    if cv is None:
+                        continue
+                    try:
+                        score = color_match_score_from_bgra(
+                            raw_bgra,
+                            w,
+                            h,
+                            target_rgb=cv.target.as_tuple(),
+                            tolerance_l1=cv.tolerance_l1,
+                        )
+                    except Exception as e:
+                        self._log_region_fail(detector_type, name, e)
+                        continue
+                    if should_periodic_log:
+                        logger.info(
+                            "[screen_health] color_vignette roi=%s score=%.4f thr=%.4f target=%s",
+                            roi.name,
+                            float(score),
+                            float(cv.min_score),
+                            cv.target.as_tuple(),
+                        )
+                        if self._debug_emit_events:
+                            self._emit_game_event(
+                                "debug",
+                                {
+                                    "kind": "color_vignette_score",
+                                    "detector": roi.name,
+                                    "score": float(score),
+                                    "threshold": float(cv.min_score),
+                                    "target_rgb": list(cv.target.as_tuple()),
+                                },
+                            )
+
+                    self._debug_maybe_save_roi(
+                        key=f"color_vignette_once:{roi.name}",
+                        kind="color_vignette",
+                        name=roi.name,
+                        raw_bgra=raw_bgra,
+                        width=w,
+                        height=h,
+                        extra={"score": float(score)},
+                        force=False,
+                    )
+                    if score < cv.min_score:
+                        continue
+
+                    now = time.time()
+                    key = f"color_vignette:{roi.name}"
+                    last = self._last_hit_by_roi.get(key, 0.0)
+                    if (now - last) * 1000.0 < cv.cooldown_ms:
+                        continue
+
+                    self._last_hit_by_roi[key] = now
+                    self.last_hit_ts = now
+
+                    saved = self._debug_maybe_save_roi(
+                        key=f"color_vignette_hit:{roi.name}",
+                        kind="color_vignette_hit",
+                        name=roi.name,
+                        raw_bgra=raw_bgra,
+                        width=w,
+                        height=h,
+                        extra={"score": float(score)},
+                        force=True,
+                    )
+                    if self._debug_log_values:
+                        logger.info(
+                            "[screen_health] HIT color_vignette roi=%s score=%.4f cooldown_ms=%s saved=%s",
+                            roi.name,
+                            float(score),
+                            int(cv.cooldown_ms),
+                            saved,
+                        )
+
+                    self._emit_game_event(
+                        "hit_recorded",
+                        {
+                            "roi": roi.name,
+                            "direction": roi.direction.value if roi.direction else None,
+                            "score": score,
+                            "source": "color_vignette",
+                            "target_rgb": list(cv.target.as_tuple()),
                         },
                     )
                     self._trigger_hit(intensity=score)
@@ -1689,11 +1907,13 @@ class ScreenHealthManager:
             debug_cfg.validate()
 
         detectors = data.get("detectors") or []
-        if not isinstance(detectors, list) or not detectors:
-            raise ValueError("profile.detectors must be a non-empty list")
+        if not isinstance(detectors, list):
+            raise ValueError("profile.detectors must be a list")
 
         redness_detector: Optional[RednessDetectorConfig] = None
         redness_rois: List[RednessROI] = []
+        color_vignette_detector: Optional[ColorVignetteDetectorConfig] = None
+        color_vignette_rois: List[RednessROI] = []
         health_bars: List[HealthBarDetector] = []
         health_numbers: List[HealthNumberDetector] = []
 
@@ -1715,29 +1935,37 @@ class ScreenHealthManager:
 
                 rois_data = d.get("rois") or d.get("zones") or []
                 if not isinstance(rois_data, list) or not rois_data:
-                    raise ValueError("redness_rois detector must include a non-empty 'rois' list")
+                    continue
 
-                rois: List[RednessROI] = []
-                for idx, r in enumerate(rois_data):
-                    r_name = str(r.get("name") or f"roi_{idx}")
-                    rect_data = r.get("rect") or r.get("roi")
-                    if not isinstance(rect_data, dict):
-                        raise ValueError(f"roi '{r_name}': missing rect")
-                    rect = NormalizedRect(
-                        x=float(rect_data.get("x", 0)),
-                        y=float(rect_data.get("y", 0)),
-                        w=float(rect_data.get("w", 0)),
-                        h=float(rect_data.get("h", 0)),
-                    )
-                    rect.validate()
-
-                    direction_raw = r.get("direction")
-                    direction = DirectionKey(direction_raw) if direction_raw else None
-
-                    rois.append(RednessROI(name=r_name, rect=rect, direction=direction))
-
+                parsed_rois = _parse_vignette_rois(rois_data)
+                if not parsed_rois:
+                    continue
                 redness_detector = detector
-                redness_rois = rois
+                redness_rois = parsed_rois
+                continue
+
+            if d_type == "color_vignette":
+                threshold = d.get("threshold") or {}
+                target_raw = d.get("target_rgb") or d.get("color_rgb") or d.get("target")
+                if not isinstance(target_raw, (list, tuple)) or len(target_raw) != 3:
+                    raise ValueError("color_vignette.target_rgb must be [r, g, b]")
+                cv = ColorVignetteDetectorConfig(
+                    target=RGB(int(target_raw[0]), int(target_raw[1]), int(target_raw[2])),
+                    tolerance_l1=int(d.get("tolerance_l1", 120)),
+                    min_score=float(threshold.get("min_score", 0.35)),
+                    cooldown_ms=int(d.get("cooldown_ms", 200)),
+                )
+                cv.validate()
+
+                rois_data = d.get("rois") or d.get("zones") or []
+                if not isinstance(rois_data, list) or not rois_data:
+                    continue
+
+                parsed_cv_rois = _parse_vignette_rois(rois_data)
+                if not parsed_cv_rois:
+                    continue
+                color_vignette_detector = cv
+                color_vignette_rois = parsed_cv_rois
                 continue
 
             if d_type == "health_bar":
@@ -1813,9 +2041,6 @@ class ScreenHealthManager:
                 health_numbers.append(self._parse_health_number_detector(d))
                 continue
 
-        if redness_detector is None and not health_bars and not health_numbers:
-            raise ValueError("profile.detectors must include at least one supported detector")
-
         ammo_numbers: List[HealthNumberDetector] = []
         recoil_duration_ms = 40
         recoil_data = data.get("recoil")
@@ -1842,6 +2067,15 @@ class ScreenHealthManager:
                 }
             ammo_numbers.append(self._parse_health_number_detector(ammo_dict))
 
+        if (
+            redness_detector is None
+            and color_vignette_detector is None
+            and not health_bars
+            and not health_numbers
+            and not ammo_numbers
+        ):
+            raise ValueError("profile must include a hit detector or ammo recoil")
+
         return ScreenHealthProfile(
             schema_version=schema_version,
             name=name,
@@ -1851,6 +2085,8 @@ class ScreenHealthManager:
             health_bars=health_bars,
             health_numbers=health_numbers,
             ammo_numbers=ammo_numbers,
+            color_vignette_rois=color_vignette_rois,
+            color_vignette_detector=color_vignette_detector,
             recoil_duration_ms=recoil_duration_ms,
             debug=debug_cfg,
         )

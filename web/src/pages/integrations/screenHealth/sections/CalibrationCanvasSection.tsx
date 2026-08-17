@@ -2,33 +2,92 @@ import { useCallback, useMemo, useState } from "react";
 import { useScreenHealthCalibration } from "../draft/CalibrationContext";
 import { useScreenHealthHealthBarDraft, useScreenHealthHealthBarDraftControls } from "../draft/HealthBarDraftContext";
 import { useScreenHealthHealthNumberDraft, useScreenHealthHealthNumberDraftControls } from "../draft/HealthNumberDraftContext";
-import { useScreenHealthProfileDraft, useScreenHealthProfileDraftControls } from "../draft/ProfileDraftContext";
+import { useScreenHealthProfileDraft } from "../draft/ProfileDraftContext";
 import { useScreenHealthRecoilDraft, useScreenHealthRecoilDraftControls } from "../draft/RecoilDraftContext";
+import { useScreenHealthColorVignetteDraft, useScreenHealthColorVignetteDraftControls } from "../draft/ColorVignetteDraftContext";
 import { useScreenHealthRednessDraft, useScreenHealthRednessDraftControls } from "../draft/RednessDraftContext";
 import { clamp01, clampInt } from "../utils";
+import type { RoiRect } from "../draft/types";
+
+type ZoneTip = { x: number; y: number; lines: string[] };
+
+function zoneLines(kind: string, name?: string | null, extra?: string | null): string[] {
+  const lines = [kind];
+  const trimmedName = name?.trim();
+  if (trimmedName) lines.push(trimmedName);
+  const trimmedExtra = extra?.trim();
+  if (trimmedExtra) lines.push(trimmedExtra);
+  return lines;
+}
+
+function RoiZoneOverlay(props: {
+  rect: RoiRect;
+  className: string;
+  lines: string[];
+  onHover: (tip: ZoneTip | null) => void;
+}) {
+  const { rect, className, lines, onHover } = props;
+  return (
+    <div
+      className={`absolute ${className}`}
+      style={{
+        left: `${rect.x * 100}%`,
+        top: `${rect.y * 100}%`,
+        width: `${rect.w * 100}%`,
+        height: `${rect.h * 100}%`,
+      }}
+      onMouseEnter={(e) => onHover({ x: e.clientX, y: e.clientY, lines })}
+      onMouseMove={(e) => onHover({ x: e.clientX, y: e.clientY, lines })}
+      onMouseLeave={() => onHover(null)}
+    />
+  );
+}
 
 export function CalibrationCanvasSection(props: { lastCapturedImage: { dataUrl: string } | null }) {
   const { lastCapturedImage } = props;
   const { imgContainerRef, offscreenCanvasRef, imageLoadedRef } = useScreenHealthCalibration();
   const profile = useScreenHealthProfileDraft();
-  const { setCanvasEditTarget } = useScreenHealthProfileDraftControls();
   const redness = useScreenHealthRednessDraft();
   const { setRois } = useScreenHealthRednessDraftControls();
+  const colorVignette = useScreenHealthColorVignetteDraft();
+  const {
+    setRois: setColorVignetteRois,
+    setTargetRgb,
+    setPickingColor,
+  } = useScreenHealthColorVignetteDraftControls();
   const hb = useScreenHealthHealthBarDraft();
   const { setRoi: setHealthBarRoi, setFilledRgb, setEmptyRgb, setColorPickMode } = useScreenHealthHealthBarDraftControls();
   const hn = useScreenHealthHealthNumberDraft();
   const { setRoi: setHealthNumberRoi } = useScreenHealthHealthNumberDraftControls();
   const recoil = useScreenHealthRecoilDraft();
-  const { setRoi: setRecoilRoi } = useScreenHealthRecoilDraftControls();
+  const { setRoi: setRecoilRoi, setRecoilType } = useScreenHealthRecoilDraftControls();
 
   const detectorType = profile.detectorType;
-  const editingRecoil = profile.canvasEditTarget === "recoil" && recoil.recoilType === "ammo_number";
+  const editingRecoil = profile.canvasEditTarget === "recoil";
 
   const [drawing, setDrawing] = useState<{ startX: number; startY: number; curX: number; curY: number } | null>(null);
+  const [hoverTip, setHoverTip] = useState<{ left: number; top: number; lines: string[] } | null>(null);
+
+  const updateHoverTip = useCallback(
+    (tip: ZoneTip | null) => {
+      if (!tip || !imgContainerRef.current) {
+        setHoverTip(null);
+        return;
+      }
+      const bounds = imgContainerRef.current.getBoundingClientRect();
+      const left = Math.min(Math.max(8, tip.x - bounds.left + 12), Math.max(8, bounds.width - 160));
+      const top = Math.min(Math.max(8, tip.y - bounds.top + 12), Math.max(8, bounds.height - 48));
+      setHoverTip({ left, top, lines: tip.lines });
+    },
+    [imgContainerRef]
+  );
 
   const pickColorAtMouse = useCallback(
     (e: React.MouseEvent) => {
-      if (!hb.colorPickMode || !imgContainerRef.current) return false;
+      const pickingVignette = colorVignette.pickingColor;
+      const pickingBar = Boolean(hb.colorPickMode);
+      if (!pickingVignette && !pickingBar) return false;
+      if (!imgContainerRef.current) return false;
       const canvas = offscreenCanvasRef.current;
       if (!canvas || !imageLoadedRef.current) return false;
       const ctx = canvas.getContext("2d");
@@ -41,18 +100,35 @@ export function CalibrationCanvasSection(props: { lastCapturedImage: { dataUrl: 
       const py = clampInt(Math.floor(ny * canvas.height), 0, canvas.height - 1);
       const data = ctx.getImageData(px, py, 1, 1).data; // RGBA
       const rgb: [number, number, number] = [data[0], data[1], data[2]];
+      if (pickingVignette) {
+        setTargetRgb(rgb);
+        setPickingColor(false);
+        return true;
+      }
       if (hb.colorPickMode === "filled") setFilledRgb(rgb);
       else setEmptyRgb(rgb);
       setColorPickMode(null);
       return true;
     },
-    [hb.colorPickMode, imgContainerRef, offscreenCanvasRef, imageLoadedRef, setEmptyRgb, setFilledRgb, setColorPickMode]
+    [
+      colorVignette.pickingColor,
+      hb.colorPickMode,
+      imgContainerRef,
+      offscreenCanvasRef,
+      imageLoadedRef,
+      setEmptyRgb,
+      setFilledRgb,
+      setColorPickMode,
+      setTargetRgb,
+      setPickingColor,
+    ]
   );
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
       if (pickColorAtMouse(e)) return;
       if (!imgContainerRef.current) return;
+      setHoverTip(null);
       const rect = imgContainerRef.current.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
@@ -87,11 +163,34 @@ export function CalibrationCanvasSection(props: { lastCapturedImage: { dataUrl: 
     const newRect = { x: clamp01(x1 / rect.width), y: clamp01(y1 / rect.height), w: clamp01(w / rect.width), h: clamp01(h / rect.height) };
     if (editingRecoil) {
       setRecoilRoi(newRect);
+      setRecoilType("ammo_number");
       return;
     }
-    if (detectorType === "health_bar") setHealthBarRoi(newRect);
-    else if (detectorType === "health_number") setHealthNumberRoi(newRect);
-    else setRois((prev) => [...prev, { name: `roi_${prev.length + 1}`, direction: "", rect: newRect }]);
+    if (detectorType === "health_bar") {
+      setHealthNumberRoi(null);
+      setRois([]);
+      setColorVignetteRois([]);
+      setHealthBarRoi(newRect);
+      return;
+    }
+    if (detectorType === "health_number") {
+      setHealthBarRoi(null);
+      setRois([]);
+      setColorVignetteRois([]);
+      setHealthNumberRoi(newRect);
+      return;
+    }
+    if (detectorType === "color_vignette") {
+      setHealthBarRoi(null);
+      setHealthNumberRoi(null);
+      setRois([]);
+      setColorVignetteRois((prev) => [...prev, { name: `roi_${prev.length + 1}`, direction: "", rect: newRect }]);
+      return;
+    }
+    setHealthBarRoi(null);
+    setHealthNumberRoi(null);
+    setColorVignetteRois([]);
+    setRois((prev) => [...prev, { name: `roi_${prev.length + 1}`, direction: "", rect: newRect }]);
   }, [
     drawing,
     detectorType,
@@ -100,45 +199,39 @@ export function CalibrationCanvasSection(props: { lastCapturedImage: { dataUrl: 
     setHealthBarRoi,
     setHealthNumberRoi,
     setRecoilRoi,
+    setRecoilType,
     setRois,
+    setColorVignetteRois,
   ]);
 
-  const cursor = hb.colorPickMode ? "copy" : "crosshair";
-  const overlays = useMemo(() => {
-    if (detectorType === "redness_rois") return { rois: redness.rois, hbRoi: null, hnRoi: null };
-    if (detectorType === "health_bar") return { rois: [], hbRoi: hb.roi, hnRoi: null };
-    return { rois: [], hbRoi: null, hnRoi: hn.roi };
-  }, [detectorType, redness.rois, hb.roi, hn.roi]);
+  const cursor = hb.colorPickMode || colorVignette.pickingColor ? "copy" : "crosshair";
+  const overlays = useMemo(
+    () => ({
+      rois: detectorType === "redness_rois" ? redness.rois : detectorType === "color_vignette" ? colorVignette.rois : [],
+      roiKind: detectorType === "color_vignette" ? "Color vignette" : "Red vignette",
+      hbRoi: detectorType === "health_bar" ? hb.roi : null,
+      hnRoi: detectorType === "health_number" ? hn.roi : null,
+    }),
+    [detectorType, redness.rois, colorVignette.rois, hb.roi, hn.roi]
+  );
 
   if (!lastCapturedImage) return null;
 
-  const detectorHint =
-    detectorType === "health_bar"
-      ? "Drag on the image to set the Health Bar ROI."
+  const drawHint = editingRecoil
+    ? "Drawing ammo counter (amber)."
+    : detectorType === "health_bar"
+      ? "Drawing health bar (green)."
       : detectorType === "health_number"
-        ? "Drag on the image to set the Health Number ROI."
-        : "Drag on the image to add ROIs.";
+        ? "Drawing health number (green)."
+        : detectorType === "color_vignette"
+          ? colorVignette.pickingColor
+            ? "Click the screenshot to pick the vignette color."
+            : "Drawing color vignette (green)."
+          : "Drawing red vignette (green).";
 
   return (
     <div className="space-y-3">
-      <div className="text-sm text-slate-400">
-        {editingRecoil
-          ? "Drag on the image to set the Recoil ammo ROI (amber). Saved config is sent when you click Start."
-          : `${detectorHint} (Saved config will be sent to the daemon when you click Start.)`}
-      </div>
-      {recoil.recoilType === "ammo_number" && (
-        <div className="flex flex-wrap gap-3 items-center">
-          <label className="text-sm text-slate-400">Drawing applies to</label>
-          <select
-            value={profile.canvasEditTarget}
-            onChange={(e) => setCanvasEditTarget(e.target.value as "detector" | "recoil")}
-            className="rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
-          >
-            <option value="detector">Damage detector</option>
-            <option value="recoil">Recoil ammo</option>
-          </select>
-        </div>
-      )}
+      <div className="text-sm text-slate-400">{drawHint} Saved when you click Start.</div>
       <div
         ref={imgContainerRef}
         className="relative w-full overflow-hidden rounded-xl ring-1 ring-white/10 bg-slate-900/30"
@@ -150,58 +243,55 @@ export function CalibrationCanvasSection(props: { lastCapturedImage: { dataUrl: 
         <img src={lastCapturedImage.dataUrl} className="block w-full select-none" draggable={false} />
         <canvas ref={offscreenCanvasRef} className="hidden" />
 
-        {detectorType === "redness_rois" &&
-          overlays.rois.map((r, idx) => (
-            <div
-              key={`${r.name}-${idx}`}
-              className="absolute border-2 border-emerald-400/80 bg-emerald-400/10"
-              style={{
-                left: `${r.rect.x * 100}%`,
-                top: `${r.rect.y * 100}%`,
-                width: `${r.rect.w * 100}%`,
-                height: `${r.rect.h * 100}%`,
-              }}
-              title={r.name}
-            />
-          ))}
+        {overlays.rois.map((r, idx) => (
+          <RoiZoneOverlay
+            key={`${r.name}-${idx}`}
+            rect={r.rect}
+            className="border-2 border-emerald-400/80 bg-emerald-400/10"
+            lines={zoneLines(overlays.roiKind, r.name, r.direction ? `direction: ${r.direction}` : null)}
+            onHover={drawing ? () => undefined : updateHoverTip}
+          />
+        ))}
 
-        {detectorType === "health_bar" && overlays.hbRoi && (
-          <div
-            className="absolute border-2 border-emerald-400/80 bg-emerald-400/10"
-            style={{
-              left: `${overlays.hbRoi.x * 100}%`,
-              top: `${overlays.hbRoi.y * 100}%`,
-              width: `${overlays.hbRoi.w * 100}%`,
-              height: `${overlays.hbRoi.h * 100}%`,
-            }}
-            title="health_bar"
+        {overlays.hbRoi && (
+          <RoiZoneOverlay
+            rect={overlays.hbRoi}
+            className="border-2 border-emerald-400/80 bg-emerald-400/10"
+            lines={zoneLines("Health bar")}
+            onHover={drawing ? () => undefined : updateHoverTip}
           />
         )}
 
-        {detectorType === "health_number" && overlays.hnRoi && (
-          <div
-            className="absolute border-2 border-emerald-400/80 bg-emerald-400/10"
-            style={{
-              left: `${overlays.hnRoi.x * 100}%`,
-              top: `${overlays.hnRoi.y * 100}%`,
-              width: `${overlays.hnRoi.w * 100}%`,
-              height: `${overlays.hnRoi.h * 100}%`,
-            }}
-            title="health_number"
+        {overlays.hnRoi && (
+          <RoiZoneOverlay
+            rect={overlays.hnRoi}
+            className="border-2 border-emerald-400/80 bg-emerald-400/10"
+            lines={zoneLines("Health number")}
+            onHover={drawing ? () => undefined : updateHoverTip}
           />
         )}
 
-        {recoil.recoilType === "ammo_number" && recoil.roi && (
-          <div
-            className="absolute border-2 border-amber-400/80 bg-amber-400/10"
-            style={{
-              left: `${recoil.roi.x * 100}%`,
-              top: `${recoil.roi.y * 100}%`,
-              width: `${recoil.roi.w * 100}%`,
-              height: `${recoil.roi.h * 100}%`,
-            }}
-            title="recoil_ammo"
+        {recoil.roi && (
+          <RoiZoneOverlay
+            rect={recoil.roi}
+            className="border-2 border-amber-400/80 bg-amber-400/10"
+            lines={zoneLines("Ammo box")}
+            onHover={drawing ? () => undefined : updateHoverTip}
           />
+        )}
+
+        {hoverTip && !drawing && (
+          <div
+            className="pointer-events-none absolute z-20 max-w-[12rem] rounded-md bg-slate-950/95 px-2 py-1.5 text-xs text-white shadow-lg ring-1 ring-white/15"
+            style={{ left: hoverTip.left, top: hoverTip.top }}
+          >
+            <div className="font-medium text-slate-100">{hoverTip.lines[0]}</div>
+            {hoverTip.lines.slice(1).map((line) => (
+              <div key={line} className="text-slate-300">
+                {line}
+              </div>
+            ))}
+          </div>
         )}
 
         {drawing && (

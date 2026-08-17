@@ -1,6 +1,7 @@
 import type { DetectorType } from "./draft/types";
 import { clamp01, clampInt } from "./utils";
 import type { AmmoOcrEngineId } from "./ammoOcrEngines";
+import { getDrawnSetup, lockedHitDetectorType } from "./drawnSetup";
 
 export type ProfileDraftSnapshot = {
   selectedPresetId: string;
@@ -13,6 +14,14 @@ export type ProfileDraftSnapshot = {
 export type RednessDraftSnapshot = {
   minScore: number;
   cooldownMs: number;
+  rois: Array<{ name: string; direction: string; rect: { x: number; y: number; w: number; h: number } }>;
+};
+
+export type ColorVignetteDraftSnapshot = {
+  minScore: number;
+  cooldownMs: number;
+  targetRgb: number[];
+  toleranceL1: number;
   rois: Array<{ name: string; direction: string; rect: { x: number; y: number; w: number; h: number } }>;
 };
 
@@ -55,10 +64,10 @@ export type RecoilDraftSnapshot = {
 };
 
 function attachRecoil(profile: Record<string, any>, recoil?: RecoilDraftSnapshot): Record<string, any> {
-  if (!recoil || recoil.recoilType === "off") {
+  if (!recoil?.roi) {
     return profile;
   }
-  const roi = recoil.roi ?? { x: 0.85, y: 0.9, w: 0.08, h: 0.04 };
+  const roi = recoil.roi;
   return {
     ...profile,
     recoil: {
@@ -87,82 +96,97 @@ function attachRecoil(profile: Record<string, any>, recoil?: RecoilDraftSnapshot
 export function buildScreenHealthDaemonProfile(args: {
   profileDraft: ProfileDraftSnapshot;
   redness: RednessDraftSnapshot;
+  colorVignette?: ColorVignetteDraftSnapshot;
   hb: HealthBarDraftSnapshot;
   hn: HealthNumberDraftSnapshot;
   recoil?: RecoilDraftSnapshot;
   presets: Array<{ preset_id: string; profile: { meta?: unknown } }>;
 }): Record<string, any> {
-  const { profileDraft, redness, hb, hn, recoil, presets } = args;
+  const { profileDraft, redness, colorVignette, hb, hn, recoil, presets } = args;
+  const cv = colorVignette ?? { minScore: 0.35, cooldownMs: 200, targetRgb: [220, 40, 40], toleranceL1: 120, rois: [] };
   const presetMeta = (presets.find((p) => p.preset_id === profileDraft.selectedPresetId)?.profile as any)?.meta;
+  const drawn = getDrawnSetup({
+    rednessRois: redness.rois,
+    colorVignetteRois: cv.rois,
+    healthBarRoi: hb.roi,
+    healthNumberRoi: hn.roi,
+    ammoRoi: recoil?.roi ?? null,
+  });
+  const hitType = lockedHitDetectorType(drawn);
+  const detectors: Record<string, unknown>[] = [];
 
-  if (profileDraft.detectorType === "health_bar") {
-    const roi = hb.roi ?? { x: 0.1, y: 0.9, w: 0.3, h: 0.03 };
-    return attachRecoil(
-      {
-        schema_version: 0,
-        name: profileDraft.profileName,
-        meta: presetMeta,
-        capture: { source: "monitor", monitor_index: profileDraft.monitorIndex, tick_ms: profileDraft.tickMs },
-        detectors: [
-          {
-            type: "health_bar",
-            name: "health_bar",
-            roi: { x: clamp01(roi.x), y: clamp01(roi.y), w: clamp01(roi.w), h: clamp01(roi.h) },
-            orientation: "horizontal",
-            ...(hb.mode === "color_sampling"
-              ? {
-                  color_sampling: {
-                    filled_rgb: hb.filledRgb.map((v) => clampInt(v, 0, 255)),
-                    empty_rgb: hb.emptyRgb.map((v) => clampInt(v, 0, 255)),
-                    tolerance_l1: clampInt(hb.toleranceL1, 0, 765),
-                  },
-                }
-              : {
-                  threshold_fallback: {
-                    mode: hb.fallbackMode,
-                    min: Math.max(0, Math.min(1, hb.fallbackMin)),
-                  },
-                }),
-            hit_on_decrease: {
-              min_drop: Math.max(0, Math.min(1, hb.hitMinDrop)),
-              cooldown_ms: Math.max(0, Math.floor(hb.hitCooldownMs)),
-            },
-          },
-        ],
+  const mapVignetteRois = (rois: RednessDraftSnapshot["rois"]) =>
+    rois.map((r) => ({
+      name: r.name,
+      direction: r.direction || undefined,
+      rect: {
+        x: clamp01(r.rect.x),
+        y: clamp01(r.rect.y),
+        w: clamp01(r.rect.w),
+        h: clamp01(r.rect.h),
       },
-      recoil
-    );
-  }
+    }));
 
-  if (profileDraft.detectorType === "health_number") {
-    const roi = hn.roi ?? { x: 0.05, y: 0.9, w: 0.12, h: 0.06 };
-    return attachRecoil(
-      {
-        schema_version: 0,
-        name: profileDraft.profileName,
-        meta: presetMeta,
-        capture: { source: "monitor", monitor_index: profileDraft.monitorIndex, tick_ms: profileDraft.tickMs },
-        detectors: [
-          {
-            type: "health_number",
-            name: "health_number",
-            engine: "daemon",
-            roi: { x: clamp01(roi.x), y: clamp01(roi.y), w: clamp01(roi.w), h: clamp01(roi.h) },
-            digits: Math.max(1, Math.floor(hn.digits)),
-            readout: {
-              min: Math.floor(hn.readMin),
-              max: Math.floor(hn.readMax),
-              stable_reads: Math.max(1, Math.floor(hn.stableReads)),
+  if (hitType === "health_bar" && hb.roi) {
+    const roi = hb.roi;
+    detectors.push({
+      type: "health_bar",
+      name: "health_bar",
+      roi: { x: clamp01(roi.x), y: clamp01(roi.y), w: clamp01(roi.w), h: clamp01(roi.h) },
+      orientation: "horizontal",
+      ...(hb.mode === "color_sampling"
+        ? {
+            color_sampling: {
+              filled_rgb: hb.filledRgb.map((v) => clampInt(v, 0, 255)),
+              empty_rgb: hb.emptyRgb.map((v) => clampInt(v, 0, 255)),
+              tolerance_l1: clampInt(hb.toleranceL1, 0, 765),
             },
-            hit_on_decrease: {
-              min_drop: Math.max(1, Math.floor(hn.hitMinDrop)),
-              cooldown_ms: Math.max(0, Math.floor(hn.hitCooldownMs)),
+          }
+        : {
+            threshold_fallback: {
+              mode: hb.fallbackMode,
+              min: Math.max(0, Math.min(1, hb.fallbackMin)),
             },
-          },
-        ],
+          }),
+      hit_on_decrease: {
+        min_drop: Math.max(0, Math.min(1, hb.hitMinDrop)),
+        cooldown_ms: Math.max(0, Math.floor(hb.hitCooldownMs)),
       },
-      recoil
-    );
+    });
+  } else if (hitType === "health_number" && hn.roi) {
+    const roi = hn.roi;
+    detectors.push({
+      type: "health_number",
+      name: "health_number",
+      engine: "daemon",
+      roi: { x: clamp01(roi.x), y: clamp01(roi.y), w: clamp01(roi.w), h: clamp01(roi.h) },
+      digits: Math.max(1, Math.floor(hn.digits)),
+      readout: {
+        min: Math.floor(hn.readMin),
+        max: Math.floor(hn.readMax),
+        stable_reads: Math.max(1, Math.floor(hn.stableReads)),
+      },
+      hit_on_decrease: {
+        min_drop: Math.max(1, Math.floor(hn.hitMinDrop)),
+        cooldown_ms: Math.max(0, Math.floor(hn.hitCooldownMs)),
+      },
+    });
+  } else if (hitType === "color_vignette" && cv.rois.length > 0) {
+    detectors.push({
+      type: "color_vignette",
+      cooldown_ms: cv.cooldownMs,
+      threshold: { min_score: cv.minScore },
+      target_rgb: cv.targetRgb.map((v) => clampInt(v, 0, 255)),
+      tolerance_l1: clampInt(cv.toleranceL1, 0, 765),
+      rois: mapVignetteRois(cv.rois),
+    });
+  } else if (hitType === "redness_rois" && redness.rois.length > 0) {
+    detectors.push({
+      type: "redness_rois",
+      cooldown_ms: redness.cooldownMs,
+      threshold: { min_score: redness.minScore },
+      rois: mapVignetteRois(redness.rois),
+    });
   }
 
   return attachRecoil(
@@ -171,23 +195,7 @@ export function buildScreenHealthDaemonProfile(args: {
       name: profileDraft.profileName,
       meta: presetMeta,
       capture: { source: "monitor", monitor_index: profileDraft.monitorIndex, tick_ms: profileDraft.tickMs },
-      detectors: [
-        {
-          type: "redness_rois",
-          cooldown_ms: redness.cooldownMs,
-          threshold: { min_score: redness.minScore },
-          rois: redness.rois.map((r) => ({
-            name: r.name,
-            direction: r.direction || undefined,
-            rect: {
-              x: clamp01(r.rect.x),
-              y: clamp01(r.rect.y),
-              w: clamp01(r.rect.w),
-              h: clamp01(r.rect.h),
-            },
-          })),
-        },
-      ],
+      detectors,
     },
     recoil
   );

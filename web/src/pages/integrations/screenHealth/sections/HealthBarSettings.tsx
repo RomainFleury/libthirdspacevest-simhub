@@ -1,10 +1,12 @@
 import { useScreenHealthHealthBarDraft, useScreenHealthHealthBarDraftControls } from "../draft/HealthBarDraftContext";
+import { useScreenHealthColorVignetteDraftControls } from "../draft/ColorVignetteDraftContext";
 import { parseRgbTriplet } from "../utils";
 
 export function HealthBarSettings() {
   const healthBar = useScreenHealthHealthBarDraft();
   const { setMode, setFallbackMode, setFallbackMin, setFilledRgb, setEmptyRgb, setToleranceL1, setHitMinDrop, setHitCooldownMs, setColorPickMode } =
     useScreenHealthHealthBarDraftControls();
+  const { setPickingColor } = useScreenHealthColorVignetteDraftControls();
 
   return (
     <div className="space-y-3">
@@ -70,7 +72,10 @@ export function HealthBarSettings() {
               style={{ backgroundColor: `rgb(${healthBar.filledRgb[0]},${healthBar.filledRgb[1]},${healthBar.filledRgb[2]})` }}
             />
             <button
-              onClick={() => setColorPickMode(healthBar.colorPickMode === "filled" ? null : "filled")}
+              onClick={() => {
+                setPickingColor(false);
+                setColorPickMode(healthBar.colorPickMode === "filled" ? null : "filled");
+              }}
               className="rounded-lg bg-slate-600/80 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-600"
               disabled={healthBar.mode !== "color_sampling"}
               title={healthBar.mode !== "color_sampling" ? "Switch to Color sampling to pick colors" : "Pick from screenshot"}
@@ -95,7 +100,10 @@ export function HealthBarSettings() {
               style={{ backgroundColor: `rgb(${healthBar.emptyRgb[0]},${healthBar.emptyRgb[1]},${healthBar.emptyRgb[2]})` }}
             />
             <button
-              onClick={() => setColorPickMode(healthBar.colorPickMode === "empty" ? null : "empty")}
+              onClick={() => {
+                setPickingColor(false);
+                setColorPickMode(healthBar.colorPickMode === "empty" ? null : "empty");
+              }}
               className="rounded-lg bg-slate-600/80 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-600"
               disabled={healthBar.mode !== "color_sampling"}
               title={healthBar.mode !== "color_sampling" ? "Switch to Color sampling to pick colors" : "Pick from screenshot"}

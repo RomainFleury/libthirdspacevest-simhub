@@ -91,6 +91,90 @@ def test_redness_score_from_bgra_expected_value():
     assert score == pytest.approx(0.5, abs=1e-6)
 
 
+def test_color_match_score_from_bgra_expected_value():
+    # 2x1: exact orange + black. tolerance 120 → orange=1, black L1=383 → 0. Mean 0.5
+    raw = bytes(
+        [
+            0,
+            128,
+            255,
+            255,  # BGRA orange (255,128,0)
+            0,
+            0,
+            0,
+            255,  # BGRA black
+        ]
+    )
+    score = shm.color_match_score_from_bgra(
+        raw, width=2, height=1, target_rgb=(255, 128, 0), tolerance_l1=120
+    )
+    assert score == pytest.approx(0.5, abs=1e-6)
+
+
+def test_parse_profile_color_vignette():
+    manager = shm.ScreenHealthManager()
+    parsed = manager._parse_profile(
+        {
+            "schema_version": 0,
+            "name": "color_vignette_only",
+            "capture": {"monitor_index": 1, "tick_ms": 50},
+            "detectors": [
+                {
+                    "type": "color_vignette",
+                    "cooldown_ms": 180,
+                    "threshold": {"min_score": 0.4},
+                    "target_rgb": [40, 180, 255],
+                    "tolerance_l1": 90,
+                    "rois": [
+                        {
+                            "name": "edge",
+                            "direction": "front",
+                            "rect": {"x": 0.0, "y": 0.0, "w": 0.1, "h": 0.2},
+                        }
+                    ],
+                }
+            ],
+        }
+    )
+    assert parsed.redness_detector is None
+    assert parsed.color_vignette_detector is not None
+    assert parsed.color_vignette_detector.min_score == pytest.approx(0.4)
+    assert parsed.color_vignette_detector.cooldown_ms == 180
+    assert parsed.color_vignette_detector.tolerance_l1 == 90
+    assert parsed.color_vignette_detector.target.as_tuple() == (40, 180, 255)
+    assert len(parsed.color_vignette_rois) == 1
+    assert parsed.color_vignette_rois[0].name == "edge"
+
+
+def test_parse_profile_skips_empty_color_vignette_rois():
+    manager = shm.ScreenHealthManager()
+    parsed = manager._parse_profile(
+        {
+            "schema_version": 0,
+            "name": "empty_color_then_health",
+            "capture": {"monitor_index": 1, "tick_ms": 50},
+            "detectors": [
+                {
+                    "type": "color_vignette",
+                    "target_rgb": [255, 255, 255],
+                    "rois": [],
+                },
+                {
+                    "type": "health_bar",
+                    "name": "health_bar",
+                    "roi": {"x": 0.1, "y": 0.9, "w": 0.3, "h": 0.03},
+                    "orientation": "horizontal",
+                    "threshold_fallback": {"mode": "brightness", "min": 0.5},
+                    "hit_on_decrease": {"min_drop": 0.02, "cooldown_ms": 150},
+                },
+            ],
+        }
+    )
+    assert parsed.color_vignette_detector is None
+    assert parsed.color_vignette_rois == []
+    assert len(parsed.health_bars) == 1
+
+
 def test_health_bar_percent_from_bgra_half_filled():
     # 10x2 ROI: left half filled (red), right half empty (dark)
     w, h = 10, 2
@@ -495,6 +579,82 @@ def test_parse_profile_recoil_ammo_number():
     assert parsed.recoil_duration_ms == 45
     assert parsed.ammo_numbers[0].engine == "daemon"
     assert parsed.ammo_numbers[0].templates is None
+
+
+def test_parse_profile_skips_empty_redness_rois():
+    manager = shm.ScreenHealthManager()
+    parsed = manager._parse_profile(
+        {
+            "schema_version": 0,
+            "name": "health_bar_only",
+            "capture": {"monitor_index": 1, "tick_ms": 50},
+            "detectors": [
+                {
+                    "type": "redness_rois",
+                    "cooldown_ms": 200,
+                    "threshold": {"min_score": 0.35},
+                    "rois": [],
+                },
+                {
+                    "type": "health_bar",
+                    "name": "health_bar",
+                    "roi": {"x": 0.1, "y": 0.9, "w": 0.3, "h": 0.03},
+                    "orientation": "horizontal",
+                    "threshold_fallback": {"mode": "brightness", "min": 0.5},
+                    "hit_on_decrease": {"min_drop": 0.02, "cooldown_ms": 150},
+                },
+            ],
+        }
+    )
+    assert parsed.redness_detector is None
+    assert parsed.redness_rois == []
+    assert len(parsed.health_bars) == 1
+
+
+def test_parse_profile_ammo_only_without_hit_detector():
+    manager = shm.ScreenHealthManager()
+    parsed = manager._parse_profile(
+        {
+            "schema_version": 0,
+            "name": "ammo_only",
+            "capture": {"monitor_index": 1, "tick_ms": 50},
+            "detectors": [],
+            "recoil": {
+                "type": "ammo_number",
+                "engine": "daemon",
+                "duration_ms": 40,
+                "roi": {"x": 0.8, "y": 0.9, "w": 0.08, "h": 0.04},
+                "digits": 3,
+                "readout": {"min": 0, "max": 999, "stable_reads": 2},
+                "hit_on_decrease": {"min_drop": 1, "cooldown_ms": 50},
+            },
+        }
+    )
+    assert parsed.redness_detector is None
+    assert parsed.health_bars == []
+    assert parsed.health_numbers == []
+    assert len(parsed.ammo_numbers) == 1
+    assert parsed.ammo_numbers[0].engine == "daemon"
+
+
+def test_parse_profile_rejects_empty_setup():
+    manager = shm.ScreenHealthManager()
+    with pytest.raises(ValueError, match="hit detector or ammo recoil"):
+        manager._parse_profile(
+            {
+                "schema_version": 0,
+                "name": "empty",
+                "capture": {"monitor_index": 1, "tick_ms": 50},
+                "detectors": [
+                    {
+                        "type": "redness_rois",
+                        "cooldown_ms": 200,
+                        "threshold": {"min_score": 0.35},
+                        "rois": [],
+                    }
+                ],
+            }
+        )
 
 
 def test_parse_profile_health_number_uses_daemon_ocr_without_templates():

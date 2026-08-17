@@ -5,6 +5,7 @@ import { ocrGetSettings } from "../../../../lib/bridgeApi";
 import { buildScreenHealthDaemonProfile } from "../buildDaemonProfile";
 import { useScreenHealthHealthNumberDraft, useScreenHealthHealthNumberDraftControls } from "../draft/HealthNumberDraftContext";
 import { useScreenHealthProfileDraftControls } from "../draft/ProfileDraftContext";
+import { useScreenHealthColorVignetteDraftControls } from "../draft/ColorVignetteDraftContext";
 import { useScreenHealthRednessDraftControls } from "../draft/RednessDraftContext";
 import { useScreenHealthHealthBarDraftControls } from "../draft/HealthBarDraftContext";
 import { useScreenHealthRecoilDraftControls } from "../draft/RecoilDraftContext";
@@ -32,6 +33,7 @@ export function HealthNumberSettings(props: {
   } = useScreenHealthHealthNumberDraftControls();
   const { readDraft: readProfileDraft } = useScreenHealthProfileDraftControls();
   const { readDraft: readRednessDraft } = useScreenHealthRednessDraftControls();
+  const { readDraft: readColorVignetteDraft } = useScreenHealthColorVignetteDraftControls();
   const { readDraft: readHealthBarDraft } = useScreenHealthHealthBarDraftControls();
   const { readDraft: readRecoilDraft } = useScreenHealthRecoilDraftControls();
   const [activeEngineLabel, setActiveEngineLabel] = useState("Daemon Settings");
@@ -59,6 +61,7 @@ export function HealthNumberSettings(props: {
     const profile = buildScreenHealthDaemonProfile({
       profileDraft: readProfileDraft(),
       redness: readRednessDraft(),
+      colorVignette: readColorVignetteDraft(),
       hb: readHealthBarDraft(),
       hn: readHealthNumberDraft(),
       recoil: readRecoilDraft(),

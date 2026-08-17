@@ -1828,6 +1828,15 @@ class VestDaemon:
                             f"[screen_health_test] redness name={name} score={score} threshold={thr} hit={hit} "
                             f"cap_ms={cap_ms} eval_ms={eval_ms} image={d.get('image_path')}"
                         )
+                    elif dtype == "color_vignette":
+                        score = d.get("score")
+                        thr = d.get("threshold")
+                        hit = d.get("hit")
+                        line = (
+                            f"[screen_health_test] color_vignette name={name} score={score} threshold={thr} "
+                            f"hit={hit} target_rgb={d.get('target_rgb')} tolerance_l1={d.get('tolerance_l1')} "
+                            f"cap_ms={cap_ms} eval_ms={eval_ms} image={d.get('image_path')}"
+                        )
                     elif dtype == "health_bar":
                         line = (
                             f"[screen_health_test] health_bar name={name} mode={d.get('mode')} "
