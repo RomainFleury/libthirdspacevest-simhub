@@ -192,6 +192,26 @@ register_integration(GameIntegrationSpec(
     mod_url="https://github.com/floh-bhaptics/PistolWhip_bhaptics",
 ))
 
+# Warhammer 40,000: Battle Sister (MelonLoader TCP client)
+register_integration(GameIntegrationSpec(
+    game_id="battlesister",
+    game_name="Warhammer 40,000: Battle Sister",
+    integration_type=IntegrationType.TCP_CLIENT,
+    status=IntegrationStatus.BETA,
+    manager_module="battlesister_manager",
+    manager_class="BattleSisterManager",
+    daemon_commands=["battlesister_start", "battlesister_stop", "battlesister_status", "battlesister_event"],
+    event_types=[
+        "gun_fire", "shotgun_fire", "melee_hit", "two_hand",
+        "player_hit", "blade_hit", "explosion", "death",
+        "low_health", "low_health_end",
+    ],
+    has_directional_damage=True,
+    docs_file="docs-external-integrations-ideas/BATTLESISTER_INTEGRATION.md",
+    requires_external_mod=True,
+    mod_url="https://github.com/floh-bhaptics/BattleSister_bhaptics",
+))
+
 # Generic Screen Health Watcher (screen capture)
 register_integration(GameIntegrationSpec(
     game_id="screen_health",

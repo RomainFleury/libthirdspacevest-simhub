@@ -52,6 +52,13 @@ const MOD_CONFIG = {
     targetFolder: "Mods",
     description: "MelonLoader TCP client for Pistol Whip haptic feedback",
   },
+  "battlesister": {
+    name: "Warhammer 40,000: Battle Sister",
+    directory: "battlesister",
+    files: ["ThirdSpace_BattleSister.dll"],
+    targetFolder: "Mods",
+    description: "MelonLoader TCP client for Battle Sister haptic feedback",
+  },
 };
 
 function registerModsHandlers(getMainWindow) {

@@ -44,6 +44,7 @@ export type DaemonEvent = {
   health_value?: number;
   duration_ms?: number;
   hand?: string;
+  angle?: number;
   // Screen health debug events (extra payload is in params)
 };
 
@@ -498,6 +499,51 @@ declare global {
         error?: string;
       }>;
       pistolwhipInstallMod: () => Promise<{
+        success: boolean;
+        copiedFiles?: string[];
+        destination?: string;
+        error?: string;
+      }>;
+      battlesisterStart: () => Promise<{ success: boolean; error?: string }>;
+      battlesisterStop: () => Promise<{ success: boolean; error?: string }>;
+      battlesisterStatus: () => Promise<{
+        success: boolean;
+        running: boolean;
+        events_received?: number;
+        last_event_ts?: number | null;
+        last_event_type?: string | null;
+        error?: string;
+      }>;
+      battlesisterGetSettings: () => Promise<{
+        success: boolean;
+        gameDir?: string | null;
+        solenoidRecoil?: SolenoidRecoilSettings;
+        error?: string;
+      }>;
+      battlesisterSetSolenoidRecoil: (
+        solenoidRecoil: Partial<SolenoidRecoilSettings>
+      ) => Promise<{ success: boolean; solenoidRecoil?: SolenoidRecoilSettings; error?: string }>;
+      battlesisterBrowseGameDir: () => Promise<{
+        success: boolean;
+        gameDir?: string;
+        canceled?: boolean;
+        error?: string;
+      }>;
+      battlesisterGetGameDir: () => Promise<{
+        success: boolean;
+        gameDir?: string | null;
+        error?: string;
+      }>;
+      battlesisterSetGameDir: (gameDir: string | null) => Promise<{ success: boolean; error?: string }>;
+      battlesisterCheckModInstalled: () => Promise<{
+        success: boolean;
+        installed?: boolean;
+        sourceAvailable?: boolean;
+        missingFiles?: string[];
+        gameDir?: string;
+        error?: string;
+      }>;
+      battlesisterInstallMod: () => Promise<{
         success: boolean;
         copiedFiles?: string[];
         destination?: string;
@@ -1006,6 +1052,70 @@ export async function pistolwhipSetSolenoidRecoil(
   solenoidRecoil: Partial<SolenoidRecoilSettings>
 ): Promise<{ success: boolean; solenoidRecoil?: SolenoidRecoilSettings; error?: string }> {
   return await ensureBridge().pistolwhipSetSolenoidRecoil(solenoidRecoil);
+}
+
+export type BattleSisterStatus = {
+  running: boolean;
+  events_received?: number;
+  last_event_ts?: number | null;
+  last_event_type?: string | null;
+  error?: string;
+};
+
+export async function battlesisterStart(): Promise<{ success: boolean; error?: string }> {
+  return await ensureBridge().battlesisterStart();
+}
+
+export async function battlesisterStop(): Promise<{ success: boolean; error?: string }> {
+  return await ensureBridge().battlesisterStop();
+}
+
+export async function battlesisterStatus(): Promise<BattleSisterStatus> {
+  return await ensureBridge().battlesisterStatus();
+}
+
+export async function battlesisterGetSettings(): Promise<{
+  success: boolean;
+  gameDir?: string | null;
+  solenoidRecoil?: SolenoidRecoilSettings;
+  error?: string;
+}> {
+  return await ensureBridge().battlesisterGetSettings();
+}
+
+export async function battlesisterSetSolenoidRecoil(
+  solenoidRecoil: Partial<SolenoidRecoilSettings>
+): Promise<{ success: boolean; solenoidRecoil?: SolenoidRecoilSettings; error?: string }> {
+  return await ensureBridge().battlesisterSetSolenoidRecoil(solenoidRecoil);
+}
+
+export async function battlesisterBrowseGameDir(): Promise<{
+  success: boolean;
+  gameDir?: string;
+  canceled?: boolean;
+  error?: string;
+}> {
+  return await ensureBridge().battlesisterBrowseGameDir();
+}
+
+export async function battlesisterCheckModInstalled(): Promise<{
+  success: boolean;
+  installed?: boolean;
+  sourceAvailable?: boolean;
+  missingFiles?: string[];
+  gameDir?: string;
+  error?: string;
+}> {
+  return await ensureBridge().battlesisterCheckModInstalled();
+}
+
+export async function battlesisterInstallMod(): Promise<{
+  success: boolean;
+  copiedFiles?: string[];
+  destination?: string;
+  error?: string;
+}> {
+  return await ensureBridge().battlesisterInstallMod();
 }
 
 // -------------------------------------------------------------------------

@@ -4,6 +4,7 @@ import {
   AlyxIntegrationPage,
   L4D2IntegrationPage,
   PistolWhipIntegrationPage,
+  BattleSisterIntegrationPage,
   ScreenHealthIntegrationPage,
   ScreenHealthBuilderPage,
   ScreenHealthSettingsPage,
@@ -18,6 +19,7 @@ const INTEGRATION_PAGES: Record<string, React.ComponentType> = {
   alyx: AlyxIntegrationPage,
   l4d2: L4D2IntegrationPage,
   pistolwhip: PistolWhipIntegrationPage,
+  battlesister: BattleSisterIntegrationPage,
   screen_health: ScreenHealthIntegrationPage,
 };
 

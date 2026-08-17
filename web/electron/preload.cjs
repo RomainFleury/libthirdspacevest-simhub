@@ -92,6 +92,18 @@ contextBridge.exposeInMainWorld("vestBridge", {
   pistolwhipCheckModInstalled: () => ipcRenderer.invoke("pistolwhip:checkModInstalled"),
   pistolwhipInstallMod: () => ipcRenderer.invoke("pistolwhip:installMod"),
 
+  battlesisterStart: () => ipcRenderer.invoke("battlesister:start"),
+  battlesisterStop: () => ipcRenderer.invoke("battlesister:stop"),
+  battlesisterStatus: () => ipcRenderer.invoke("battlesister:status"),
+  battlesisterGetSettings: () => ipcRenderer.invoke("battlesister:getSettings"),
+  battlesisterSetSolenoidRecoil: (solenoidRecoil) =>
+    ipcRenderer.invoke("battlesister:setSolenoidRecoil", solenoidRecoil),
+  battlesisterBrowseGameDir: () => ipcRenderer.invoke("battlesister:browseGameDir"),
+  battlesisterGetGameDir: () => ipcRenderer.invoke("battlesister:getGameDir"),
+  battlesisterSetGameDir: (gameDir) => ipcRenderer.invoke("battlesister:setGameDir", gameDir),
+  battlesisterCheckModInstalled: () => ipcRenderer.invoke("battlesister:checkModInstalled"),
+  battlesisterInstallMod: () => ipcRenderer.invoke("battlesister:installMod"),
+
   // Predefined Effects Library API
   playEffect: (effectName) => ipcRenderer.invoke("effects:play", effectName),
   listEffectsLibrary: () => ipcRenderer.invoke("effects:list"),

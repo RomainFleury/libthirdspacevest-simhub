@@ -997,6 +997,50 @@ class DaemonBridge extends EventEmitter {
     }
   }
 
+  async battlesisterStart(solenoidRecoil) {
+    try {
+      const params = {};
+      if (solenoidRecoil && typeof solenoidRecoil === "object") {
+        params.solenoid_recoil = solenoidRecoil;
+      }
+      const response = await this.sendCommand("battlesister_start", params);
+      return {
+        success: response.success ?? true,
+        error: response.message,
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  async battlesisterStop() {
+    try {
+      await this.sendCommand("battlesister_stop");
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  async battlesisterStatus() {
+    try {
+      const response = await this.sendCommand("battlesister_status");
+      return {
+        success: true,
+        running: response.running ?? false,
+        events_received: response.events_received ?? 0,
+        last_event_ts: response.last_event_ts ?? null,
+        last_event_type: response.last_event_type ?? null,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        running: false,
+        error: error.message,
+      };
+    }
+  }
+
   // -------------------------------------------------------------------------
   // Generic Screen Health Watcher API
   // -------------------------------------------------------------------------

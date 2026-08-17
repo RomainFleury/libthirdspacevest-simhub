@@ -54,6 +54,13 @@ extraResources:
       - "*.dll"
       - "README.md"
 
+  # Battle Sister MelonLoader DLL (built ThirdSpace_BattleSister.dll, plus README)
+  - from: "../mods/battlesister/"
+    to: "mods/battlesister/"
+    filter:
+      - "*.dll"
+      - "README.md"
+
 # Don't pack into asar (easier debugging, daemon access)
 asar: true
 asarUnpack:
