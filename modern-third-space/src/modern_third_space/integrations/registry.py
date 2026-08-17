@@ -172,6 +172,26 @@ register_integration(GameIntegrationSpec(
     launch_options="-condebug",
 ))
 
+# Pistol Whip (MelonLoader TCP client)
+register_integration(GameIntegrationSpec(
+    game_id="pistolwhip",
+    game_name="Pistol Whip",
+    integration_type=IntegrationType.TCP_CLIENT,
+    status=IntegrationStatus.BETA,
+    manager_module="pistolwhip_manager",
+    manager_class="PistolWhipManager",
+    daemon_commands=["pistolwhip_start", "pistolwhip_stop", "pistolwhip_status", "pistolwhip_event"],
+    event_types=[
+        "gun_fire", "shotgun_fire", "empty_gun_fire", "melee_hit",
+        "reload_hip", "reload_shoulder", "player_hit", "death",
+        "low_health", "healing",
+    ],
+    has_directional_damage=False,
+    docs_file="docs-external-integrations-ideas/PISTOLWHIP_INTEGRATION.md",
+    requires_external_mod=True,
+    mod_url="https://github.com/floh-bhaptics/PistolWhip_bhaptics",
+))
+
 # Generic Screen Health Watcher (screen capture)
 register_integration(GameIntegrationSpec(
     game_id="screen_health",

@@ -79,6 +79,19 @@ contextBridge.exposeInMainWorld("vestBridge", {
   l4d2CheckModInstalled: () => ipcRenderer.invoke("l4d2:checkModInstalled"),
   l4d2InstallMod: () => ipcRenderer.invoke("l4d2:installMod"),
 
+  // Pistol Whip Integration API
+  pistolwhipStart: () => ipcRenderer.invoke("pistolwhip:start"),
+  pistolwhipStop: () => ipcRenderer.invoke("pistolwhip:stop"),
+  pistolwhipStatus: () => ipcRenderer.invoke("pistolwhip:status"),
+  pistolwhipGetSettings: () => ipcRenderer.invoke("pistolwhip:getSettings"),
+  pistolwhipSetSolenoidRecoil: (solenoidRecoil) =>
+    ipcRenderer.invoke("pistolwhip:setSolenoidRecoil", solenoidRecoil),
+  pistolwhipBrowseGameDir: () => ipcRenderer.invoke("pistolwhip:browseGameDir"),
+  pistolwhipGetGameDir: () => ipcRenderer.invoke("pistolwhip:getGameDir"),
+  pistolwhipSetGameDir: (gameDir) => ipcRenderer.invoke("pistolwhip:setGameDir", gameDir),
+  pistolwhipCheckModInstalled: () => ipcRenderer.invoke("pistolwhip:checkModInstalled"),
+  pistolwhipInstallMod: () => ipcRenderer.invoke("pistolwhip:installMod"),
+
   // Predefined Effects Library API
   playEffect: (effectName) => ipcRenderer.invoke("effects:play", effectName),
   listEffectsLibrary: () => ipcRenderer.invoke("effects:list"),

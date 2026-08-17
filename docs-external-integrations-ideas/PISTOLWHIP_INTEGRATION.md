@@ -1,10 +1,10 @@
 # Pistol Whip Integration Plan
 
-> **Status: 🚀 IN PROGRESS**
+> **Status: BETA** (MelonLoader mod untested in-game)
 >
-> Integration strategy for Pistol Whip using MelonLoader mod framework.
-> **Reusing existing bHaptics/OWO mods** - adapting their Harmony patches to our daemon.
-> Very similar to SuperHot VR - same engine, same mod framework.
+> Integration strategy for Pistol Whip using MelonLoader. Harmony patches are
+> adapted from the open-source bHaptics/OWO mods; the game connects to the
+> daemon as a TCP client on port 5050.
 
 ## Overview
 
@@ -262,8 +262,10 @@ The game supports dual wielding, so:
 ## Files Reference
 
 ### In Repository
-- `misc-documentations/bhaptics-svg-24-nov/pistol-whip/` - OWO mod files
-- `misc-documentations/bhaptics-svg-24-nov/pistol-whip/PistolWhip_bhaptics.dll` - bHaptics DLL
+- `pistolwhip-mod/` - Third Space MelonLoader source (TCP client to daemon 5050)
+- `misc-documentations/achived-untested-mods/pistolwhip-mod/README.md` - previous investigation / install notes
+- `misc-documentations/achived-untested-mods/pistolwhip-mod/bHaptics-nexusmods/PistolWhip_bhaptics.zip-1-2-0-1-1692419467/` - original NexusMods `PistolWhip_bhaptics.dll` (Harmony reference only; talks to bHaptics Player)
+- `misc-documentations/bhaptics-svg-24-nov/pistol-whip/` - OWO sensation files
 
 ### External
 - [bHaptics source](https://github.com/floh-bhaptics/PistolWhip_bhaptics)
@@ -275,7 +277,7 @@ The game supports dual wielding, so:
 1. [x] **Phase 1**: Create C# mod (adapted from SUPERHOT, reused bHaptics/OWO Harmony patches)
 2. [x] **Phase 2**: Add `pistolwhip_manager.py` to daemon
 3. [x] **Phase 3**: Add protocol commands and handlers
-4. [ ] **Phase 4**: Create Electron UI panel (optional)
+4. [x] **Phase 4**: Create Electron UI panel (optional)
 5. [ ] **Phase 5**: Test and tune for rhythm gameplay
 6. [ ] **Phase 6**: Package and document
 

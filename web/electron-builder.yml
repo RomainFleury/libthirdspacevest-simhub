@@ -47,6 +47,13 @@ extraResources:
       - "*.lua"
       - "README.md"
 
+  # Pistol Whip MelonLoader DLL (built ThirdSpace_PistolWhip.dll, plus README)
+  - from: "../mods/pistolwhip/"
+    to: "mods/pistolwhip/"
+    filter:
+      - "*.dll"
+      - "README.md"
+
 # Don't pack into asar (easier debugging, daemon access)
 asar: true
 asarUnpack:

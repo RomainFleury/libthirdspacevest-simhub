@@ -8,8 +8,10 @@ This directory contains pre-built game mod files that are bundled with the Third
 mods/
 ├── alyx/                  # Half-Life: Alyx scripts
 │   └── (Lua scripts from NexusMods)
-└── l4d2/                  # Left 4 Dead 2 VScripts (in misc-documentations/)
-    └── (Copied from misc-documentations during build)
+├── l4d2/                  # Left 4 Dead 2 VScripts (in misc-documentations/)
+│   └── (Copied from misc-documentations during build)
+└── pistolwhip/            # Pistol Whip MelonLoader README (build DLL from pistolwhip-mod/)
+    └── README.md
 ```
 
 ## Building Mods

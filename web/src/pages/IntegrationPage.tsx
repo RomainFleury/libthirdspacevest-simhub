@@ -3,6 +3,7 @@ import {
   CS2IntegrationPage, 
   AlyxIntegrationPage,
   L4D2IntegrationPage,
+  PistolWhipIntegrationPage,
   ScreenHealthIntegrationPage,
   ScreenHealthBuilderPage,
   ScreenHealthSettingsPage,
@@ -16,6 +17,7 @@ const INTEGRATION_PAGES: Record<string, React.ComponentType> = {
   cs2: CS2IntegrationPage,
   alyx: AlyxIntegrationPage,
   l4d2: L4D2IntegrationPage,
+  pistolwhip: PistolWhipIntegrationPage,
   screen_health: ScreenHealthIntegrationPage,
 };
 

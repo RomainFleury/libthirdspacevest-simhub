@@ -43,6 +43,7 @@ export type DaemonEvent = {
   detector?: string | null;
   health_value?: number;
   duration_ms?: number;
+  hand?: string;
   // Screen health debug events (extra payload is in params)
 };
 
@@ -456,6 +457,52 @@ declare global {
       l4d2SetSolenoidRecoil: (
         solenoidRecoil: Partial<SolenoidRecoilSettings>
       ) => Promise<{ success: boolean; solenoidRecoil?: SolenoidRecoilSettings; error?: string }>;
+      // Pistol Whip Integration API
+      pistolwhipStart: () => Promise<{ success: boolean; error?: string }>;
+      pistolwhipStop: () => Promise<{ success: boolean; error?: string }>;
+      pistolwhipStatus: () => Promise<{
+        success: boolean;
+        running: boolean;
+        events_received?: number;
+        last_event_ts?: number | null;
+        last_event_type?: string | null;
+        error?: string;
+      }>;
+      pistolwhipGetSettings: () => Promise<{
+        success: boolean;
+        gameDir?: string | null;
+        solenoidRecoil?: SolenoidRecoilSettings;
+        error?: string;
+      }>;
+      pistolwhipSetSolenoidRecoil: (
+        solenoidRecoil: Partial<SolenoidRecoilSettings>
+      ) => Promise<{ success: boolean; solenoidRecoil?: SolenoidRecoilSettings; error?: string }>;
+      pistolwhipBrowseGameDir: () => Promise<{
+        success: boolean;
+        gameDir?: string;
+        canceled?: boolean;
+        error?: string;
+      }>;
+      pistolwhipGetGameDir: () => Promise<{
+        success: boolean;
+        gameDir?: string | null;
+        error?: string;
+      }>;
+      pistolwhipSetGameDir: (gameDir: string | null) => Promise<{ success: boolean; error?: string }>;
+      pistolwhipCheckModInstalled: () => Promise<{
+        success: boolean;
+        installed?: boolean;
+        sourceAvailable?: boolean;
+        missingFiles?: string[];
+        gameDir?: string;
+        error?: string;
+      }>;
+      pistolwhipInstallMod: () => Promise<{
+        success: boolean;
+        copiedFiles?: string[];
+        destination?: string;
+        error?: string;
+      }>;
       // Generic Screen Health Watcher API
       screenHealthExportProfile: (profile: Record<string, any>) => Promise<{
         success: boolean;
@@ -887,6 +934,78 @@ export async function alyxSetSettings(settings: {
  */
 export async function alyxSetLogPath(logPath: string | null): Promise<{ success: boolean; error?: string }> {
   return await ensureBridge().alyxSetLogPath(logPath);
+}
+
+export type PistolWhipStatus = {
+  running: boolean;
+  events_received?: number;
+  last_event_ts?: number | null;
+  last_event_type?: string | null;
+  error?: string;
+};
+
+export async function pistolwhipStart(): Promise<{ success: boolean; error?: string }> {
+  return await ensureBridge().pistolwhipStart();
+}
+
+export async function pistolwhipStop(): Promise<{ success: boolean; error?: string }> {
+  return await ensureBridge().pistolwhipStop();
+}
+
+export async function pistolwhipStatus(): Promise<PistolWhipStatus> {
+  return await ensureBridge().pistolwhipStatus();
+}
+
+export async function pistolwhipGetSettings(): Promise<{
+  success: boolean;
+  gameDir?: string | null;
+  solenoidRecoil?: SolenoidRecoilSettings;
+  error?: string;
+}> {
+  return await ensureBridge().pistolwhipGetSettings();
+}
+
+export async function pistolwhipBrowseGameDir(): Promise<{
+  success: boolean;
+  gameDir?: string;
+  canceled?: boolean;
+  error?: string;
+}> {
+  return await ensureBridge().pistolwhipBrowseGameDir();
+}
+
+export async function pistolwhipGetGameDir(): Promise<{
+  success: boolean;
+  gameDir?: string | null;
+  error?: string;
+}> {
+  return await ensureBridge().pistolwhipGetGameDir();
+}
+
+export async function pistolwhipCheckModInstalled(): Promise<{
+  success: boolean;
+  installed?: boolean;
+  sourceAvailable?: boolean;
+  missingFiles?: string[];
+  gameDir?: string;
+  error?: string;
+}> {
+  return await ensureBridge().pistolwhipCheckModInstalled();
+}
+
+export async function pistolwhipInstallMod(): Promise<{
+  success: boolean;
+  copiedFiles?: string[];
+  destination?: string;
+  error?: string;
+}> {
+  return await ensureBridge().pistolwhipInstallMod();
+}
+
+export async function pistolwhipSetSolenoidRecoil(
+  solenoidRecoil: Partial<SolenoidRecoilSettings>
+): Promise<{ success: boolean; solenoidRecoil?: SolenoidRecoilSettings; error?: string }> {
+  return await ensureBridge().pistolwhipSetSolenoidRecoil(solenoidRecoil);
 }
 
 // -------------------------------------------------------------------------

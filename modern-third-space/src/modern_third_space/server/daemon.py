@@ -76,6 +76,7 @@ from .protocol import (
 from .cs2_manager import CS2Manager, generate_cs2_config
 from .alyx_manager import AlyxManager, get_mod_info as get_alyx_mod_info
 from .l4d2_manager import L4D2Manager
+from .pistolwhip_manager import PistolWhipManager
 from .ocr_settings import load_ocr_settings, save_ocr_settings
 from .screen_health_manager import ScreenHealthManager
 from .screen_ocr import list_ocr_engines, normalize_text_ocr_engine
@@ -93,6 +94,13 @@ from .protocol import (
     response_l4d2_start,
     response_l4d2_stop,
     response_l4d2_status,
+    event_pistolwhip_started,
+    event_pistolwhip_stopped,
+    event_pistolwhip_game_event,
+    response_pistolwhip_start,
+    response_pistolwhip_stop,
+    response_pistolwhip_status,
+    response_pistolwhip_event,
     event_screen_health_started,
     event_screen_health_stopped,
     event_screen_health_hit,
@@ -186,6 +194,12 @@ class VestDaemon:
             on_recoil=self._on_solenoid_recoil,
         )
 
+        self._pistolwhip_manager = PistolWhipManager(
+            on_game_event=self._on_pistolwhip_game_event,
+            on_trigger=self._on_pistolwhip_trigger,
+            on_recoil=self._on_solenoid_recoil,
+        )
+
         # Generic Screen Health Watcher manager
         self._ocr_settings = load_ocr_settings()
         self._screen_health_manager = ScreenHealthManager(
@@ -240,6 +254,8 @@ class VestDaemon:
         # Stop Alyx integration if running
         if self._alyx_manager.is_running:
             self._alyx_manager.stop()
+        if self._pistolwhip_manager.enabled:
+            self._pistolwhip_manager.disable()
 
         # Disconnect USB relay if connected
         try:
@@ -466,6 +482,18 @@ class VestDaemon:
         
         if cmd_type == CommandType.L4D2_STATUS:
             return await self._cmd_l4d2_status(command)
+
+        if cmd_type == CommandType.PISTOLWHIP_START:
+            return await self._cmd_pistolwhip_start(command)
+
+        if cmd_type == CommandType.PISTOLWHIP_STOP:
+            return await self._cmd_pistolwhip_stop(command)
+
+        if cmd_type == CommandType.PISTOLWHIP_STATUS:
+            return await self._cmd_pistolwhip_status(command)
+
+        if cmd_type == CommandType.PISTOLWHIP_EVENT:
+            return await self._cmd_pistolwhip_event(command)
 
         # Generic Screen Health Watcher commands
         if cmd_type == CommandType.SCREEN_HEALTH_START:
@@ -1491,6 +1519,62 @@ class VestDaemon:
                 self._clients.broadcast(event),
                 self._loop,
             )
+
+    async def _cmd_pistolwhip_start(self, command: Command) -> Response:
+        success, error = self._pistolwhip_manager.start(solenoid_recoil=command.solenoid_recoil)
+        if success:
+            await self._clients.broadcast(event_pistolwhip_started())
+            return response_pistolwhip_start(success=True, req_id=command.req_id)
+        return response_pistolwhip_start(success=False, error=error, req_id=command.req_id)
+
+    async def _cmd_pistolwhip_stop(self, command: Command) -> Response:
+        success = self._pistolwhip_manager.stop()
+        if success:
+            await self._clients.broadcast(event_pistolwhip_stopped())
+        return response_pistolwhip_stop(success=success, req_id=command.req_id)
+
+    async def _cmd_pistolwhip_status(self, command: Command) -> Response:
+        return response_pistolwhip_status(
+            running=self._pistolwhip_manager.enabled,
+            events_received=self._pistolwhip_manager.events_received,
+            last_event_ts=self._pistolwhip_manager.last_event_ts,
+            last_event_type=self._pistolwhip_manager.last_event_type,
+            req_id=command.req_id,
+        )
+
+    async def _cmd_pistolwhip_event(self, command: Command) -> Response:
+        handled = self._pistolwhip_manager.process_event(
+            str(command.event or ""),
+            hand=command.hand,
+            priority=int(command.priority or 0),
+        )
+        if not handled:
+            return response_pistolwhip_event(
+                success=False,
+                error="Pistol Whip integration is not started",
+                req_id=command.req_id,
+            )
+        return response_pistolwhip_event(success=True, req_id=command.req_id)
+
+    def _on_pistolwhip_game_event(self, event_type: str, params: dict) -> None:
+        if self._loop is None:
+            return
+        asyncio.run_coroutine_threadsafe(
+            self._clients.broadcast(event_pistolwhip_game_event(event_type, params)),
+            self._loop,
+        )
+
+    def _on_pistolwhip_trigger(self, cell: int, speed: int) -> None:
+        main_device_id = self._registry.get_main_device_id()
+        if main_device_id is None:
+            return
+        controller = self._registry.get_controller(main_device_id)
+        if controller is None or not controller.status().connected:
+            return
+        controller.trigger_effect(cell, speed)
+        if self._loop is not None:
+            event = event_effect_triggered(cell, speed, device_id=main_device_id)
+            asyncio.run_coroutine_threadsafe(self._clients.broadcast(event), self._loop)
 
     # -------------------------------------------------------------------------
     # Generic Screen Health Watcher commands

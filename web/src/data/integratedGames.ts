@@ -46,6 +46,17 @@ export const integratedGames: IntegratedGameConfig[] = [
     hasSetupGuide: true,
     tags: ["fps", "coop", "valve", "zombie"],
   },
+  {
+    id: "pistolwhip",
+    name: "Pistol Whip",
+    description: "VR rhythm shooter haptics via MelonLoader TCP events",
+    icon: "🔫",
+    steamAppId: 1070000,
+    hasConfiguration: true,
+    hasSetupGuide: true,
+    requiresMod: true,
+    tags: ["vr", "rhythm", "fps", "beta"],
+  },
 ];
 
 /**
