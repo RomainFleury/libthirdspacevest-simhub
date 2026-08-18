@@ -70,7 +70,7 @@ cd modern-third-space && python3 -m pytest tests/test_game_integrations.py -v
    python3 -m pytest tests/test_game_integrations.py -v
    ```
 
-**Pattern reference**: See `alyx_manager.py` for log watchers, `gtav_manager.py` for TCP handlers.
+**Pattern reference**: See `alyx_manager.py` or `l4d2_manager.py` for log watchers.
 
 ### Testing
 

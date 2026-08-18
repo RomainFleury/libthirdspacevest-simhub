@@ -54,7 +54,7 @@ async def test_game_mapping_commands():
         print("✓ LIST_GAME_PLAYER_MAPPINGS command works")
         
         # Test 3: List game mappings (specific game)
-        daemon._game_mapping.set_mapping("gtav", 1, "device_456")
+        daemon._game_mapping.set_mapping("test_game", 1, "device_456")
         cmd = Command(
             cmd=CommandType.LIST_GAME_PLAYER_MAPPINGS.value,
             game_id="cs2"

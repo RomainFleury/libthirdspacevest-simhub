@@ -133,10 +133,6 @@ class VestDaemon:
         self._registry = VestControllerRegistry()
         self._player_manager = PlayerManager()
         self._game_mapping = GamePlayerMapping()
-        # Keep _selected_device for backward compatibility (refers to main device)
-        self._selected_device: Optional[Dict[str, Any]] = None
-        # Legacy: _controller now refers to main device controller (for backward compatibility)
-        self._controller: Optional[VestController] = None
         self._clients = ClientManager()
         self._server: Optional[asyncio.Server] = None
         self._running = False
@@ -166,11 +162,6 @@ class VestDaemon:
         )
         
         self._loop: Optional[asyncio.AbstractEventLoop] = None
-    
-    @property
-    def selected_device(self) -> Optional[Dict[str, Any]]:
-        """Currently selected device."""
-        return self._selected_device
     
     @property
     def is_connected(self) -> bool:
@@ -210,8 +201,6 @@ class VestDaemon:
         # Disconnect from all vests
         for device_id in list(self._registry._controllers.keys()):
             self._registry.remove_device(device_id)
-        self._controller = None
-        self._selected_device = None
         
         # Close server
         if self._server is not None:
@@ -461,7 +450,7 @@ class VestDaemon:
         """
         return response_ping(
             connected=self.is_connected,
-            has_device_selected=self._selected_device is not None,
+            has_device_selected=self._registry.get_main_device_id() is not None,
             client_count=self._clients.client_count,
             req_id=command.req_id,
         )
@@ -518,10 +507,6 @@ class VestDaemon:
                 device_info=selected
             )
             
-            # Update selected device (for backward compatibility)
-            self._selected_device = selected
-            self._controller = controller  # Keep for backward compatibility
-            
             # Broadcast device selected event (include device_id)
             event_data = selected.copy()
             event_data["device_id"] = device_id
@@ -535,17 +520,19 @@ class VestDaemon:
             return response_error(str(e), command.req_id)
     
     async def _cmd_get_selected_device(self, command: Command) -> Response:
-        """Get the currently selected device."""
-        return response_get_selected_device(self._selected_device, command.req_id)
+        """Get the currently selected device (returns main device from registry)."""
+        main_id = self._registry.get_main_device_id()
+        if main_id:
+            device_info = self._registry.get_device_info(main_id)
+            return response_get_selected_device(device_info, command.req_id)
+        return response_get_selected_device(None, command.req_id)
     
     async def _cmd_clear_device(self, command: Command) -> Response:
-        """Clear device selection."""
-        # Disconnect first
-        if self._controller is not None:
-            self._controller.disconnect()
-            self._controller = None
-        
-        self._selected_device = None
+        """Clear device selection (disconnect main device)."""
+        # Disconnect main device
+        main_id = self._registry.get_main_device_id()
+        if main_id:
+            self._registry.remove_device(main_id)
         
         # Broadcast device cleared event
         await self._clients.broadcast(event_device_cleared())
@@ -610,14 +597,6 @@ class VestDaemon:
         
         # Remove device from registry
         self._registry.remove_device(command.device_id)
-        
-        # Update _controller if it was the disconnected device
-        main_id = self._registry.get_main_device_id()
-        if main_id:
-            self._controller = self._registry.get_controller()
-        else:
-            self._controller = None
-            self._selected_device = None
         
         # Check if it's a mock device
         is_mock = self._registry.is_mock_device(command.device_id)
@@ -704,18 +683,18 @@ class VestDaemon:
                 await self._clients.broadcast(event_connected(device_info))
             return response_ok(command.req_id)
         
-        # Otherwise, connect to selected device (backward compatibility)
-        if self._selected_device is None:
-            return response_error("No device selected", command.req_id)
+        # Otherwise, connect to main device
+        main_id = self._registry.get_main_device_id()
+        if main_id is None:
+            return response_error("No main device selected", command.req_id)
         
-        # Device should already be in registry from select_device
-        # Just verify connection
         controller = self._registry.get_controller()
         if controller is None or not controller.status().connected:
             return response_error("Device not connected. Use select_device first.", command.req_id)
         
         # Broadcast connected event
-        await self._clients.broadcast(event_connected(self._selected_device))
+        device_info = self._registry.get_device_info(main_id)
+        await self._clients.broadcast(event_connected(device_info))
         return response_ok(command.req_id)
     
     async def _cmd_disconnect(self, command: Command) -> Response:
@@ -726,18 +705,13 @@ class VestDaemon:
                 return response_error(f"Device {command.device_id} not found", command.req_id)
             
             self._registry.remove_device(command.device_id)
-            # Update _controller if it was the disconnected device
-            if self._controller == self._registry.get_controller():
-                self._controller = self._registry.get_controller()
             await self._clients.broadcast(event_disconnected())
             return response_ok(command.req_id)
         
-        # Otherwise, disconnect main device (backward compatibility)
+        # Otherwise, disconnect main device
         main_id = self._registry.get_main_device_id()
         if main_id:
             self._registry.remove_device(main_id)
-            self._controller = None
-            self._selected_device = None
         
         # Broadcast disconnected event
         await self._clients.broadcast(event_disconnected())
@@ -994,21 +968,9 @@ class VestDaemon:
         # Get controller for resolved device_id
         controller = self._registry.get_controller(target_device_id)
         
-        # If no controller found, try to auto-connect main device (backward compatibility)
+        # If no controller found, return error
         if controller is None:
-            if self._selected_device is None:
-                return response_error("No device selected and no device_id specified", command.req_id)
-            
-            # Auto-connect main device
-            try:
-                device_id, controller = self._registry.add_device(
-                    device_id=None,
-                    device_info=self._selected_device
-                )
-                self._controller = controller  # Update for backward compatibility
-                await self._clients.broadcast(event_connected(self._selected_device))
-            except ValueError as e:
-                return response_error(str(e), command.req_id)
+            return response_error("No device found. Use select_device first.", command.req_id)
         
         # Check if connected
         if not controller.status().connected:
@@ -1068,12 +1030,14 @@ class VestDaemon:
                 req_id=command.req_id,
             )
         
-        # Otherwise, get status for main device (backward compatibility)
+        # Otherwise, get status for main device
         controller = self._registry.get_controller()
+        main_id = self._registry.get_main_device_id()
+        device_info = self._registry.get_device_info(main_id) if main_id else None
         if controller is None:
             return response_status(
                 connected=False,
-                device=self._selected_device,
+                device=device_info,
                 req_id=command.req_id,
             )
         
@@ -1436,13 +1400,12 @@ class VestDaemon:
             return response_screen_health_test(success=False, error="profile is required", req_id=command.req_id)
 
         path_s = (command.frame_bgra_path or "").strip()
-        b64_legacy = (command.frame_bgra_base64 or "").strip()
-        if (not path_s and not b64_legacy) or command.frame_width is None or command.frame_height is None:
+        if not path_s or command.frame_width is None or command.frame_height is None:
             return response_screen_health_test(
                 success=False,
                 error=(
-                    "frame_bgra_path (raw BGRA file) or legacy frame_bgra_base64, plus frame_width "
-                    "and frame_height, are required for screen_health_test"
+                    "frame_bgra_path (raw BGRA file), frame_width, "
+                    "and frame_height are required for screen_health_test"
                 ),
                 req_id=command.req_id,
             )
@@ -1462,32 +1425,21 @@ class VestDaemon:
                 req_id=command.req_id,
             )
 
-        frame_file: Optional[Path] = None
-        if path_s:
-            frame_file = Path(path_s).expanduser().resolve()
-            if not frame_file.is_file():
-                return response_screen_health_test(
-                    success=False,
-                    error=f"frame_bgra_path is not a file: {frame_file}",
-                    req_id=command.req_id,
-                )
-            try:
-                raw_bgra = frame_file.read_bytes()
-            except OSError as e:
-                return response_screen_health_test(
-                    success=False,
-                    error=f"failed to read frame_bgra_path: {e}",
-                    req_id=command.req_id,
-                )
-        else:
-            try:
-                raw_bgra = base64.b64decode(b64_legacy, validate=False)
-            except Exception as e:
-                return response_screen_health_test(
-                    success=False,
-                    error=f"invalid frame_bgra_base64: {e}",
-                    req_id=command.req_id,
-                )
+        frame_file = Path(path_s).expanduser().resolve()
+        if not frame_file.is_file():
+            return response_screen_health_test(
+                success=False,
+                error=f"frame_bgra_path is not a file: {frame_file}",
+                req_id=command.req_id,
+            )
+        try:
+            raw_bgra = frame_file.read_bytes()
+        except OSError as e:
+            return response_screen_health_test(
+                success=False,
+                error=f"failed to read frame_bgra_path: {e}",
+                req_id=command.req_id,
+            )
 
         # Always log/print test runs for debugging (even if profile debug mode is off).
         try:
@@ -1676,22 +1628,9 @@ class VestDaemon:
         # Get controller for resolved device_id
         controller = self._registry.get_controller(target_device_id)
         
-        # If no controller found, try to auto-connect main device (backward compatibility)
+        # If no controller found, return error
         if controller is None:
-            if self._selected_device is None:
-                return response_error("No device selected and no device_id specified", command.req_id)
-            
-            # Auto-connect main device
-            try:
-                device_id, controller = self._registry.add_device(
-                    device_id=None,
-                    device_info=self._selected_device
-                )
-                self._controller = controller  # Update for backward compatibility
-                await self._clients.broadcast(event_connected(self._selected_device))
-                target_device_id = device_id
-            except ValueError as e:
-                return response_error(str(e), command.req_id)
+            return response_error("No device found. Use select_device first.", command.req_id)
         
         # Check if connected
         if not controller.status().connected:
@@ -1762,9 +1701,10 @@ class VestDaemon:
         
         This stops all cells immediately.
         """
-        if self._controller is not None:
+        controller = self._registry.get_controller()
+        if controller is not None:
             for cell in range(8):
-                self._controller.trigger_effect(cell, 0)
+                controller.trigger_effect(cell, 0)
         
         await self._clients.broadcast(event_all_stopped())
         return response_ok(command.req_id)

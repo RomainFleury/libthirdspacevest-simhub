@@ -80,7 +80,7 @@ async def test_device_resolution():
         # Test 6: Player mapping when game mapping doesn't exist
         device_id = daemon._resolve_device_id(Command(
             cmd="trigger",
-            game_id="gtav",  # No mapping for this game
+            game_id="test_game",  # No mapping for this game
             player_num=1,
             player_id="player_1"
         ))
