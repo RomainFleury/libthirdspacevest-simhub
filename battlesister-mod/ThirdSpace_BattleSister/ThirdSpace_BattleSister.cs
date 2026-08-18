@@ -1,11 +1,9 @@
 using HarmonyLib;
-using Il2Cpp;
-using Il2CppBattleSister.Ballistics;
 using MelonLoader;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using UnityEngine;
+using System.Reflection;
 
 [assembly: MelonInfo(typeof(ThirdSpace_BattleSister.ThirdSpace_BattleSister), "ThirdSpace_BattleSister", "1.0.0", "ThirdSpace")]
 [assembly: MelonGame("Pixel Toys", "Battle Sister")]
@@ -14,8 +12,8 @@ namespace ThirdSpace_BattleSister
 {
     /// <summary>
     /// Third Space Vest haptic integration for Warhammer 40,000: Battle Sister.
-    /// Harmony patches adapted from https://github.com/floh-bhaptics/BattleSister_bhaptics
-    /// with bHaptics SDK calls replaced by TCP daemon events.
+    /// Harmony patches resolve game types at runtime so the DLL builds against
+    /// MelonLoader + Harmony only. Targets follow BattleSister_bhaptics.
     /// </summary>
     public class ThirdSpace_BattleSister : MelonMod
     {
@@ -30,13 +28,9 @@ namespace ThirdSpace_BattleSister
             string configPath = Path.Combine(Directory.GetCurrentDirectory(), "Mods", "ThirdSpace_Config.txt");
             daemon.Initialize(configPath);
             if (daemon.Connect())
-            {
                 MelonLogger.Msg("[ThirdSpace] Ready for haptic feedback!");
-            }
             else
-            {
                 MelonLogger.Warning("[ThirdSpace] Could not connect to daemon on port 5050.");
-            }
         }
 
         public override void OnDeinitializeMelon()
@@ -45,31 +39,125 @@ namespace ThirdSpace_BattleSister
             daemon?.Dispose();
         }
 
-        private static bool IsRightHand(bool isPrimaryHand)
+        internal static Type FindType(string name)
+        {
+            return AccessTools.TypeByName(name)
+                ?? AccessTools.TypeByName("Il2Cpp." + name)
+                ?? AccessTools.TypeByName("Il2CppBattleSister.Ballistics." + name);
+        }
+
+        internal static MethodBase FindMethod(string typeName, string methodName)
+        {
+            var type = FindType(typeName);
+            if (type == null)
+            {
+                MelonLogger.Warning("[ThirdSpace] Type not found: " + typeName + " (patch skipped)");
+                return null;
+            }
+            var method = AccessTools.Method(type, methodName);
+            if (method == null)
+                MelonLogger.Warning("[ThirdSpace] Method not found: " + typeName + "." + methodName + " (patch skipped)");
+            return method;
+        }
+
+        internal static object GetMember(object obj, string name)
+        {
+            if (obj == null) return null;
+            var type = obj.GetType();
+            var prop = AccessTools.Property(type, name);
+            if (prop != null) return prop.GetValue(obj, null);
+            var field = AccessTools.Field(type, name);
+            return field?.GetValue(obj);
+        }
+
+        internal static object GetPath(object obj, params string[] names)
+        {
+            foreach (var name in names)
+            {
+                obj = GetMember(obj, name);
+                if (obj == null) return null;
+            }
+            return obj;
+        }
+
+        internal static bool GetBool(object obj, string name, bool fallback = false)
+        {
+            var value = GetMember(obj, name);
+            if (value == null) return fallback;
+            try { return Convert.ToBoolean(value); }
+            catch { return fallback; }
+        }
+
+        internal static float GetFloat(object obj, string name, float fallback = 0f)
+        {
+            var value = GetMember(obj, name);
+            if (value == null) return fallback;
+            try { return Convert.ToSingle(value); }
+            catch { return fallback; }
+        }
+
+        internal static bool TryXYZ(object vec, out float x, out float y, out float z)
+        {
+            x = y = z = 0f;
+            if (vec == null) return false;
+            try
+            {
+                x = Convert.ToSingle(GetMember(vec, "x"));
+                y = Convert.ToSingle(GetMember(vec, "y"));
+                z = Convert.ToSingle(GetMember(vec, "z"));
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        internal static bool IsRightHand(bool isPrimaryHand)
         {
             if (isPrimaryHand && rightHanded) return true;
             if (!isPrimaryHand && !rightHanded) return true;
             return false;
         }
 
-        private static string HandString(bool isRight)
+        internal static string HandString(bool isRight)
         {
             return isRight ? "right" : "left";
         }
 
-        private static KeyValuePair<float, float> GetAngleAndShift(Transform player, Vector3 hit)
+        internal static string DamageName(object damageType)
         {
-            Vector3 patternOrigin = new Vector3(0f, 0f, 1f);
-            Vector3 hitPosition = hit - player.position;
-            Vector3 playerDir = player.rotation.eulerAngles;
-            Vector3 flattenedHit = new Vector3(hitPosition.x, 0f, hitPosition.z);
-            float hitAngle = Vector3.Angle(flattenedHit, patternOrigin);
-            Vector3 crossProduct = Vector3.Cross(flattenedHit, patternOrigin);
-            if (crossProduct.y < 0f) hitAngle *= -1f;
-            float myRotation = (hitAngle - playerDir.y) * -1f;
+            return damageType == null ? "" : damageType.ToString();
+        }
+
+        internal static KeyValuePair<float, float> GetAngleAndShift(object playerTransform, object hit)
+        {
+            float px, py, pz, hx, hy, hz, ey = 0f;
+            TryXYZ(GetMember(playerTransform, "position"), out px, out py, out pz);
+            TryXYZ(hit, out hx, out hy, out hz);
+            var rot = GetMember(playerTransform, "rotation");
+            if (rot != null)
+            {
+                float ex, ez;
+                TryXYZ(GetMember(rot, "eulerAngles"), out ex, out ey, out ez);
+            }
+
+            float dx = hx - px;
+            float dz = hz - pz;
+            float mag = (float)Math.Sqrt(dx * dx + dz * dz);
+            float hitAngle = 0f;
+            if (mag > 1e-5f)
+            {
+                float dot = dz / mag;
+                if (dot > 1f) dot = 1f;
+                if (dot < -1f) dot = -1f;
+                hitAngle = (float)(Math.Acos(dot) * 180.0 / Math.PI);
+                if (-dx < 0f) hitAngle *= -1f;
+            }
+            float myRotation = (hitAngle - ey) * -1f;
             if (myRotation < 0f) myRotation = 360f + myRotation;
 
-            float hitShift = hitPosition.y;
+            float hitShift = hy - py;
             float upperBound = 0.0f;
             float lowerBound = -0.5f;
             if (hitShift > upperBound) hitShift = 0.5f;
@@ -79,114 +167,110 @@ namespace ThirdSpace_BattleSister
             return new KeyValuePair<float, float>(myRotation, hitShift);
         }
 
-        [HarmonyPatch(typeof(VrRig), "SetHandedness")]
+        [HarmonyPatch]
         public class Patch_SetHandedness
         {
+            static bool Prepare() => FindMethod("VrRig", "SetHandedness") != null;
+            static MethodBase TargetMethod() => FindMethod("VrRig", "SetHandedness");
+
             [HarmonyPostfix]
-            public static void Postfix(Handedness handedness)
+            public static void Postfix(object handedness)
             {
-                string text = handedness.ToString();
+                string text = handedness == null ? "" : handedness.ToString();
                 rightHanded = text.IndexOf("Right", StringComparison.OrdinalIgnoreCase) >= 0;
             }
         }
 
-        [HarmonyPatch(typeof(VrMeleeAudio), "OnCollisionEnter")]
+        [HarmonyPatch]
         public class Patch_MeleeCollide
         {
+            static bool Prepare() => FindMethod("VrMeleeAudio", "OnCollisionEnter") != null;
+            static MethodBase TargetMethod() => FindMethod("VrMeleeAudio", "OnCollisionEnter");
+
             [HarmonyPostfix]
-            public static void Postfix(VrMeleeAudio __instance)
+            public static void Postfix(object __instance)
             {
                 if (daemon == null || !daemon.IsConnected) return;
-                bool isRight;
                 try
                 {
-                    isRight = IsRightHand(__instance.m_item.AttachedHoldInteraction.ActivePrimaryHand.m_isPrimaryHand);
-                }
-                catch
-                {
-                    return;
-                }
-                daemon.SendEvent("melee_hit", HandString(isRight), priority: 2);
-            }
-        }
-
-        [HarmonyPatch(typeof(VrGun), "Fire")]
-        public class Patch_FireGun
-        {
-            [HarmonyPostfix]
-            public static void Postfix(VrGun __instance)
-            {
-                if (daemon == null || !daemon.IsConnected) return;
-                bool isRight;
-                DamageType damageType = DamageType.Bolt;
-                try
-                {
-                    isRight = IsRightHand(__instance.AttachedHoldInteraction.ActivePrimaryHand.m_isPrimaryHand);
-                    damageType = __instance.Magazine.damageType;
-                }
-                catch
-                {
-                    return;
-                }
-
-                string eventName = "gun_fire";
-                if (damageType == DamageType.GrenadeLauncherProjectile)
-                    eventName = "shotgun_fire";
-                else if (damageType == DamageType.PowerSword || damageType == DamageType.Fire)
-                    eventName = "melee_hit";
-
-                daemon.SendEvent(eventName, HandString(isRight), priority: 2);
-
-                try
-                {
-                    if (__instance.AttachedHoldInteraction.HasPrimaryGrasp &&
-                        __instance.AttachedHoldInteraction.HasSecondaryGrasp)
-                    {
-                        daemon.SendEvent("two_hand", HandString(!isRight), priority: 1);
-                    }
+                    object isPrimary = GetPath(__instance, "m_item", "AttachedHoldInteraction", "ActivePrimaryHand", "m_isPrimaryHand");
+                    if (isPrimary == null) return;
+                    bool isRight = IsRightHand(Convert.ToBoolean(isPrimary));
+                    daemon.SendEvent("melee_hit", HandString(isRight), priority: 2);
                 }
                 catch { }
             }
         }
 
-        [HarmonyPatch(typeof(ImpactManager), "ProcessImpact")]
-        public class Patch_ProcessImpact
+        [HarmonyPatch]
+        public class Patch_FireGun
         {
+            static bool Prepare() => FindMethod("VrGun", "Fire") != null;
+            static MethodBase TargetMethod() => FindMethod("VrGun", "Fire");
+
             [HarmonyPostfix]
-            public static void Postfix(DamageType damageType, Collider impactCollider, Vector3 impactPosition)
+            public static void Postfix(object __instance)
             {
                 if (daemon == null || !daemon.IsConnected) return;
-                Rigidbody myPlayer;
                 try
                 {
-                    myPlayer = impactCollider.attachedRigidbody;
-                    if (myPlayer == null || myPlayer.name != "PlayerRig") return;
-                }
-                catch
-                {
-                    return;
-                }
+                    object isPrimary = GetPath(__instance, "AttachedHoldInteraction", "ActivePrimaryHand", "m_isPrimaryHand");
+                    if (isPrimary == null) return;
+                    bool isRight = IsRightHand(Convert.ToBoolean(isPrimary));
+                    string damageType = DamageName(GetPath(__instance, "Magazine", "damageType"));
 
-                string eventName = "player_hit";
-                if (damageType == DamageType.Axe ||
-                    damageType == DamageType.Club ||
-                    damageType == DamageType.BloodletterSword)
-                {
-                    eventName = "blade_hit";
-                }
-                else if (damageType == DamageType.Explosion)
-                {
-                    eventName = "explosion";
-                }
+                    string eventName = "gun_fire";
+                    if (damageType == "GrenadeLauncherProjectile")
+                        eventName = "shotgun_fire";
+                    else if (damageType == "PowerSword" || damageType == "Fire")
+                        eventName = "melee_hit";
 
-                var angleShift = GetAngleAndShift(myPlayer.transform, impactPosition);
-                daemon.SendEvent(eventName, priority: 3, angle: angleShift.Key);
+                    daemon.SendEvent(eventName, HandString(isRight), priority: 2);
+
+                    object hold = GetMember(__instance, "AttachedHoldInteraction");
+                    if (GetBool(hold, "HasPrimaryGrasp") && GetBool(hold, "HasSecondaryGrasp"))
+                        daemon.SendEvent("two_hand", HandString(!isRight), priority: 1);
+                }
+                catch { }
             }
         }
 
-        [HarmonyPatch(typeof(VrTimedExplosive), "Explode")]
+        [HarmonyPatch]
+        public class Patch_ProcessImpact
+        {
+            static bool Prepare() => FindMethod("ImpactManager", "ProcessImpact") != null;
+            static MethodBase TargetMethod() => FindMethod("ImpactManager", "ProcessImpact");
+
+            [HarmonyPostfix]
+            public static void Postfix(object damageType, object impactCollider, object impactPosition)
+            {
+                if (daemon == null || !daemon.IsConnected) return;
+                try
+                {
+                    object myPlayer = GetMember(impactCollider, "attachedRigidbody");
+                    object name = GetMember(myPlayer, "name");
+                    if (myPlayer == null || (name as string) != "PlayerRig") return;
+
+                    string dtype = DamageName(damageType);
+                    string eventName = "player_hit";
+                    if (dtype == "Axe" || dtype == "Club" || dtype == "BloodletterSword")
+                        eventName = "blade_hit";
+                    else if (dtype == "Explosion")
+                        eventName = "explosion";
+
+                    var angleShift = GetAngleAndShift(GetMember(myPlayer, "transform"), impactPosition);
+                    daemon.SendEvent(eventName, priority: 3, angle: angleShift.Key);
+                }
+                catch { }
+            }
+        }
+
+        [HarmonyPatch]
         public class Patch_BombExplode
         {
+            static bool Prepare() => FindMethod("VrTimedExplosive", "Explode") != null;
+            static MethodBase TargetMethod() => FindMethod("VrTimedExplosive", "Explode");
+
             [HarmonyPostfix]
             public static void Postfix()
             {
@@ -195,9 +279,12 @@ namespace ThirdSpace_BattleSister
             }
         }
 
-        [HarmonyPatch(typeof(HealthAudio), "OnDeath")]
+        [HarmonyPatch]
         public class Patch_OnDeath
         {
+            static bool Prepare() => FindMethod("HealthAudio", "OnDeath") != null;
+            static MethodBase TargetMethod() => FindMethod("HealthAudio", "OnDeath");
+
             [HarmonyPostfix]
             public static void Postfix()
             {
@@ -207,18 +294,22 @@ namespace ThirdSpace_BattleSister
             }
         }
 
-        [HarmonyPatch(typeof(HealthStatusReceiver_DamageHud), "OnApplyHealthStatusUpdate")]
+        [HarmonyPatch]
         public class Patch_OnHealthUpdated
         {
+            static bool Prepare() => FindMethod("HealthStatusReceiver_DamageHud", "OnApplyHealthStatusUpdate") != null;
+            static MethodBase TargetMethod() => FindMethod("HealthStatusReceiver_DamageHud", "OnApplyHealthStatusUpdate");
+
             [HarmonyPostfix]
-            public static void Postfix(HealthStatusReceiver_DamageHud __instance)
+            public static void Postfix(object __instance)
             {
                 if (daemon == null || !daemon.IsConnected) return;
                 try
                 {
-                    float current = __instance.m_healthStatus.m_currentHealth;
-                    float start = __instance.m_healthStatus.m_startHealth;
-                    bool isLow = current < 0.5f * start;
+                    object status = GetMember(__instance, "m_healthStatus");
+                    float current = GetFloat(status, "m_currentHealth");
+                    float start = GetFloat(status, "m_startHealth");
+                    bool isLow = start > 0f && current < 0.5f * start;
                     if (isLow && !lowHealth)
                     {
                         lowHealth = true;

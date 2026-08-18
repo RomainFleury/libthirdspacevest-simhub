@@ -12,15 +12,10 @@ Harmony patches are adapted from [BattleSister_bhaptics](https://github.com/floh
 
 ## Build
 
-Copy MelonLoader / Il2Cpp DLLs into `libs/` from:
-
-- `Battle Sister\MelonLoader\net6\` — `MelonLoader.dll`, `0Harmony.dll`
-- `Battle Sister\MelonLoader\Il2CppAssemblies\` — `Assembly-CSharp.dll`, `UnityEngine.CoreModule.dll`, `UnityEngine.PhysicsModule.dll`
-
-Then:
+Needs a .NET 6 or 8 SDK. If MelonLoader is installed in Battle Sister, pass that folder:
 
 ```powershell
-./build.ps1
+./build.ps1 -GameDir "C:\path\to\Battle Sister"
 ```
 
-Copy `ThirdSpace_BattleSister\bin\Release\ThirdSpace_BattleSister.dll` to `Battle Sister/Mods/`.
+Otherwise the script can compile against another game's `MelonLoader\net6` (same MelonLoader/Harmony DLLs). Copy `..\mods\battlesister\ThirdSpace_BattleSister.dll` into `Battle Sister/Mods/` after MelonLoader is installed, or use **Install Mod** in the Electron UI.

@@ -8,11 +8,14 @@ Do **not** install `BattleSister_bhaptics.dll` from the NexusMods dump (`BattleS
 
 ## Build
 
+Needs a .NET 6 or 8 SDK. MelonLoader 0.6+ in the game folder is used when present; otherwise the script can compile against another MelonLoader `net6` install.
+
 ```powershell
 cd battlesister-mod
-./build.ps1
-copy ThirdSpace_BattleSister\bin\Release\ThirdSpace_BattleSister.dll ..\mods\battlesister\
+./build.ps1 -GameDir "D:\Jeux\SteamLibrary\steamapps\common\Battle Sister"
 ```
+
+That writes `ThirdSpace_BattleSister.dll` into this folder. **Install Mod** in the Electron UI copies it into the game `Mods/` directory (and will try to build first if the DLL is missing).
 
 ## Installation
 

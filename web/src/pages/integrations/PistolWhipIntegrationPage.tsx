@@ -69,21 +69,13 @@ export function PistolWhipIntegrationPage() {
     githubUrl: "https://github.com/floh-bhaptics/PistolWhip_bhaptics",
     installInstructions: [
       "Install MelonLoader 0.6.x or 0.7.x into Pistol Whip and launch once to create Mods/",
-      "Select the Pistol Whip folder below and click Install Mod to copy ThirdSpace_PistolWhip.dll",
+          "Select the Pistol Whip folder below and click Install Mod (builds ThirdSpace_PistolWhip.dll if needed)",
       "Start the vest daemon, click Start on this page, then launch Pistol Whip",
     ],
   };
 
   const configurationPanel = (
     <div className="space-y-4">
-      <div className="rounded-lg bg-amber-900/20 border border-amber-700/30 px-3 py-2 text-xs text-amber-200">
-        BETA: Harmony patches come from the archived bHaptics/OWO investigation. The NexusMods file
-        <code className="mx-1 bg-slate-800 px-1 rounded">PistolWhip_bhaptics.dll</code>
-        is the original Tactsuit mod (reference only). This app installs
-        <code className="mx-1 bg-slate-800 px-1 rounded">ThirdSpace_PistolWhip.dll</code>,
-        which sends events to the daemon on TCP 5050.
-      </div>
-
       <div className="rounded-lg bg-slate-800/60 p-4 ring-1 ring-white/10">
         <h4 className="text-sm font-medium text-slate-200 mb-3">MelonLoader mod installation</h4>
         <div className="mb-3">
@@ -183,7 +175,7 @@ export function PistolWhipIntegrationPage() {
           <strong className="text-slate-300">Install MelonLoader</strong> into Pistol Whip (0.6.x or 0.7.x for Il2Cpp), then launch once so it creates a <code className="bg-slate-800 px-1 rounded">Mods</code> folder.
         </li>
         <li>
-          <strong className="text-slate-300">Install the vest mod:</strong> select the Pistol Whip folder above and click Install Mod. That copies <code className="bg-slate-800 px-1 rounded">ThirdSpace_PistolWhip.dll</code> into <code className="bg-slate-800 px-1 rounded">Mods/</code> (build it from <code className="bg-slate-800 px-1 rounded">pistolwhip-mod/</code> first if the DLL is missing).
+          <strong className="text-slate-300">Install the vest mod:</strong> select the Pistol Whip folder above and click Install Mod. That builds <code className="bg-slate-800 px-1 rounded">ThirdSpace_PistolWhip.dll</code> if needed and copies it into <code className="bg-slate-800 px-1 rounded">Mods/</code>.
         </li>
         <li>
           <strong className="text-slate-300">Start this integration</strong> (and the daemon) before launching the game. Events are ignored until Start is pressed.

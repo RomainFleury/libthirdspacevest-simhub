@@ -69,20 +69,13 @@ export function BattleSisterIntegrationPage() {
     githubUrl: "https://github.com/floh-bhaptics/BattleSister_bhaptics",
     installInstructions: [
       "Install MelonLoader 0.6.x+ into Battle Sister and launch once to create Mods/",
-      "Select the Battle Sister folder below and click Install Mod",
+          "Select the Battle Sister folder below and click Install Mod (builds ThirdSpace_BattleSister.dll if needed)",
       "Start the vest daemon, click Start on this page, then launch the game",
     ],
   };
 
   const configurationPanel = (
     <div className="space-y-4">
-      <div className="rounded-lg bg-amber-900/20 border border-amber-700/30 px-3 py-2 text-xs text-amber-200">
-        BETA: Harmony patches come from the open-source bHaptics mod. The NexusMods file
-        <code className="mx-1 bg-slate-800 px-1 rounded">BattleSister_bhaptics.dll</code>
-        is the original Tactsuit mod (reference only). This app installs
-        <code className="mx-1 bg-slate-800 px-1 rounded">ThirdSpace_BattleSister.dll</code>.
-      </div>
-
       <div className="rounded-lg bg-slate-800/60 p-4 ring-1 ring-white/10">
         <h4 className="text-sm font-medium text-slate-200 mb-3">MelonLoader mod installation</h4>
         <div className="mb-3">
@@ -178,7 +171,7 @@ export function BattleSisterIntegrationPage() {
           <strong className="text-slate-300">Install MelonLoader</strong> into Battle Sister, then launch once so it creates <code className="bg-slate-800 px-1 rounded">Mods</code>.
         </li>
         <li>
-          <strong className="text-slate-300">Install the vest mod</strong> with the button above (build <code className="bg-slate-800 px-1 rounded">battlesister-mod/</code> first if the DLL is missing).
+          <strong className="text-slate-300">Install the vest mod</strong> with the button above. That builds <code className="bg-slate-800 px-1 rounded">ThirdSpace_BattleSister.dll</code> if needed and copies it into <code className="bg-slate-800 px-1 rounded">Mods/</code>.
         </li>
         <li>
           <strong className="text-slate-300">Start this integration</strong> before launching the game.

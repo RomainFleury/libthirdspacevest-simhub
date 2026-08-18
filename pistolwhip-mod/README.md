@@ -82,24 +82,17 @@ To connect to a daemon on a different machine:
 ## Building from Source
 
 ### Requirements
-- Visual Studio 2019/2022
-- .NET Framework 4.7.2
+- .NET 6 or 8 SDK
+- MelonLoader 0.6+ already installed in Pistol Whip (`MelonLoader/net6/MelonLoader.dll`)
 
 ### Steps
 
-1. Copy required DLLs to `libs/` folder from:
-   - `Pistol Whip/MelonLoader/Managed/`:
-     - `MelonLoader.dll`
-     - `0Harmony.dll`
-     - `Il2Cppmscorlib.dll`
-     - `Il2CppUnityEngine.dll`
-     - `Assembly-CSharp.dll`
+```powershell
+cd pistolwhip-mod
+./build.ps1 -GameDir "C:\path\to\Pistol Whip"
+```
 
-2. Open `ThirdSpace_PistolWhip.sln` in Visual Studio
-
-3. Build in Release mode
-
-4. Copy `bin/Release/ThirdSpace_PistolWhip.dll` to `Pistol Whip/Mods/`
+Copy `..\mods\pistolwhip\ThirdSpace_PistolWhip.dll` into `Pistol Whip/Mods/`, or use **Install Mod** in the Electron UI (it will build if needed).
 
 ## Troubleshooting
 

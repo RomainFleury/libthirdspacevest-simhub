@@ -1,42 +1,80 @@
+# Build ThirdSpace_BattleSister.dll against MelonLoader 0.7 net6 (Il2Cpp).
+# Usage:
+#   ./build.ps1
+#   ./build.ps1 -GameDir "D:\Jeux\SteamLibrary\steamapps\common\Battle Sister"
+
+param(
+    [string]$GameDir = ""
+)
+
 $ErrorActionPreference = "Stop"
+$modRoot = $PSScriptRoot
+Set-Location $modRoot
+
 Write-Host "=== Third Space Vest Battle Sister Mod Build ===" -ForegroundColor Cyan
 
-$msbuild = "${env:ProgramFiles}\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe"
-if (-not (Test-Path $msbuild)) { $msbuild = "${env:ProgramFiles}\Microsoft Visual Studio\2022\Professional\MSBuild\Current\Bin\MSBuild.exe" }
-if (-not (Test-Path $msbuild)) { $msbuild = "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\MSBuild.exe" }
-if (-not (Test-Path $msbuild)) { $msbuild = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2019\Community\MSBuild\Current\Bin\MSBuild.exe" }
-if (-not (Test-Path $msbuild)) {
-    Write-Host "ERROR: MSBuild not found" -ForegroundColor Red
+if (-not $GameDir) {
+    $candidates = @(
+        "D:\Jeux\SteamLibrary\steamapps\common\Battle Sister",
+        "C:\Program Files (x86)\Steam\steamapps\common\Battle Sister"
+    )
+    foreach ($c in $candidates) {
+        if (Test-Path (Join-Path $c "Battle_Sisters.exe")) { $GameDir = $c; break }
+        if (Test-Path (Join-Path $c "Battle Sister.exe")) { $GameDir = $c; break }
+    }
+}
+
+$melonDll = $null
+$melonDir = $null
+if ($GameDir) {
+    $candidate = Join-Path $GameDir "MelonLoader\net6\MelonLoader.dll"
+    if (Test-Path $candidate) {
+        $melonDll = $candidate
+        $melonDir = $GameDir
+    }
+}
+
+$pistolWhip = "F:\SteamLibrary\steamapps\common\Pistol Whip"
+if (-not $melonDll -and (Test-Path (Join-Path $pistolWhip "MelonLoader\net6\MelonLoader.dll"))) {
+    $melonDll = Join-Path $pistolWhip "MelonLoader\net6\MelonLoader.dll"
+    Write-Host "Battle Sister MelonLoader/net6 not found; using Pistol Whip MelonLoader refs to compile." -ForegroundColor Yellow
+}
+
+if (-not $melonDll -and (Test-Path (Join-Path $modRoot "libs\MelonLoader.dll"))) {
+    $melonDll = Join-Path $modRoot "libs\MelonLoader.dll"
+}
+
+if (-not $melonDll) {
+    Write-Host "ERROR: MelonLoader.net6 not found. Install MelonLoader into Battle Sister, or pass -GameDir." -ForegroundColor Red
     exit 1
 }
 
-$libsDir = "libs"
-if (-not (Test-Path $libsDir)) { New-Item -ItemType Directory -Path $libsDir | Out-Null }
-$requiredDlls = @(
-    "MelonLoader.dll",
-    "0Harmony.dll",
-    "Il2Cppmscorlib.dll",
-    "Il2CppUnityEngine.dll",
-    "UnityEngine.CoreModule.dll",
-    "UnityEngine.PhysicsModule.dll",
-    "Assembly-CSharp.dll"
-)
-$missing = @()
-foreach ($dll in $requiredDlls) {
-    if (-not (Test-Path "$libsDir\$dll")) { $missing += $dll }
-}
-if ($missing.Count -gt 0) {
-    Write-Host "Missing DLLs in libs/ (copy from Battle Sister MelonLoader folders):" -ForegroundColor Yellow
-    $missing | ForEach-Object { Write-Host "  - $_" }
+$dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
+if (-not $dotnet) {
+    Write-Host "ERROR: .NET SDK not found. Install .NET 6 or 8 SDK, then retry." -ForegroundColor Red
+    exit 1
 }
 
-& $msbuild "ThirdSpace_BattleSister.sln" /p:Configuration=Release /p:Platform=AnyCPU /t:Build /v:minimal /nologo
+$csproj = Join-Path $modRoot "ThirdSpace_BattleSister\ThirdSpace_BattleSister.csproj"
+$buildArgs = @("build", $csproj, "-c", "Release", "--nologo")
+if ($melonDir) {
+    $buildArgs += "/p:BattleSisterDir=$melonDir"
+} elseif ($pistolWhip -and (Test-Path (Join-Path $pistolWhip "MelonLoader\net6\MelonLoader.dll"))) {
+    $buildArgs += "/p:PistolWhipDir=$pistolWhip"
+}
+
+Write-Host "Building with $melonDll"
+& dotnet @buildArgs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-$dllPath = "ThirdSpace_BattleSister\bin\Release\ThirdSpace_BattleSister.dll"
+$dllPath = Join-Path $modRoot "ThirdSpace_BattleSister\bin\Release\ThirdSpace_BattleSister.dll"
 if (-not (Test-Path $dllPath)) {
     Write-Host "ERROR: DLL not found at $dllPath" -ForegroundColor Red
     exit 1
 }
+
+$destDir = Join-Path $modRoot "..\mods\battlesister"
+New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+Copy-Item $dllPath (Join-Path $destDir "ThirdSpace_BattleSister.dll") -Force
 Write-Host "Built $dllPath" -ForegroundColor Green
-Write-Host "Copy to Battle Sister\Mods\ then start the daemon."
+Write-Host "Copied to mods/battlesister/ThirdSpace_BattleSister.dll" -ForegroundColor Green

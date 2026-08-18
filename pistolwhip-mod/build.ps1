@@ -1,130 +1,59 @@
-# Build script for Third Space Vest Pistol Whip Mod
-# This script automates the build process
+# Build ThirdSpace_PistolWhip.dll against MelonLoader 0.7 net6 (Il2Cpp).
+# Usage:
+#   ./build.ps1
+#   ./build.ps1 -GameDir "F:\SteamLibrary\steamapps\common\Pistol Whip"
+
+param(
+    [string]$GameDir = ""
+)
 
 $ErrorActionPreference = "Stop"
+$modRoot = $PSScriptRoot
+Set-Location $modRoot
 
 Write-Host "=== Third Space Vest Pistol Whip Mod Build ===" -ForegroundColor Cyan
-Write-Host ""
 
-# Step 1: Check prerequisites
-Write-Host "[1/4] Checking prerequisites..." -ForegroundColor Yellow
-
-# Check for MSBuild
-$msbuild = "${env:ProgramFiles}\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe"
-if (-not (Test-Path $msbuild)) {
-    $msbuild = "${env:ProgramFiles}\Microsoft Visual Studio\2022\Professional\MSBuild\Current\Bin\MSBuild.exe"
-}
-if (-not (Test-Path $msbuild)) {
-    $msbuild = "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\MSBuild.exe"
-}
-if (-not (Test-Path $msbuild)) {
-    $msbuild = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2019\Community\MSBuild\Current\Bin\MSBuild.exe"
-}
-if (-not (Test-Path $msbuild)) {
-    $msbuild = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2019\Professional\MSBuild\Current\Bin\MSBuild.exe"
-}
-if (-not (Test-Path $msbuild)) {
-    Write-Host "ERROR: MSBuild not found! Please install Visual Studio 2019/2022" -ForegroundColor Red
-    exit 1
-}
-Write-Host "  [OK] MSBuild found at $msbuild" -ForegroundColor Green
-
-# Step 2: Check for MelonLoader/Il2Cpp DLLs
-Write-Host ""
-Write-Host "[2/4] Checking for MelonLoader/Il2Cpp DLLs..." -ForegroundColor Yellow
-
-$libsDir = "libs"
-if (-not (Test-Path $libsDir)) {
-    New-Item -ItemType Directory -Path $libsDir | Out-Null
-}
-
-$requiredDlls = @(
-    "MelonLoader.dll",
-    "0Harmony.dll",
-    "Il2Cppmscorlib.dll",
-    "Il2CppUnityEngine.dll",
-    "Assembly-CSharp.dll"
-)
-$missingDlls = @()
-
-foreach ($dll in $requiredDlls) {
-    if (-not (Test-Path "$libsDir\$dll")) {
-        $missingDlls += $dll
+if (-not $GameDir) {
+    $candidates = @(
+        "F:\SteamLibrary\steamapps\common\Pistol Whip",
+        "C:\Program Files (x86)\Steam\steamapps\common\Pistol Whip"
+    )
+    foreach ($c in $candidates) {
+        if (Test-Path (Join-Path $c "Pistol Whip.exe")) { $GameDir = $c; break }
     }
 }
 
-if ($missingDlls.Count -gt 0) {
-    Write-Host "  [WARN] Missing DLLs in libs folder:" -ForegroundColor Yellow
-    foreach ($dll in $missingDlls) {
-        Write-Host "    - $dll" -ForegroundColor Yellow
-    }
-    Write-Host ""
-    Write-Host "  Please copy MelonLoader/Il2Cpp DLLs to libs folder:" -ForegroundColor Yellow
-    Write-Host "    1. Install MelonLoader 0.6.x into Pistol Whip" -ForegroundColor White
-    Write-Host "    2. Copy DLLs from: Pistol Whip\MelonLoader\Managed\" -ForegroundColor White
-    Write-Host "    3. Copy them to: $libsDir\" -ForegroundColor White
-    Write-Host ""
-    $continue = Read-Host "Continue anyway? (Y/N)"
-    if ($continue -ne "Y" -and $continue -ne "y") {
-        exit 1
-    }
-} else {
-    Write-Host "  [OK] All required DLLs found" -ForegroundColor Green
-}
-
-# Step 3: Build the solution
-Write-Host ""
-Write-Host "[3/4] Building mod (Release)..." -ForegroundColor Yellow
-
-$solutionPath = "ThirdSpace_PistolWhip.sln"
-if (-not (Test-Path $solutionPath)) {
-    Write-Host "ERROR: Solution file not found!" -ForegroundColor Red
+$melonDll = if ($GameDir) { Join-Path $GameDir "MelonLoader\net6\MelonLoader.dll" } else { Join-Path $modRoot "libs\MelonLoader.dll" }
+if (-not (Test-Path $melonDll)) {
+    Write-Host "ERROR: MelonLoader.net6 not found." -ForegroundColor Red
+    Write-Host "Install MelonLoader 0.6+ into Pistol Whip, then pass -GameDir to this script." -ForegroundColor Yellow
     exit 1
 }
 
-$buildArgs = @(
-    $solutionPath,
-    "/p:Configuration=Release",
-    "/p:Platform=AnyCPU",
-    "/t:Build",
-    "/v:minimal",
-    "/nologo"
-)
-
-$buildResult = & $msbuild $buildArgs 2>&1
-$buildExitCode = $LASTEXITCODE
-
-if ($buildExitCode -eq 0) {
-    Write-Host "  [OK] Build successful!" -ForegroundColor Green
-} else {
-    Write-Host "  [FAIL] Build failed!" -ForegroundColor Red
-    Write-Host $buildResult
+$dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
+if (-not $dotnet) {
+    Write-Host "ERROR: .NET SDK not found. Install .NET 6 or 8 SDK, then retry." -ForegroundColor Red
     exit 1
 }
 
-# Step 4: Verify output
-Write-Host ""
-Write-Host "[4/4] Verifying build output..." -ForegroundColor Yellow
+$csproj = Join-Path $modRoot "ThirdSpace_PistolWhip\ThirdSpace_PistolWhip.csproj"
+$buildArgs = @("build", $csproj, "-c", "Release", "--nologo")
+if ($GameDir) {
+    $buildArgs += "/p:PistolWhipDir=$GameDir"
+}
 
-$dllPath = "ThirdSpace_PistolWhip\bin\Release\ThirdSpace_PistolWhip.dll"
-if (Test-Path $dllPath) {
-    $dllSize = (Get-Item $dllPath).Length
-    Write-Host "  [OK] DLL created: $dllPath ($([math]::Round($dllSize/1KB, 2)) KB)" -ForegroundColor Green
-} else {
-    Write-Host "  [FAIL] DLL not found at $dllPath" -ForegroundColor Red
+Write-Host "Building with $melonDll"
+& dotnet @buildArgs
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+$dllPath = Join-Path $modRoot "ThirdSpace_PistolWhip\bin\Release\ThirdSpace_PistolWhip.dll"
+if (-not (Test-Path $dllPath)) {
+    Write-Host "ERROR: DLL not found at $dllPath" -ForegroundColor Red
     exit 1
 }
 
-Write-Host ""
-Write-Host "=== Build Complete ===" -ForegroundColor Green
-Write-Host ""
-Write-Host "Next steps:" -ForegroundColor Cyan
-Write-Host "  1. Copy the DLL to Pistol Whip:" -ForegroundColor White
-Write-Host "     Copy-Item '$dllPath' 'C:\path\to\Pistol Whip\Mods\'" -ForegroundColor Gray
-Write-Host ""
-Write-Host "  2. Start the Python daemon:" -ForegroundColor White
-Write-Host "     python3 -m modern_third_space.cli daemon start" -ForegroundColor Gray
-Write-Host ""
-Write-Host "  3. Launch Pistol Whip" -ForegroundColor White
-Write-Host ""
-
+$destDir = Join-Path $modRoot "..\mods\pistolwhip"
+New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+Copy-Item $dllPath (Join-Path $destDir "ThirdSpace_PistolWhip.dll") -Force
+Write-Host "Built $dllPath" -ForegroundColor Green
+Write-Host "Copied to mods/pistolwhip/ThirdSpace_PistolWhip.dll" -ForegroundColor Green

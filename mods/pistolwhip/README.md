@@ -18,13 +18,14 @@ Do **not** install `PistolWhip_bhaptics.dll` from the NexusMods dump. That file 
 
 ## Building
 
+Needs MelonLoader 0.6+ already installed in Pistol Whip (uses `MelonLoader/net6/*.dll`) and a .NET 6 or 8 SDK.
+
 ```powershell
 cd pistolwhip-mod
-./build.ps1
-copy ThirdSpace_PistolWhip\bin\Release\ThirdSpace_PistolWhip.dll ..\mods\pistolwhip\
+./build.ps1 -GameDir "F:\SteamLibrary\steamapps\common\Pistol Whip"
 ```
 
-The Electron UI **Install Mod** button copies `ThirdSpace_PistolWhip.dll` from this folder (or from the MSBuild output) into the game `Mods/` directory.
+That writes `ThirdSpace_PistolWhip.dll` into this folder. **Install Mod** in the Electron UI copies it into the game `Mods/` directory (and will try to build first if the DLL is missing).
 
 ## Installation
 

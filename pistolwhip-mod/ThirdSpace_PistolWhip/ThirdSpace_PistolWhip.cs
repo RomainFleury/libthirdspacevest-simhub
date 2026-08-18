@@ -2,7 +2,7 @@ using HarmonyLib;
 using MelonLoader;
 using System;
 using System.IO;
-using UnityEngine;
+using System.Reflection;
 
 [assembly: MelonInfo(typeof(ThirdSpace_PistolWhip.ThirdSpace_PistolWhip), "ThirdSpace_PistolWhip", "1.0.0", "ThirdSpace")]
 [assembly: MelonGame("Cloudhead Games, Ltd.", "Pistol Whip")]
@@ -11,17 +11,13 @@ namespace ThirdSpace_PistolWhip
 {
     /// <summary>
     /// Third Space Vest haptic integration for Pistol Whip.
-    /// 
-    /// Adapted from existing bHaptics/OWO mods by replacing their SDK calls
-    /// with TCP daemon communication. Harmony patches are based on:
-    /// - bHaptics mod: https://github.com/floh-bhaptics/PistolWhip_bhaptics
-    /// - OWO mod: https://github.com/floh-bhaptics/PistolWhip_OWO
+    /// Harmony patches resolve game types at runtime so the DLL can be built
+    /// against MelonLoader + Harmony only (no Pistol Whip Il2Cpp assemblies).
+    /// Patch targets follow the archived bHaptics/OWO mods.
     /// </summary>
     public class ThirdSpace_PistolWhip : MelonMod
     {
         public static DaemonClient daemon;
-        
-        // Track game state
         public static bool rightGunHasAmmo = true;
         public static bool leftGunHasAmmo = true;
         public static bool lowHealth = false;
@@ -31,12 +27,9 @@ namespace ThirdSpace_PistolWhip
             MelonLogger.Msg("[ThirdSpace] Initializing Third Space Vest integration for Pistol Whip...");
 
             daemon = new DaemonClient();
-
-            // Check for manual IP config
-            string configPath = Path.Combine(Directory.GetCurrentDirectory(), "Mods", "ThirdSpace_Config.txt");
+            string configPath = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "Mods", "ThirdSpace_Config.txt");
             daemon.Initialize(configPath);
 
-            // Connect to daemon
             if (daemon.Connect())
             {
                 MelonLogger.Msg("[ThirdSpace] Ready for haptic feedback!");
@@ -44,7 +37,6 @@ namespace ThirdSpace_PistolWhip
             else
             {
                 MelonLogger.Warning("[ThirdSpace] Could not connect to daemon. Make sure it's running on port 5050.");
-                MelonLogger.Warning("[ThirdSpace] Start daemon with: python -m modern_third_space.cli daemon start");
             }
         }
 
@@ -55,209 +47,240 @@ namespace ThirdSpace_PistolWhip
             daemon?.Dispose();
         }
 
-        #region Helper Methods
+        internal static Type FindType(string name)
+        {
+            return AccessTools.TypeByName(name)
+                ?? AccessTools.TypeByName("Il2Cpp." + name);
+        }
 
-        private static string GetHandString(Transform hand)
+        internal static MethodBase FindMethod(string typeName, string methodName)
+        {
+            var type = FindType(typeName);
+            if (type == null)
+            {
+                MelonLogger.Warning($"[ThirdSpace] Type not found: {typeName} (patch skipped)");
+                return null;
+            }
+            var method = AccessTools.Method(type, methodName);
+            if (method == null)
+            {
+                MelonLogger.Warning($"[ThirdSpace] Method not found: {typeName}.{methodName} (patch skipped)");
+            }
+            return method;
+        }
+
+        internal static object GetMember(object obj, string name)
+        {
+            if (obj == null) return null;
+            try
+            {
+                var traverse = Traverse.Create(obj);
+                var field = traverse.Field(name);
+                var fieldValue = field.GetValue();
+                if (fieldValue != null) return fieldValue;
+                var prop = traverse.Property(name);
+                return prop.GetValue();
+            }
+            catch { /* fall through */ }
+
+            var type = obj.GetType();
+            var accessProp = AccessTools.Property(type, name);
+            if (accessProp != null) return accessProp.GetValue(obj, null);
+            var accessField = AccessTools.Field(type, name);
+            return accessField?.GetValue(obj);
+        }
+
+        internal static object GetPath(object obj, params string[] names)
+        {
+            foreach (var name in names)
+            {
+                obj = GetMember(obj, name);
+                if (obj == null) return null;
+            }
+            return obj;
+        }
+
+        internal static int GetInt(object obj, string name, int fallback = 0)
+        {
+            var value = GetMember(obj, name);
+            if (value == null) return fallback;
+            try { return Convert.ToInt32(value); }
+            catch { return fallback; }
+        }
+
+        internal static void SetHandAmmo(bool isRight, bool hasAmmo)
+        {
+            if (isRight) rightGunHasAmmo = hasAmmo;
+            else leftGunHasAmmo = hasAmmo;
+        }
+
+        internal static bool HandHasAmmo(bool isRight)
+        {
+            return isRight ? rightGunHasAmmo : leftGunHasAmmo;
+        }
+
+        internal static string GetHandString(object hand)
         {
             if (hand == null) return null;
-            string handName = hand.name;
-            if (handName.Contains("Right") || handName.Contains("right"))
-                return "right";
-            if (handName.Contains("Left") || handName.Contains("left"))
-                return "left";
+            var nameObj = GetMember(hand, "name");
+            string handName = nameObj as string ?? hand.ToString() ?? "";
+            if (handName.IndexOf("Right", StringComparison.OrdinalIgnoreCase) >= 0) return "right";
+            if (handName.IndexOf("Left", StringComparison.OrdinalIgnoreCase) >= 0) return "left";
             return null;
         }
 
-        private static bool IsShotgun(int gunType)
+        internal static bool IsShotgun(object gun)
         {
-            // From source code analysis: gunType == 3 is shotgun
-            return gunType == 3;
+            return GetInt(gun, "gunType") == 3;
         }
 
-        #endregion
-
-        #region Harmony Patches
-
-        /// <summary>
-        /// Gun fire - recoil feedback.
-        /// Also detects empty gun fire (click feedback).
-        /// Adapted from bHaptics/OWO mods.
-        /// </summary>
-        [HarmonyPatch(typeof(Gun), "Fire")]
-        public class Patch_GunFire
+        [HarmonyPatch]
+        public class Patch_GunAmmoDisplay
         {
-            [HarmonyPrefix]
-            public static void Prefix(Gun __instance, out int __state)
-            {
-                // Store ammo count before Fire() is called
-                __state = __instance.currentAmmo;
-            }
+            static bool Prepare() => FindMethod("GunAmmoDisplay", "Update") != null;
+            static MethodBase TargetMethod() => FindMethod("GunAmmoDisplay", "Update");
 
             [HarmonyPostfix]
-            public static void Postfix(Gun __instance, int __state)
+            public static void Postfix(object __instance)
+            {
+                try
+                {
+                    object hand = GetPath(__instance, "gun", "hand");
+                    string handSide = GetHandString(hand);
+                    if (handSide == null) return;
+                    bool isRight = handSide == "right";
+                    int bullets = GetInt(__instance, "currentBulletCount", -1);
+                    if (bullets < 0) return;
+                    SetHandAmmo(isRight, bullets > 0);
+                }
+                catch { /* GunAmmoDisplay layout can vary by game version */ }
+            }
+        }
+
+        [HarmonyPatch]
+        public class Patch_GunFire
+        {
+            static bool Prepare() => FindType("Gun") != null && FindMethod("Gun", "Fire") != null;
+            static MethodBase TargetMethod() => FindMethod("Gun", "Fire");
+
+            [HarmonyPostfix]
+            public static void Postfix(object __instance)
             {
                 if (daemon == null || !daemon.IsConnected) return;
-
-                // Determine hand
-                string hand = GetHandString(__instance.hand);
+                string hand = GetHandString(GetMember(__instance, "hand"));
                 if (hand == null) return;
 
-                // Check if gun was empty (no ammo before Fire() was called)
-                if (__state == 0)
+                bool isRight = hand == "right";
+                if (!HandHasAmmo(isRight))
                 {
-                    // Empty gun - subtle click feedback
                     daemon.SendEvent("empty_gun_fire", hand, priority: 1);
                     MelonLogger.Msg($"[ThirdSpace] Event: empty_gun_fire ({hand})");
                     return;
                 }
 
-                // Normal fire - check if shotgun
-                bool isShotgun = IsShotgun(__instance.gunType);
-                string eventName = isShotgun ? "shotgun_fire" : "gun_fire";
-
+                string eventName = IsShotgun(__instance) ? "shotgun_fire" : "gun_fire";
                 daemon.SendEvent(eventName, hand, priority: 2);
                 MelonLogger.Msg($"[ThirdSpace] Event: {eventName} ({hand})");
             }
         }
 
-        /// <summary>
-        /// Gun reload - hip or shoulder reload.
-        /// Adapted from bHaptics/OWO mods.
-        /// </summary>
-        [HarmonyPatch(typeof(Gun), "Reload")]
+        [HarmonyPatch]
         public class Patch_GunReload
         {
+            static bool Prepare() => FindMethod("Gun", "Reload") != null;
+            static MethodBase TargetMethod() => FindMethod("Gun", "Reload");
+
             [HarmonyPostfix]
-            public static void Postfix(Gun __instance, int reloadType)
+            public static void Postfix(object __instance, int reloadType)
             {
                 if (daemon == null || !daemon.IsConnected) return;
-
-                string hand = GetHandString(__instance.hand);
+                string hand = GetHandString(GetMember(__instance, "hand"));
                 if (hand == null) return;
 
-                // Reload types: 0 = DOWN (hip), 1 = UP (shoulder), 2 = BOTH
-                string eventName;
-                if (reloadType == 0) // Hip reload
-                    eventName = "reload_hip";
-                else if (reloadType == 1) // Shoulder reload
-                    eventName = "reload_shoulder";
-                else
-                    eventName = "reload_hip"; // Default to hip
-
+                string eventName = reloadType == 1 ? "reload_shoulder" : "reload_hip";
                 daemon.SendEvent(eventName, hand, priority: 1);
                 MelonLogger.Msg($"[ThirdSpace] Event: {eventName} ({hand})");
             }
         }
 
-        /// <summary>
-        /// Melee hit - impact feedback.
-        /// Adapted from bHaptics/OWO mods.
-        /// </summary>
-        [HarmonyPatch(typeof(MeleeWeapon), "ProcessHit")]
+        [HarmonyPatch]
         public class Patch_MeleeHit
         {
+            static bool Prepare() => FindMethod("MeleeWeapon", "ProcessHit") != null;
+            static MethodBase TargetMethod() => FindMethod("MeleeWeapon", "ProcessHit");
+
             [HarmonyPostfix]
-            public static void Postfix(MeleeWeapon __instance)
+            public static void Postfix(object __instance)
             {
                 if (daemon == null || !daemon.IsConnected) return;
-
-                string hand = GetHandString(__instance.hand);
+                string hand = GetHandString(GetMember(__instance, "hand"));
                 if (hand == null) return;
-
                 daemon.SendEvent("melee_hit", hand, priority: 2);
                 MelonLogger.Msg($"[ThirdSpace] Event: melee_hit ({hand})");
             }
         }
 
-        /// <summary>
-        /// Player hit by projectile - getting shot.
-        /// Adapted from bHaptics/OWO mods.
-        /// </summary>
-        [HarmonyPatch(typeof(Projectile), "ShowPlayerHitEffects")]
+        [HarmonyPatch]
         public class Patch_PlayerHit
         {
+            static bool Prepare() => FindMethod("Projectile", "ShowPlayerHitEffects") != null;
+            static MethodBase TargetMethod() => FindMethod("Projectile", "ShowPlayerHitEffects");
+
             [HarmonyPostfix]
             public static void Postfix()
             {
                 if (daemon == null || !daemon.IsConnected) return;
-
                 daemon.SendEvent("player_hit", priority: 3);
                 MelonLogger.Msg("[ThirdSpace] Event: player_hit");
             }
         }
 
-        /// <summary>
-        /// Player death - fatal hit.
-        /// Adapted from bHaptics/OWO mods.
-        /// </summary>
-        [HarmonyPatch(typeof(Player), "ProcessKillerHit")]
+        [HarmonyPatch]
         public class Patch_PlayerDeath
         {
+            static bool Prepare() => FindMethod("Player", "ProcessKillerHit") != null;
+            static MethodBase TargetMethod() => FindMethod("Player", "ProcessKillerHit");
+
             [HarmonyPostfix]
             public static void Postfix()
             {
                 if (daemon == null || !daemon.IsConnected) return;
-
                 daemon.SendEvent("death", priority: 4);
                 MelonLogger.Msg("[ThirdSpace] Event: death");
             }
         }
 
-        /// <summary>
-        /// Armor lost - low health heartbeat.
-        /// Adapted from bHaptics/OWO mods.
-        /// </summary>
-        [HarmonyPatch(typeof(PlayerHUD), "OnArmorLost")]
+        [HarmonyPatch]
         public class Patch_LowHealth
         {
+            static bool Prepare() => FindMethod("PlayerHUD", "OnArmorLost") != null;
+            static MethodBase TargetMethod() => FindMethod("PlayerHUD", "OnArmorLost");
+
             [HarmonyPostfix]
             public static void Postfix()
             {
                 if (daemon == null || !daemon.IsConnected) return;
-                if (lowHealth) return; // Already in low health state
-
+                if (lowHealth) return;
                 lowHealth = true;
                 daemon.SendEvent("low_health", priority: 1);
                 MelonLogger.Msg("[ThirdSpace] Event: low_health");
             }
         }
 
-        /// <summary>
-        /// Armor gained - healing effect.
-        /// Adapted from bHaptics/OWO mods.
-        /// </summary>
-        [HarmonyPatch(typeof(PlayerHUD), "playArmorGainedEffect")]
+        [HarmonyPatch]
         public class Patch_Healing
         {
+            static bool Prepare() => FindMethod("PlayerHUD", "playArmorGainedEffect") != null;
+            static MethodBase TargetMethod() => FindMethod("PlayerHUD", "playArmorGainedEffect");
+
             [HarmonyPostfix]
             public static void Postfix()
             {
                 if (daemon == null || !daemon.IsConnected) return;
-
-                lowHealth = false; // Reset low health state
+                lowHealth = false;
                 daemon.SendEvent("healing", priority: 1);
                 MelonLogger.Msg("[ThirdSpace] Event: healing");
             }
         }
-
-        /// <summary>
-        /// Track ammo state for both guns.
-        /// Adapted from bHaptics/OWO mods.
-        /// </summary>
-        [HarmonyPatch(typeof(GunAmmoDisplay), "Update")]
-        public class Patch_AmmoCheck
-        {
-            [HarmonyPostfix]
-            public static void Postfix(GunAmmoDisplay __instance)
-            {
-                // Track ammo state for "no ammo" events
-                // This can be used to trigger haptics when trying to fire empty gun
-                // Note: This is optional - the Gun.Fire() patch will naturally handle empty guns
-            }
-        }
-
-
-        #endregion
     }
 }
-
