@@ -100,20 +100,6 @@ This keeps profiles robust across resolution changes (within reason).
 
 ---
 
-## Relationship to existing repo artifacts
-
-This repo already contains relevant prototypes/docs:
-- A screen capture prototype for BF2 2017 in:
-  - `misc-documentations/bhaptics-svg-24-nov/star-wars-battlefront-2-2017/screen_capture_prototype.py`
-- Docs recommending screen capture for BF2 2017:
-  - `docs-external-integrations-ideas/EA_BATTLEFRONT2_2017_INTEGRATION.md`
-- Electron IPC + storage for BF2 threshold tuning (existing UI precedent):
-  - `web/electron/ipc/bf2Handlers.cjs`
-
-The new “Generic Screen Health Watcher” should generalize this approach into a **proper daemon integration** with **profiles** and a **calibration UI**.
-
----
-
 ## Enable/disable model
 - The UI selects **one active profile** at a time.
 - Enabling a profile means:

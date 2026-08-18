@@ -3,8 +3,8 @@
 > **Status: RESEARCH COMPLETE / PROTOTYPE PROPOSED**
 >
 > **Decision:** pursue exact, server-authoritative combat events through a KYBER
-> native extension. Screen capture, OCR, input inference, retail-client memory
-> readers, and packet decoding are explicitly out of scope.
+> native extension. Non-authoritative event inference is explicitly out of
+> scope.
 
 ## Scope and non-goals
 
@@ -348,7 +348,7 @@ The prototype is worth continuing only if all of these hold:
    environments.
 
 If the native hook cannot distinguish accepted shots or final applied damage,
-the project stops rather than falling back to inferred screen/input events.
+the project stops rather than falling back to inferred events.
 
 ## Risks and maintenance
 
