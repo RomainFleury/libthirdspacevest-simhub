@@ -1,8 +1,16 @@
 # EA Star Wars Battlefront 2 (2017) Haptic Integration
 
-> **Status: 🔬 RESEARCH / HIGH COMPLEXITY**
+> **Status: SUPERSEDED RESEARCH NOTES**
 >
-> EA Battlefront 2 (2017) uses Frostbite engine with Frosty Mod tooling. This is a complex modding ecosystem with limited event hooking capabilities.
+> The screen-capture recommendation in this historical document was rejected
+> because inferred events are not accurate enough for recoil or damage haptics.
+> The current exact-event plan is
+> [`EA_BATTLEFRONT2_2017_KYBER_PLAN.md`](EA_BATTLEFRONT2_2017_KYBER_PLAN.md).
+> It uses authoritative native hooks on a KYBER private server and does not
+> support official EA matchmaking.
+
+EA Battlefront 2 (2017) uses Frostbite engine with Frosty Mod tooling. This is
+a complex modding ecosystem with limited event hooking capabilities.
 
 ## Game Engine & Modding
 
