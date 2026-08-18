@@ -8,7 +8,8 @@
 
 **This document is for Star Wars Battlefront 2 (2005)** - the Pandemic engine game with Lua scripting.
 
-**For EA Battlefront 2 (2017)** - see `EA_BATTLEFRONT2_2017_INTEGRATION.md` instead.
+**For EA Battlefront 2 (2017)** - see
+`EA_BATTLEFRONT2_2017_KYBER_PLAN.md` instead.
 
 **Star Wars Battlefront 2 (2005)** uses the **Pandemic engine** with Lua scripting, NOT Frostbite.
 

@@ -84,6 +84,12 @@ These documents outline approaches, patterns, and implementation strategies for 
   - Implementation phases and recommendations
   - Based on analysis of OWO_SuperhotVR mod
 
+- **`EA_BATTLEFRONT2_2017_KYBER_PLAN.md`** - Exact EA Battlefront II (2017) events through KYBER
+  - Native server-authoritative hooks for accepted shots and applied damage
+  - KYBER Lua plugin streams NDJSON to a daemon-side integration manager
+  - Private KYBER servers and offline development only
+  - 📋 **PLANNED** - Native event spike required
+
 ### Future Additions
 
 This folder will grow as new integration strategies are developed for:
