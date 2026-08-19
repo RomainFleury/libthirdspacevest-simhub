@@ -40,13 +40,6 @@ This file helps AI assistants quickly understand recent project evolution.
   - **Documentation**: `docs-external-integrations-ideas/PISTOLWHIP_INTEGRATION.md`
   - **Status**: Complete and ready for testing
 
-- **Unified Build Script** - `build-all-mods.ps1` for building all mods
-  - Builds SUPERHOT VR, Pistol Whip, and SimHub plugin
-  - Supports selective builds (`-Mods superhot,gta5`)
-  - Auto-detects MSBuild and checks prerequisites
-  - Uses mod-specific build scripts when available
-  - **Documentation**: `BUILD.md` with usage examples
-
 - **Effects Library** - Predefined haptic patterns from TN Games SDK
   - 28 effects across 5 categories: Weapons, Impacts, Melee, Driving, Special
   - `vest/effects.py`: Effect pattern definitions using `HapticEffect` dataclass
@@ -59,11 +52,6 @@ This file helps AI assistants quickly understand recent project evolution.
   - Central `vest/cell_layout.py` module with correct hardware indices
   - Updated CS2, Alyx, and SUPERHOT managers to use shared constants
   - **Docs**: See [`docs-external-integrations-ideas/CELL_MAPPING_AUDIT.md`](docs-external-integrations-ideas/CELL_MAPPING_AUDIT.md)
-
-- **SimHub Plugin Cell Mapping** - Corrected `VestCells` constants to match hardware
-  - `HapticCommand.cs`: Fixed all 8 cell indices based on reverse engineering
-  - Updated cell groups (`AllFront`, `AllBack`, `LeftSide`, etc.) to use named constants
-  - Now consistent with Python `cell_layout.py` module
 
 ### Fixed
 
@@ -92,20 +80,6 @@ This file helps AI assistants quickly understand recent project evolution.
   - Daemon commands: `superhot_event`, `superhot_start`, `superhot_stop`, `superhot_status`
   - React UI panel with live event log
   - IPC handlers: `superhotHandlers.cjs`
-
-- **SimHub Plugin** (`simhub-plugin/`)
-  - C# plugin for SimHub telemetry platform
-  - Supports 90+ sim racing games (iRacing, Assetto Corsa, F1, etc.)
-  - TCP client connects to Python daemon (port 5050)
-  - Effects: braking, acceleration, G-forces, impacts, gear shifts, rumble, ABS/TC
-  - WPF settings UI with per-effect enable/intensity controls
-  - Auto-reconnect and per-cell throttling
-
-- **SimHub Integration Docs** (`docs-external-integrations-ideas/SIMHUB_IRACING_INTEGRATION.md`)
-  - Research on SimHub plugin architecture
-  - Telemetry data reference (GameData properties)
-  - Effect-to-cell mapping design
-  - Build and installation instructions
 
 ---
 

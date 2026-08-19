@@ -85,25 +85,13 @@
 
 ## Integration Strategy
 
-See full strategy document: `docs-external-integrations-ideas/EA_BATTLEFRONT2_2017_INTEGRATION.md`
+See current integration plan: `docs-external-integrations-ideas/EA_BATTLEFRONT2_2017_KYBER_PLAN.md`
 
-### Potential Approaches
+This document describes the KYBER native extension approach for exact, server-authoritative combat events.
 
-1. **⭐⭐⭐ Screen Capture + Pixel Analysis** (HIGHLY RECOMMENDED)
-   - Capture screen edges using Python (`mss` library)
-   - Analyze pixels for red tint (damage indicator)
-   - Detect which edge has red = damage direction
-   - Measure intensity = damage amount
-   - Write events to file
-   - Python daemon watches file
-   - **Advantages:** 
-     - No game modification needed
-     - Works with any game version
-     - Much simpler than modding
-     - Universal approach (can work for other games)
-   - **Prototype:** See `screen_capture_prototype.py`
+### Archived Approaches
 
-2. **Frosty Mod - Damage Indicator Hook** (Alternative)
+**Frosty Mod - Damage Indicator Hook** (Not Pursued)
    - Hook into red damage filter via Frosty mod
    - Edge position = damage direction
    - Intensity = damage amount
