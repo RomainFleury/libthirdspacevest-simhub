@@ -7,7 +7,6 @@ This folder contains documentation and strategies for integrating the Third Spac
 These documents outline approaches, patterns, and implementation strategies for connecting the Third Space Vest to various external systems beyond the core debugger functionality. This includes:
 
 - Game integrations (via mods, APIs, telemetry)
-- Platform integrations (SimHub, other haptic systems)
 - Protocol bridges and adapters
 - Event streaming and telemetry systems
 
@@ -56,14 +55,6 @@ These documents outline approaches, patterns, and implementation strategies for 
   - Embedded in daemon with UI panel
   - ✅ **IMPLEMENTED**
 
-- **`SIMHUB_IRACING_INTEGRATION.md`** - SimHub integration for 90+ sim racing games
-  - C# plugin using SimHub SDK (IDataPlugin interface)
-  - Supports iRacing, Assetto Corsa, F1, Forza, BeamNG, etc.
-  - TCP connection to Python daemon (port 5050)
-  - Effects: braking, acceleration, G-forces, impacts, gear shifts, rumble
-  - WPF settings UI with intensity controls
-  - ✅ **IMPLEMENTED** - See `simhub-plugin/`
-
 - **`SUPERHOTVR_INTEGRATION.md`** - SUPERHOT VR integration via MelonLoader mod
   - Fork of OWO_SuperhotVR mod with TCP client instead of OWO SDK
   - 12 events: death, gunfire (pistol/shotgun/uzi), punch, throw, parry, mindwave
@@ -89,7 +80,6 @@ These documents outline approaches, patterns, and implementation strategies for 
 This folder will grow as new integration strategies are developed for:
 - Other game modding frameworks
 - Native game APIs (GSI, etc.)
-- SimHub plugins
 - Other haptic device bridges
 
 ## Usage

@@ -15,18 +15,6 @@ export const DEVICE_COLORS = [
   "bg-indigo-500/20 text-indigo-300 border-indigo-500/50",
 ];
 
-// Solid color variants for badges and indicators
-export const DEVICE_COLORS_SOLID = [
-  "bg-blue-500 text-white",
-  "bg-green-500 text-white",
-  "bg-purple-500 text-white",
-  "bg-yellow-500 text-white",
-  "bg-pink-500 text-white",
-  "bg-cyan-500 text-white",
-  "bg-orange-500 text-white",
-  "bg-indigo-500 text-white",
-];
-
 // Border color variants
 export const DEVICE_COLORS_BORDER = [
   "border-blue-500",
@@ -51,18 +39,6 @@ export function getDeviceColor(deviceId: string | undefined): string {
     hash = deviceId.charCodeAt(i) + ((hash << 5) - hash);
   }
   return DEVICE_COLORS[Math.abs(hash) % DEVICE_COLORS.length];
-}
-
-/**
- * Get a solid color class for a device ID (for badges, indicators, etc.).
- */
-export function getDeviceColorSolid(deviceId: string | undefined): string {
-  if (!deviceId) return "";
-  let hash = 0;
-  for (let i = 0; i < deviceId.length; i++) {
-    hash = deviceId.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return DEVICE_COLORS_SOLID[Math.abs(hash) % DEVICE_COLORS_SOLID.length];
 }
 
 /**

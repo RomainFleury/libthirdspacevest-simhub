@@ -154,14 +154,6 @@ class Command:
     alyx_settings: Optional[Dict[str, Any]] = None
     # Generic params
     message: Optional[str] = None  # Used for player name or other messages
-    # Generic game event params (for TCP client integrations)
-    event: Optional[str] = None  # Event name
-    hand: Optional[str] = None   # "left" or "right" for hand-specific events
-    priority: Optional[int] = None
-    angle: Optional[float] = None  # Damage angle in degrees
-    damage: Optional[float] = None  # Damage amount
-    health_remaining: Optional[float] = None  # Remaining health
-    cause: Optional[str] = None  # Death cause
     # Predefined effects params
     effect_name: Optional[str] = None  # Effect to play
     # Multi-vest support
@@ -174,7 +166,6 @@ class Command:
     output_dir: Optional[str] = None  # Optional output dir for test/debug artifacts
     # For screen_health_test only: tight row-major BGRA bytes on disk (path + dimensions; see daemon).
     frame_bgra_path: Optional[str] = None
-    frame_bgra_base64: Optional[str] = None  # legacy; prefer frame_bgra_path
     frame_width: Optional[int] = None
     frame_height: Optional[int] = None
 
@@ -309,8 +300,6 @@ class Response:
     events_received: Optional[int] = None
     last_event_ts: Optional[float] = None
     last_event_type: Optional[str] = None
-    events_received: Optional[int] = None
-    last_event_ts: Optional[float] = None
     config_content: Optional[str] = None
     filename: Optional[str] = None
     # Half-Life: Alyx response

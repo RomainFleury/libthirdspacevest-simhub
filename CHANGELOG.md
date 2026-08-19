@@ -40,33 +40,6 @@ This file helps AI assistants quickly understand recent project evolution.
   - **Documentation**: `docs-external-integrations-ideas/PISTOLWHIP_INTEGRATION.md`
   - **Status**: Complete and ready for testing
 
-- **Unified Build Script** - `build-all-mods.ps1` for building all mods
-  - Builds SUPERHOT VR, GTA V, Pistol Whip, and SimHub plugin
-  - Supports selective builds (`-Mods superhot,gta5`)
-  - Auto-detects MSBuild and checks prerequisites
-  - Uses mod-specific build scripts when available
-  - **Documentation**: `BUILD.md` with usage examples
-
-- **GTA V Integration (Phase 1)** - Script Hook V .NET mod for Grand Theft Auto V
-  - Player damage detection with directional haptic feedback (angle-based cell mapping)
-  - Player death detection with full vest pulse (all cells, max intensity)
-  - Damage intensity scaling (damage amount → haptic speed 1-10)
-  - TCP client connects to Python daemon (port 5050)
-  - Auto-connect on mod startup with in-game connection status notifications
-  - **Mod Files**: `gta5-mod/ThirdSpaceGTAV/` (C# Script Hook V .NET project)
-    - `ThirdSpaceGTAV.cs`: Main mod entry point
-    - `DaemonClient.cs`: TCP client for daemon communication
-    - `EventHooks.cs`: Player damage/death detection
-    - `HapticMapper.cs`: Angle-to-cells and damage-to-intensity mapping
-  - **Python Manager**: `server/gtav_manager.py`
-    - Processes `player_damage` and `player_death` events
-    - Maps damage angles (0-360°) to directional vest cells
-    - Scales intensity based on damage amount
-  - **Daemon Protocol**: Added `gtav_event`, `gtav_start`, `gtav_stop`, `gtav_status` commands
-  - **Build System**: `build.ps1` script for automated building
-  - **Documentation**: `docs-external-integrations-ideas/GTAV_INTEGRATION.md` (strategy and setup guide)
-  - **Status**: Phase 1 complete (damage/death). Vehicle events deferred to Phase 2.
-
 - **Effects Library** - Predefined haptic patterns from TN Games SDK
   - 28 effects across 5 categories: Weapons, Impacts, Melee, Driving, Special
   - `vest/effects.py`: Effect pattern definitions using `HapticEffect` dataclass
@@ -79,11 +52,6 @@ This file helps AI assistants quickly understand recent project evolution.
   - Central `vest/cell_layout.py` module with correct hardware indices
   - Updated CS2, Alyx, and SUPERHOT managers to use shared constants
   - **Docs**: See [`docs-external-integrations-ideas/CELL_MAPPING_AUDIT.md`](docs-external-integrations-ideas/CELL_MAPPING_AUDIT.md)
-
-- **SimHub Plugin Cell Mapping** - Corrected `VestCells` constants to match hardware
-  - `HapticCommand.cs`: Fixed all 8 cell indices based on reverse engineering
-  - Updated cell groups (`AllFront`, `AllBack`, `LeftSide`, etc.) to use named constants
-  - Now consistent with Python `cell_layout.py` module
 
 ### Fixed
 
@@ -112,20 +80,6 @@ This file helps AI assistants quickly understand recent project evolution.
   - Daemon commands: `superhot_event`, `superhot_start`, `superhot_stop`, `superhot_status`
   - React UI panel with live event log
   - IPC handlers: `superhotHandlers.cjs`
-
-- **SimHub Plugin** (`simhub-plugin/`)
-  - C# plugin for SimHub telemetry platform
-  - Supports 90+ sim racing games (iRacing, Assetto Corsa, F1, etc.)
-  - TCP client connects to Python daemon (port 5050)
-  - Effects: braking, acceleration, G-forces, impacts, gear shifts, rumble, ABS/TC
-  - WPF settings UI with per-effect enable/intensity controls
-  - Auto-reconnect and per-cell throttling
-
-- **SimHub Integration Docs** (`docs-external-integrations-ideas/SIMHUB_IRACING_INTEGRATION.md`)
-  - Research on SimHub plugin architecture
-  - Telemetry data reference (GameData properties)
-  - Effect-to-cell mapping design
-  - Build and installation instructions
 
 ---
 
@@ -250,7 +204,5 @@ After (Daemon-based):
 - [x] ~~SUPERHOT VR integration~~ ✅ Done
 - [x] ~~Half-Life: Alyx integration~~ ✅ Done
 - [x] ~~Effect patterns/presets system~~ ✅ Done (Effects Library)
-- [x] ~~GTA V integration (Phase 1)~~ ✅ Done (damage/death)
-- [ ] GTA V Phase 2: Vehicle events (crashes, G-forces, acceleration/braking)
 - [ ] Daemon auto-start from Electron
 - [ ] Pistol Whip integration (planned)

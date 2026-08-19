@@ -47,9 +47,9 @@ def test_basic_functionality():
     print("✓ Multiple players for same game works")
     
     # Test 5: Multiple games
-    mapping.set_mapping("gtav", 1, "device_789")
+    mapping.set_mapping("test_game", 1, "device_789")
     assert mapping.count() == 3, "Should have 3 mappings"
-    assert mapping.get_mapping("gtav", 1) == "device_789", "Should get correct device for gtav"
+    assert mapping.get_mapping("test_game", 1) == "device_789", "Should get correct device for gtav"
     print("✓ Multiple games works")
     
     # Test 6: List mappings (all)
@@ -79,7 +79,7 @@ def test_basic_functionality():
     success = mapping.clear_mapping("cs2")
     assert success is True, "Clearing all should succeed"
     assert not mapping.has_game("cs2"), "cs2 should have no mappings"
-    assert mapping.has_game("gtav"), "gtav should still have mappings"
+    assert mapping.has_game("test_game"), "gtav should still have mappings"
     print("✓ Clear all mappings for game works")
     
     # Test 10: Clear all

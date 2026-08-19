@@ -67,14 +67,14 @@ class TestGamePlayerMapping:
         
         mapping.set_mapping("cs2", 1, "device_123")
         mapping.set_mapping("cs2", 2, "device_456")
-        mapping.set_mapping("gtav", 1, "device_789")
+        mapping.set_mapping("test_game", 1, "device_789")
         assert mapping.count() == 3
         
         success = mapping.clear_mapping("cs2")
         assert success is True
         assert mapping.count() == 1
         assert not mapping.has_game("cs2")
-        assert mapping.has_game("gtav")
+        assert mapping.has_game("test_game")
     
     def test_clear_mapping_nonexistent(self):
         """Test clearing a non-existent mapping."""
@@ -89,7 +89,7 @@ class TestGamePlayerMapping:
         
         mapping.set_mapping("cs2", 1, "device_123")
         mapping.set_mapping("cs2", 2, "device_456")
-        mapping.set_mapping("gtav", 1, "device_789")
+        mapping.set_mapping("test_game", 1, "device_789")
         
         mappings = mapping.list_mappings()
         assert len(mappings) == 3
@@ -105,7 +105,7 @@ class TestGamePlayerMapping:
         
         mapping.set_mapping("cs2", 1, "device_123")
         mapping.set_mapping("cs2", 2, "device_456")
-        mapping.set_mapping("gtav", 1, "device_789")
+        mapping.set_mapping("test_game", 1, "device_789")
         
         mappings = mapping.list_mappings("cs2")
         assert len(mappings) == 2
@@ -152,7 +152,7 @@ class TestGamePlayerMapping:
         mapping.set_mapping("cs2", 2, "device_456")
         assert mapping.count() == 2
         
-        mapping.set_mapping("gtav", 1, "device_789")
+        mapping.set_mapping("test_game", 1, "device_789")
         assert mapping.count() == 3
     
     def test_clear_all(self):
@@ -160,7 +160,7 @@ class TestGamePlayerMapping:
         mapping = GamePlayerMapping()
         
         mapping.set_mapping("cs2", 1, "device_123")
-        mapping.set_mapping("gtav", 1, "device_789")
+        mapping.set_mapping("test_game", 1, "device_789")
         assert mapping.count() == 2
         
         mapping.clear_all()
@@ -173,12 +173,12 @@ class TestGamePlayerMapping:
         
         mapping.set_mapping("cs2", 1, "device_123")
         mapping.set_mapping("cs2", 2, "device_456")
-        mapping.set_mapping("gtav", 1, "device_789")
+        mapping.set_mapping("test_game", 1, "device_789")
         mapping.set_mapping("roulette", 1, "device_123")
         
         assert mapping.get_mapping("cs2", 1) == "device_123"
         assert mapping.get_mapping("cs2", 2) == "device_456"
-        assert mapping.get_mapping("gtav", 1) == "device_789"
+        assert mapping.get_mapping("test_game", 1) == "device_789"
         assert mapping.get_mapping("roulette", 1) == "device_123"
     
     def test_reassign_player(self):

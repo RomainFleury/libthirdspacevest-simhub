@@ -245,7 +245,7 @@ class TestHapticMappings:
             # Get the event class from the same module
             # Try common event class names
             event_cls = None
-            for name in ["L4D2Event", "AlyxEvent", "GTAVEvent", "Event"]:
+            for name in ["L4D2Event", "AlyxEvent", "Event"]:
                 if hasattr(module, name):
                     event_cls = getattr(module, name)
                     break

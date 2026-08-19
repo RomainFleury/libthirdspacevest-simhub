@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
   { name = "SimHub Contributors", email = "contact@simhub.dev" }
 ]
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 dependencies = [
   "pyusb>=1.2.1",
   "mss>=9.0.1",
