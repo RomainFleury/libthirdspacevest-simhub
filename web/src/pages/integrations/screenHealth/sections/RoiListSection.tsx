@@ -2,13 +2,15 @@ import { useState } from "react";
 import { SCREEN_HEALTH_PRESETS } from "../../../../data/screenHealthPresets";
 import { buildScreenHealthDaemonProfile } from "../buildDaemonProfile";
 import { DIRECTION_KEYS } from "../constants";
-import { useScreenHealthProfileDraft, useScreenHealthProfileDraftControls } from "../draft/ProfileDraftContext";
+import { useScreenHealthProfileDraftControls } from "../draft/ProfileDraftContext";
+import { useScreenHealthColorVignetteDraft, useScreenHealthColorVignetteDraftControls } from "../draft/ColorVignetteDraftContext";
 import { useScreenHealthRednessDraft, useScreenHealthRednessDraftControls } from "../draft/RednessDraftContext";
 import { useScreenHealthHealthBarDraft, useScreenHealthHealthBarDraftControls } from "../draft/HealthBarDraftContext";
 import { useScreenHealthHealthNumberDraft, useScreenHealthHealthNumberDraftControls } from "../draft/HealthNumberDraftContext";
-import { useScreenHealthRecoilDraftControls } from "../draft/RecoilDraftContext";
+import { useScreenHealthRecoilDraft, useScreenHealthRecoilDraftControls } from "../draft/RecoilDraftContext";
+import { getDrawnSetup } from "../drawnSetup";
 import { clamp01 } from "../utils";
-import type { RoiRect } from "../draft/types";
+import type { RoiDraft, RoiRect } from "../draft/types";
 
 const PRESETS = SCREEN_HEALTH_PRESETS as Array<{ preset_id: string; profile: { meta?: unknown } }>;
 
@@ -42,36 +44,43 @@ export function RoiListSection(props: {
   ) => Promise<{ success: boolean; test_result?: Record<string, any> | null; error?: string }>;
 }) {
   const { lastCapturedImage, evaluateProfileOnScreenshot } = props;
-  const profile = useScreenHealthProfileDraft();
   const { readDraft: readProfileDraft } = useScreenHealthProfileDraftControls();
   const redness = useScreenHealthRednessDraft();
   const { readDraft: readRednessDraft, updateRoi, removeRoi } = useScreenHealthRednessDraftControls();
+  const colorVignette = useScreenHealthColorVignetteDraft();
+  const {
+    readDraft: readColorVignetteDraft,
+    updateRoi: updateColorVignetteRoi,
+    removeRoi: removeColorVignetteRoi,
+  } = useScreenHealthColorVignetteDraftControls();
   const hb = useScreenHealthHealthBarDraft();
   const { readDraft: readHealthBarDraft, setRoi: setHealthBarRoi } = useScreenHealthHealthBarDraftControls();
   const hn = useScreenHealthHealthNumberDraft();
   const { readDraft: readHealthNumberDraft, setRoi: setHealthNumberRoi } = useScreenHealthHealthNumberDraftControls();
-  const { readDraft: readRecoilDraft } = useScreenHealthRecoilDraftControls();
+  const recoil = useScreenHealthRecoilDraft();
+  const { readDraft: readRecoilDraft, setRoi: setRecoilRoi, setRecoilType } = useScreenHealthRecoilDraftControls();
 
   const [evaluating, setEvaluating] = useState(false);
   const [evalError, setEvalError] = useState<string | null>(null);
   const [evalResult, setEvalResult] = useState<Record<string, any> | null>(null);
 
-  const detectorType = profile.detectorType;
   const rois = redness.rois;
+  const colorVignetteRois = colorVignette.rois;
   const healthBarRoi = hb.roi;
   const healthNumberRoi = hn.roi;
-
-  const title =
-    detectorType === "health_bar" ? "Health bar ROI" : detectorType === "health_number" ? "Health number ROI" : "ROIs";
+  const ammoRoi = recoil.roi;
+  const drawn = getDrawnSetup({
+    rednessRois: rois,
+    colorVignetteRois,
+    healthBarRoi,
+    healthNumberRoi,
+    ammoRoi,
+  });
 
   const hasScreenshotPath = Boolean(lastCapturedImage?.path?.trim());
   const canCapture =
     hasScreenshotPath &&
-    (detectorType === "health_bar"
-      ? !!healthBarRoi
-      : detectorType === "health_number"
-        ? !!healthNumberRoi
-        : rois.length > 0);
+    (drawn.hasRedness || drawn.hasColorVignette || drawn.hasHealthBar || drawn.hasHealthNumber || drawn.hasAmmo);
 
   const runEvaluate = async () => {
     const imagePath = lastCapturedImage?.path?.trim();
@@ -83,6 +92,7 @@ export function RoiListSection(props: {
       const daemonProfile = buildScreenHealthDaemonProfile({
         profileDraft: readProfileDraft(),
         redness: readRednessDraft(),
+        colorVignette: readColorVignetteDraft(),
         hb: readHealthBarDraft(),
         hn: readHealthNumberDraft(),
         recoil: readRecoilDraft(),
@@ -104,7 +114,7 @@ export function RoiListSection(props: {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-white">{title}</h3>
+        <h3 className="text-sm font-semibold text-white">Drawn boxes</h3>
         <button
           type="button"
           onClick={() => void runEvaluate()}
@@ -116,7 +126,7 @@ export function RoiListSection(props: {
               : "Capture or load a screenshot first"
           }
         >
-          {evaluating ? "Evaluating…" : `Evaluate ROI${detectorType === "health_bar" || detectorType === "health_number" ? "" : "s"} (daemon)`}
+          {evaluating ? "Evaluating…" : "Evaluate boxes (daemon)"}
         </button>
       </div>
 
@@ -144,6 +154,7 @@ export function RoiListSection(props: {
                     {d.type}:{d.name}{" "}
                     {typeof d.score === "number" ? `score=${d.score.toFixed(3)}` : ""}
                     {typeof d.percent === "number" ? ` percent=${(d.percent * 100).toFixed(1)}%` : ""}
+                    {typeof d.overheat_score === "number" ? ` overheat=${d.overheat_score.toFixed(2)}` : ""}
                     {typeof d.read === "number" ? ` read=${d.read}` : d?.read === null ? " read=null" : ""}
                     {typeof d.image_path === "string" ? ` file=${d.image_path}` : ""}
                     {d.error ? ` err=${d.error}` : ""}
@@ -162,10 +173,7 @@ export function RoiListSection(props: {
         </div>
       )}
 
-      {detectorType === "health_bar" ? (
-        !healthBarRoi ? (
-          <div className="text-sm text-slate-500">No health bar ROI yet. Capture a screenshot and draw one.</div>
-        ) : (
+      {drawn.hasHealthBar && healthBarRoi && (
           <div className="rounded-lg bg-slate-700/20 p-3 ring-1 ring-white/5 space-y-3">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
               <div>
@@ -240,11 +248,9 @@ export function RoiListSection(props: {
               </button>
             </div>
           </div>
-        )
-      ) : detectorType === "health_number" ? (
-        !healthNumberRoi ? (
-          <div className="text-sm text-slate-500">No health number ROI yet. Capture a screenshot and draw one.</div>
-        ) : (
+      )}
+
+      {drawn.hasHealthNumber && healthNumberRoi && (
           <div className="rounded-lg bg-slate-700/20 p-3 ring-1 ring-white/5 space-y-3">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
               <div>
@@ -319,113 +325,156 @@ export function RoiListSection(props: {
               </button>
             </div>
           </div>
-        )
-      ) : rois.length === 0 ? (
-        <div className="text-sm text-slate-500">No ROIs yet. Capture a screenshot and draw one.</div>
-      ) : (
-        <div className="space-y-2">
-          {rois.map((r, idx) => (
-            <div key={`${r.name}-${idx}`} className="rounded-lg bg-slate-700/20 p-3 ring-1 ring-white/5 space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">Name</label>
-                  <input
-                    value={r.name}
-                    onChange={(e) => updateRoi(idx, { name: e.target.value })}
-                    className="w-full rounded-lg bg-slate-800/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">Direction (optional — defaults to random)</label>
-                  <select
-                    value={r.direction || ""}
-                    onChange={(e) => updateRoi(idx, { direction: e.target.value })}
-                    className="w-full rounded-lg bg-slate-800/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
-                  >
-                    {DIRECTION_KEYS.map((k) => (
-                      <option key={k} value={k}>
-                        {k || "(none)"}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">Horizontal box start (x)</label>
-                  <input
-                    type="number"
-                    step="0.001"
-                    min="0"
-                    max="1"
-                    value={r.rect.x}
-                    onChange={(e) => {
-                      const val = clamp01(Number(e.target.value));
-                      updateRoi(idx, { rect: { ...r.rect, x: val } });
-                    }}
-                    className="w-full rounded-lg bg-slate-800/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">Vertical box start (y)</label>
-                  <input
-                    type="number"
-                    step="0.001"
-                    min="0"
-                    max="1"
-                    value={r.rect.y}
-                    onChange={(e) => {
-                      const val = clamp01(Number(e.target.value));
-                      updateRoi(idx, { rect: { ...r.rect, y: val } });
-                    }}
-                    className="w-full rounded-lg bg-slate-800/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">Box width (w)</label>
-                  <input
-                    type="number"
-                    step="0.001"
-                    min="0"
-                    max="1"
-                    value={r.rect.w}
-                    onChange={(e) => {
-                      const val = clamp01(Number(e.target.value));
-                      updateRoi(idx, { rect: { ...r.rect, w: val } });
-                    }}
-                    className="w-full rounded-lg bg-slate-800/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">Box height (h)</label>
-                  <input
-                    type="number"
-                    step="0.001"
-                    min="0"
-                    max="1"
-                    value={r.rect.h}
-                    onChange={(e) => {
-                      const val = clamp01(Number(e.target.value));
-                      updateRoi(idx, { rect: { ...r.rect, h: val } });
-                    }}
-                    className="w-full rounded-lg bg-slate-800/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
-                  />
-                </div>
-              </div>
-              <RoiPreviewInfo rect={r.rect} />
-              <div className="flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => removeRoi(idx)}
-                  className="rounded-lg bg-rose-600/70 px-3 py-2 text-sm font-medium text-white transition hover:bg-rose-600"
-                >
-                  Remove
-                </button>
-              </div>
-            </div>
-          ))}
+      )}
+
+      {drawn.hasRedness && (
+        <VignetteRoiCards rois={rois} updateRoi={updateRoi} removeRoi={removeRoi} />
+      )}
+
+      {drawn.hasColorVignette && (
+        <VignetteRoiCards rois={colorVignetteRois} updateRoi={updateColorVignetteRoi} removeRoi={removeColorVignetteRoi} />
+      )}
+
+      {drawn.hasAmmo && ammoRoi && (
+        <div className="rounded-lg bg-slate-700/20 p-3 ring-1 ring-white/5 space-y-3">
+          <div className="text-xs font-medium text-amber-200">
+            {recoil.recoilType === "fill_up_bar" ? "Fill-up bar" : "Ammo counter"}
+          </div>
+          <RoiPreviewInfo rect={ammoRoi} />
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setRecoilRoi(null);
+                setRecoilType("off");
+              }}
+              className="rounded-lg bg-rose-600/70 px-3 py-2 text-sm font-medium text-white transition hover:bg-rose-600"
+            >
+              Clear
+            </button>
+          </div>
         </div>
       )}
+
+      {!drawn.hasRedness &&
+        !drawn.hasColorVignette &&
+        !drawn.hasHealthBar &&
+        !drawn.hasHealthNumber &&
+        !drawn.hasAmmo && (
+        <div className="text-sm text-slate-500">No boxes yet. Capture a screenshot and draw one.</div>
+      )}
+    </div>
+  );
+}
+
+function VignetteRoiCards(props: {
+  rois: RoiDraft[];
+  updateRoi: (index: number, patch: Partial<RoiDraft>) => void;
+  removeRoi: (index: number) => void;
+}) {
+  const { rois, updateRoi, removeRoi } = props;
+  return (
+    <div className="space-y-2">
+      {rois.map((r, idx) => (
+        <div key={`${r.name}-${idx}`} className="rounded-lg bg-slate-700/20 p-3 ring-1 ring-white/5 space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">Name</label>
+              <input
+                value={r.name}
+                onChange={(e) => updateRoi(idx, { name: e.target.value })}
+                className="w-full rounded-lg bg-slate-800/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">Direction (optional — defaults to random)</label>
+              <select
+                value={r.direction || ""}
+                onChange={(e) => updateRoi(idx, { direction: e.target.value })}
+                className="w-full rounded-lg bg-slate-800/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
+              >
+                {DIRECTION_KEYS.map((k) => (
+                  <option key={k} value={k}>
+                    {k || "(none)"}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">Horizontal box start (x)</label>
+              <input
+                type="number"
+                step="0.001"
+                min="0"
+                max="1"
+                value={r.rect.x}
+                onChange={(e) => {
+                  const val = clamp01(Number(e.target.value));
+                  updateRoi(idx, { rect: { ...r.rect, x: val } });
+                }}
+                className="w-full rounded-lg bg-slate-800/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">Vertical box start (y)</label>
+              <input
+                type="number"
+                step="0.001"
+                min="0"
+                max="1"
+                value={r.rect.y}
+                onChange={(e) => {
+                  const val = clamp01(Number(e.target.value));
+                  updateRoi(idx, { rect: { ...r.rect, y: val } });
+                }}
+                className="w-full rounded-lg bg-slate-800/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">Box width (w)</label>
+              <input
+                type="number"
+                step="0.001"
+                min="0"
+                max="1"
+                value={r.rect.w}
+                onChange={(e) => {
+                  const val = clamp01(Number(e.target.value));
+                  updateRoi(idx, { rect: { ...r.rect, w: val } });
+                }}
+                className="w-full rounded-lg bg-slate-800/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">Box height (h)</label>
+              <input
+                type="number"
+                step="0.001"
+                min="0"
+                max="1"
+                value={r.rect.h}
+                onChange={(e) => {
+                  const val = clamp01(Number(e.target.value));
+                  updateRoi(idx, { rect: { ...r.rect, h: val } });
+                }}
+                className="w-full rounded-lg bg-slate-800/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
+              />
+            </div>
+          </div>
+          <RoiPreviewInfo rect={r.rect} />
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => removeRoi(idx)}
+              className="rounded-lg bg-rose-600/70 px-3 py-2 text-sm font-medium text-white transition hover:bg-rose-600"
+            >
+              Remove
+            </button>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

@@ -65,6 +65,16 @@ class CommandType(Enum):
     L4D2_START = "l4d2_start"
     L4D2_STOP = "l4d2_stop"
     L4D2_STATUS = "l4d2_status"
+    # Pistol Whip (MelonLoader TCP client)
+    PISTOLWHIP_START = "pistolwhip_start"
+    PISTOLWHIP_STOP = "pistolwhip_stop"
+    PISTOLWHIP_STATUS = "pistolwhip_status"
+    PISTOLWHIP_EVENT = "pistolwhip_event"
+    # Warhammer 40,000: Battle Sister (MelonLoader TCP client)
+    BATTLESISTER_START = "battlesister_start"
+    BATTLESISTER_STOP = "battlesister_stop"
+    BATTLESISTER_STATUS = "battlesister_status"
+    BATTLESISTER_EVENT = "battlesister_event"
     # Generic Screen Health Watcher (screen capture)
     SCREEN_HEALTH_START = "screen_health_start"
     SCREEN_HEALTH_STOP = "screen_health_stop"
@@ -131,6 +141,14 @@ class EventType(Enum):
     L4D2_STARTED = "l4d2_started"
     L4D2_STOPPED = "l4d2_stopped"
     L4D2_GAME_EVENT = "l4d2_game_event"
+    # Pistol Whip
+    PISTOLWHIP_STARTED = "pistolwhip_started"
+    PISTOLWHIP_STOPPED = "pistolwhip_stopped"
+    PISTOLWHIP_GAME_EVENT = "pistolwhip_game_event"
+    # Warhammer 40,000: Battle Sister
+    BATTLESISTER_STARTED = "battlesister_started"
+    BATTLESISTER_STOPPED = "battlesister_stopped"
+    BATTLESISTER_GAME_EVENT = "battlesister_game_event"
     # Generic Screen Health Watcher (screen capture)
     SCREEN_HEALTH_STARTED = "screen_health_started"
     SCREEN_HEALTH_STOPPED = "screen_health_stopped"
@@ -357,8 +375,6 @@ class Response:
     events_received: Optional[int] = None
     last_event_ts: Optional[float] = None
     last_event_type: Optional[str] = None
-    events_received: Optional[int] = None
-    last_event_ts: Optional[float] = None
     config_content: Optional[str] = None
     filename: Optional[str] = None
     # Half-Life: Alyx response
@@ -920,6 +936,148 @@ def response_l4d2_status(
         events_received=events_received,
         last_event_ts=last_event_ts,
         last_event_type=last_event_type,
+    )
+
+
+def event_pistolwhip_started() -> Event:
+    return Event(event=EventType.PISTOLWHIP_STARTED.value)
+
+
+def event_pistolwhip_stopped() -> Event:
+    return Event(event=EventType.PISTOLWHIP_STOPPED.value)
+
+
+def event_pistolwhip_game_event(
+    event_type: str,
+    params: Optional[Dict[str, Any]] = None,
+) -> Event:
+    return Event(
+        event=EventType.PISTOLWHIP_GAME_EVENT.value,
+        event_type=event_type,
+        params=params,
+        hand=(params or {}).get("hand"),
+    )
+
+
+def response_pistolwhip_start(
+    success: bool,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    return Response(
+        response="pistolwhip_start",
+        req_id=req_id,
+        success=success,
+        message=error,
+    )
+
+
+def response_pistolwhip_stop(success: bool, req_id: Optional[str] = None) -> Response:
+    return Response(
+        response="pistolwhip_stop",
+        req_id=req_id,
+        success=success,
+    )
+
+
+def response_pistolwhip_status(
+    running: bool,
+    events_received: int = 0,
+    last_event_ts: Optional[float] = None,
+    last_event_type: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    return Response(
+        response="pistolwhip_status",
+        req_id=req_id,
+        running=running,
+        events_received=events_received,
+        last_event_ts=last_event_ts,
+        last_event_type=last_event_type,
+    )
+
+
+def response_pistolwhip_event(
+    success: bool,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    return Response(
+        response="pistolwhip_event",
+        req_id=req_id,
+        success=success,
+        message=error,
+    )
+
+
+def event_battlesister_started() -> Event:
+    return Event(event=EventType.BATTLESISTER_STARTED.value)
+
+
+def event_battlesister_stopped() -> Event:
+    return Event(event=EventType.BATTLESISTER_STOPPED.value)
+
+
+def event_battlesister_game_event(
+    event_type: str,
+    params: Optional[Dict[str, Any]] = None,
+) -> Event:
+    return Event(
+        event=EventType.BATTLESISTER_GAME_EVENT.value,
+        event_type=event_type,
+        params=params,
+        hand=(params or {}).get("hand"),
+    )
+
+
+def response_battlesister_start(
+    success: bool,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    return Response(
+        response="battlesister_start",
+        req_id=req_id,
+        success=success,
+        message=error,
+    )
+
+
+def response_battlesister_stop(success: bool, req_id: Optional[str] = None) -> Response:
+    return Response(
+        response="battlesister_stop",
+        req_id=req_id,
+        success=success,
+    )
+
+
+def response_battlesister_status(
+    running: bool,
+    events_received: int = 0,
+    last_event_ts: Optional[float] = None,
+    last_event_type: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    return Response(
+        response="battlesister_status",
+        req_id=req_id,
+        running=running,
+        events_received=events_received,
+        last_event_ts=last_event_ts,
+        last_event_type=last_event_type,
+    )
+
+
+def response_battlesister_event(
+    success: bool,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    return Response(
+        response="battlesister_event",
+        req_id=req_id,
+        success=success,
+        message=error,
     )
 
 

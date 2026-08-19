@@ -11,6 +11,8 @@ const { registerDaemonHandlers } = require("./daemonHandlers.cjs");
 const { registerCS2Handlers } = require("./cs2Handlers.cjs");
 const { registerAlyxHandlers } = require("./alyxHandlers.cjs");
 const { registerL4D2Handlers } = require("./l4d2Handlers.cjs");
+const { registerPistolWhipHandlers } = require("./pistolwhipHandlers.cjs");
+const { registerBattleSisterHandlers } = require("./battlesisterHandlers.cjs");
 const { registerEffectsHandlers } = require("./effectsHandlers.cjs");
 const { registerScreenHealthHandlers } = require("./screenHealthHandlers.cjs");
 const { registerMultiVestHandlers } = require("./multiVestHandlers.cjs");
@@ -40,6 +42,12 @@ function registerAllHandlers(getDaemonBridge, getMainWindow, reconnectToDaemon) 
   // Left 4 Dead 2 integration handlers
   registerL4D2Handlers(getMainWindow);
 
+  // Pistol Whip integration handlers
+  registerPistolWhipHandlers(getMainWindow);
+
+  // Battle Sister integration handlers
+  registerBattleSisterHandlers(getMainWindow);
+
   // Predefined effects library handlers
   registerEffectsHandlers();
 
@@ -65,6 +73,8 @@ module.exports = {
   registerDaemonHandlers,
   registerCS2Handlers,
   registerAlyxHandlers,
+  registerPistolWhipHandlers,
+  registerBattleSisterHandlers,
   registerEffectsHandlers,
   registerScreenHealthHandlers,
   registerRelayHandlers,

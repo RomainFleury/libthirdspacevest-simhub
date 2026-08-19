@@ -11,6 +11,7 @@
  */
 
 const { ipcMain, dialog, desktopCapturer, nativeImage, screen, shell } = require("electron");
+const crypto = require("crypto");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -115,6 +116,124 @@ async function _captureMonitorImage(monitorIndex) {
   return { image: img, width: img.getSize().width, height: img.getSize().height };
 }
 
+function _stripCalibrationScreenshot(profile) {
+  if (!profile || typeof profile !== "object") return profile;
+  const meta = profile.meta;
+  if (!meta || typeof meta !== "object" || !("calibration_screenshot" in meta)) return profile;
+  const nextMeta = { ...meta };
+  delete nextMeta.calibration_screenshot;
+  return { ...profile, meta: nextMeta };
+}
+
+function _encodeCalibrationScreenshotFromImage(image) {
+  if (!image || image.isEmpty()) {
+    throw new Error("Failed to encode empty image");
+  }
+  const jpeg = image.toJPEG(80);
+  const { width, height } = image.getSize();
+  const sha256 = crypto.createHash("sha256").update(jpeg).digest("hex");
+  return {
+    mime: "image/jpeg",
+    data: jpeg.toString("base64"),
+    width,
+    height,
+    sha256,
+  };
+}
+
+function _imageFromBuffer(buf) {
+  if (!buf || !buf.length) return null;
+  const image = nativeImage.createFromBuffer(buf);
+  return image && !image.isEmpty() ? image : null;
+}
+
+function _bufferFromDataUrl(dataUrl) {
+  const text = String(dataUrl);
+  const comma = text.indexOf(",");
+  if (comma < 0) return null;
+  const header = text.slice(0, comma);
+  const data = text.slice(comma + 1);
+  try {
+    return /;base64/i.test(header) ? Buffer.from(data, "base64") : Buffer.from(decodeURIComponent(data));
+  } catch (_) {
+    return null;
+  }
+}
+
+function _candidatePathsForUrl(url) {
+  const raw = decodeURIComponent(String(url).split("?")[0].replace(/\\/g, "/"));
+  let pathname = raw;
+  try {
+    pathname = new URL(raw, "http://dummy.local").pathname;
+  } catch (_) {
+    /* keep raw */
+  }
+  pathname = pathname.replace(/^\/+/, "");
+  const basename = path.basename(pathname);
+  const webRoot = path.join(__dirname, "..");
+  const candidates = [
+    path.join(webRoot, pathname),
+    path.join(webRoot, "src", "data", "screenHealthPresets", basename),
+    path.join(webRoot, "dist", pathname),
+    path.join(webRoot, "dist", "assets", basename),
+  ];
+  try {
+    const { app } = require("electron");
+    const appPath = app.getAppPath();
+    candidates.push(path.join(appPath, "dist", pathname));
+    candidates.push(path.join(appPath, "dist", "assets", basename));
+  } catch (_) {
+    /* app may be unavailable in tests */
+  }
+  return candidates;
+}
+
+async function _imageFromScreenshotPayload(payload) {
+  const p = payload || {};
+  if (p.shot && typeof p.shot.data === "string") {
+    const image = _imageFromBuffer(Buffer.from(p.shot.data, "base64"));
+    if (image) return image;
+  }
+  if (typeof p.dataUrl === "string" && p.dataUrl) {
+    const fromBuf = _imageFromBuffer(_bufferFromDataUrl(p.dataUrl));
+    if (fromBuf) return fromBuf;
+    const fromDataUrl = nativeImage.createFromDataURL(p.dataUrl);
+    if (fromDataUrl && !fromDataUrl.isEmpty()) return fromDataUrl;
+  }
+  if (typeof p.path === "string" && p.path.trim()) {
+    const resolved = path.resolve(p.path.trim());
+    if (fs.existsSync(resolved)) {
+      const fromPath = nativeImage.createFromPath(resolved);
+      if (fromPath && !fromPath.isEmpty()) return fromPath;
+      const fromFile = _imageFromBuffer(fs.readFileSync(resolved));
+      if (fromFile) return fromFile;
+    }
+  }
+  if (typeof p.url === "string" && p.url.trim()) {
+    const url = p.url.trim();
+    for (const candidate of _candidatePathsForUrl(url)) {
+      if (!fs.existsSync(candidate) || !fs.statSync(candidate).isFile()) continue;
+      const fromPath = nativeImage.createFromPath(candidate);
+      if (fromPath && !fromPath.isEmpty()) return fromPath;
+      const fromFile = _imageFromBuffer(fs.readFileSync(candidate));
+      if (fromFile) return fromFile;
+    }
+    try {
+      const { net } = require("electron");
+      if (/^https?:/i.test(url)) {
+        const res = await net.fetch(url);
+        if (res.ok) {
+          const image = _imageFromBuffer(Buffer.from(await res.arrayBuffer()));
+          if (image) return image;
+        }
+      }
+    } catch (_) {
+      /* fall through */
+    }
+  }
+  return null;
+}
+
 function registerScreenHealthHandlers(getDaemonBridge, getMainWindow) {
   // -------------------------------------------------------------------------
   // Export & settings
@@ -157,6 +276,48 @@ function registerScreenHealthHandlers(getDaemonBridge, getMainWindow) {
       const raw = fs.readFileSync(p, "utf8");
       const parsed = JSON.parse(raw);
       return { success: true, profile: parsed, path: p };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle("screenHealth:encodeCalibrationScreenshot", async (_, payload) => {
+    try {
+      const image = await _imageFromScreenshotPayload(payload || {});
+      if (!image || image.isEmpty()) {
+        return { success: false, error: "Could not load screenshot to encode" };
+      }
+      return { success: true, screenshot: _encodeCalibrationScreenshotFromImage(image) };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle("screenHealth:materializeCalibrationScreenshot", async (_, payload) => {
+    try {
+      const image = await _imageFromScreenshotPayload(payload || {});
+      if (!image || image.isEmpty()) {
+        const hint = payload?.url || payload?.path || (payload?.dataUrl ? "data URL" : "no image payload");
+        return { success: false, error: `Could not load screenshot (${hint})` };
+      }
+      const encoded = _encodeCalibrationScreenshotFromImage(image);
+      const buf = Buffer.from(encoded.data, "base64");
+      const dir = storage.getScreenshotsDir();
+      const filename = `calibration_embedded_${encoded.sha256.slice(0, 12)}.jpg`;
+      const outPath = path.join(dir, filename);
+      if (!fs.existsSync(outPath)) {
+        fs.writeFileSync(outPath, buf);
+        storage.recordScreenshot({ filename, path: outPath, size: buf.length, mtimeMs: Date.now() });
+      }
+      return {
+        success: true,
+        screenshot: encoded,
+        filename,
+        path: outPath,
+        width: encoded.width,
+        height: encoded.height,
+        dataUrl: `data:image/jpeg;base64,${encoded.data}`,
+      };
     } catch (e) {
       return { success: false, error: e.message };
     }
@@ -449,7 +610,7 @@ function registerScreenHealthHandlers(getDaemonBridge, getMainWindow) {
       if (!profile || typeof profile !== "object") {
         return { success: false, error: "profile is required" };
       }
-      return await daemonBridge.screenHealthStart(profile);
+      return await daemonBridge.screenHealthStart(_stripCalibrationScreenshot(profile));
     } catch (e) {
       return { success: false, error: e.message };
     }
@@ -489,7 +650,7 @@ function registerScreenHealthHandlers(getDaemonBridge, getMainWindow) {
       if (!profile || typeof profile !== "object") {
         return { success: false, error: "profile is required" };
       }
-      const params = { profile };
+      const params = { profile: _stripCalibrationScreenshot(profile) };
       if (outputDir && typeof outputDir === "string" && outputDir.trim()) {
         params.output_dir = outputDir.trim();
       }

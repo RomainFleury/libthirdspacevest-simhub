@@ -2,6 +2,7 @@ import { SCREEN_HEALTH_PRESETS } from "../../../../data/screenHealthPresets";
 import { buildScreenHealthDaemonProfile } from "../buildDaemonProfile";
 import { useScreenHealthRecoilDraft, useScreenHealthRecoilDraftControls } from "../draft/RecoilDraftContext";
 import { useScreenHealthProfileDraftControls } from "../draft/ProfileDraftContext";
+import { useScreenHealthColorVignetteDraftControls } from "../draft/ColorVignetteDraftContext";
 import { useScreenHealthRednessDraftControls } from "../draft/RednessDraftContext";
 import { useScreenHealthHealthBarDraftControls } from "../draft/HealthBarDraftContext";
 import { useScreenHealthHealthNumberDraftControls } from "../draft/HealthNumberDraftContext";
@@ -21,6 +22,7 @@ export function AmmoNumberRecoilSettings(props: {
   const { lastCapturedImage, evaluateProfileOnScreenshot } = props;
   const state = useScreenHealthRecoilDraft();
   const {
+    setDurationMs,
     setStableReads,
     setHitMinDrop,
     setHitCooldownMs,
@@ -30,6 +32,7 @@ export function AmmoNumberRecoilSettings(props: {
   } = useScreenHealthRecoilDraftControls();
   const { readDraft: readProfileDraft } = useScreenHealthProfileDraftControls();
   const { readDraft: readRednessDraft } = useScreenHealthRednessDraftControls();
+  const { readDraft: readColorVignetteDraft } = useScreenHealthColorVignetteDraftControls();
   const { readDraft: readHealthBarDraft } = useScreenHealthHealthBarDraftControls();
   const { readDraft: readHealthNumberDraft } = useScreenHealthHealthNumberDraftControls();
   const [activeEngineLabel, setActiveEngineLabel] = useState("Daemon Settings");
@@ -50,13 +53,14 @@ export function AmmoNumberRecoilSettings(props: {
   const onTest = async () => {
     setCalibrationError(null);
     setTestResult(null);
-    if (!state.roi) throw new Error("No ammo ROI set — draw it on the calibration image (Recoil target)");
+    if (!state.roi) throw new Error("No ammo ROI set — draw an ammo box on the screenshot");
     const imagePath = lastCapturedImage?.path?.trim();
     if (!imagePath) throw new Error("Capture or select a screenshot first");
 
     const profile = buildScreenHealthDaemonProfile({
       profileDraft: readProfileDraft(),
       redness: readRednessDraft(),
+      colorVignette: readColorVignetteDraft(),
       hb: readHealthBarDraft(),
       hn: readHealthNumberDraft(),
       recoil: readRecoilDraft(),
@@ -104,6 +108,17 @@ export function AmmoNumberRecoilSettings(props: {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div>
+          <label className="text-sm text-slate-400 block mb-1">Pulse duration (ms)</label>
+          <input
+            type="number"
+            min={25}
+            max={1000}
+            value={state.durationMs}
+            onChange={(e) => setDurationMs(Math.max(25, parseInt(e.target.value, 10) || 40))}
+            className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
+          />
+        </div>
         <div>
           <label className="text-sm text-slate-400 block mb-1">Stable reads</label>
           <input

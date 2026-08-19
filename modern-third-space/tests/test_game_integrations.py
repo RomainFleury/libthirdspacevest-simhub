@@ -245,7 +245,7 @@ class TestHapticMappings:
             # Get the event class from the same module
             # Try common event class names
             event_cls = None
-            for name in ["L4D2Event", "AlyxEvent", "GTAVEvent", "Event"]:
+            for name in ["L4D2Event", "AlyxEvent", "GTAVEvent", "PistolWhipEvent", "BattleSisterEvent", "Event"]:
                 if hasattr(module, name):
                     event_cls = getattr(module, name)
                     break
@@ -480,6 +480,20 @@ class TestIntegrationSnapshot:
             "status": "stable",
             "has_manager": True,
             "event_count_min": 4,
+        },
+        "pistolwhip": {
+            "game_name": "Pistol Whip",
+            "integration_type": "tcp_client",
+            "status": "beta",
+            "has_manager": True,
+            "event_count_min": 8,
+        },
+        "battlesister": {
+            "game_name": "Warhammer 40,000: Battle Sister",
+            "integration_type": "tcp_client",
+            "status": "beta",
+            "has_manager": True,
+            "event_count_min": 8,
         },
         "screen_health": {
             "game_name": "Generic Screen Health (Screen Capture)",

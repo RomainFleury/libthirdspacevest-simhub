@@ -43,6 +43,8 @@ export type DaemonEvent = {
   detector?: string | null;
   health_value?: number;
   duration_ms?: number;
+  hand?: string;
+  angle?: number;
   // Screen health debug events (extra payload is in params)
 };
 
@@ -303,12 +305,23 @@ export type ScreenHealthScreenshotFile = {
   mtimeMs: number;
 };
 
-export type ScreenHealthCapturedImage = {
-  filename: string;
-  path: string;
+export type ScreenHealthCalibrationScreenshot = {
+  mime: string;
+  data: string;
   width: number;
   height: number;
-  dataUrl: string;
+  sha256: string;
+};
+
+export type ScreenHealthMaterializeScreenshotResult = {
+  success: boolean;
+  screenshot?: ScreenHealthCalibrationScreenshot;
+  filename?: string;
+  path?: string;
+  width?: number;
+  height?: number;
+  dataUrl?: string;
+  error?: string;
 };
 
 export type ScreenHealthLocalProfile = {
@@ -456,6 +469,97 @@ declare global {
       l4d2SetSolenoidRecoil: (
         solenoidRecoil: Partial<SolenoidRecoilSettings>
       ) => Promise<{ success: boolean; solenoidRecoil?: SolenoidRecoilSettings; error?: string }>;
+      // Pistol Whip Integration API
+      pistolwhipStart: () => Promise<{ success: boolean; error?: string }>;
+      pistolwhipStop: () => Promise<{ success: boolean; error?: string }>;
+      pistolwhipStatus: () => Promise<{
+        success: boolean;
+        running: boolean;
+        events_received?: number;
+        last_event_ts?: number | null;
+        last_event_type?: string | null;
+        error?: string;
+      }>;
+      pistolwhipGetSettings: () => Promise<{
+        success: boolean;
+        gameDir?: string | null;
+        solenoidRecoil?: SolenoidRecoilSettings;
+        error?: string;
+      }>;
+      pistolwhipSetSolenoidRecoil: (
+        solenoidRecoil: Partial<SolenoidRecoilSettings>
+      ) => Promise<{ success: boolean; solenoidRecoil?: SolenoidRecoilSettings; error?: string }>;
+      pistolwhipBrowseGameDir: () => Promise<{
+        success: boolean;
+        gameDir?: string;
+        canceled?: boolean;
+        error?: string;
+      }>;
+      pistolwhipGetGameDir: () => Promise<{
+        success: boolean;
+        gameDir?: string | null;
+        error?: string;
+      }>;
+      pistolwhipSetGameDir: (gameDir: string | null) => Promise<{ success: boolean; error?: string }>;
+      pistolwhipCheckModInstalled: () => Promise<{
+        success: boolean;
+        installed?: boolean;
+        sourceAvailable?: boolean;
+        missingFiles?: string[];
+        gameDir?: string;
+        error?: string;
+      }>;
+      pistolwhipInstallMod: () => Promise<{
+        success: boolean;
+        copiedFiles?: string[];
+        destination?: string;
+        error?: string;
+      }>;
+      battlesisterStart: () => Promise<{ success: boolean; error?: string }>;
+      battlesisterStop: () => Promise<{ success: boolean; error?: string }>;
+      battlesisterStatus: () => Promise<{
+        success: boolean;
+        running: boolean;
+        events_received?: number;
+        last_event_ts?: number | null;
+        last_event_type?: string | null;
+        error?: string;
+      }>;
+      battlesisterGetSettings: () => Promise<{
+        success: boolean;
+        gameDir?: string | null;
+        solenoidRecoil?: SolenoidRecoilSettings;
+        error?: string;
+      }>;
+      battlesisterSetSolenoidRecoil: (
+        solenoidRecoil: Partial<SolenoidRecoilSettings>
+      ) => Promise<{ success: boolean; solenoidRecoil?: SolenoidRecoilSettings; error?: string }>;
+      battlesisterBrowseGameDir: () => Promise<{
+        success: boolean;
+        gameDir?: string;
+        canceled?: boolean;
+        error?: string;
+      }>;
+      battlesisterGetGameDir: () => Promise<{
+        success: boolean;
+        gameDir?: string | null;
+        error?: string;
+      }>;
+      battlesisterSetGameDir: (gameDir: string | null) => Promise<{ success: boolean; error?: string }>;
+      battlesisterCheckModInstalled: () => Promise<{
+        success: boolean;
+        installed?: boolean;
+        sourceAvailable?: boolean;
+        missingFiles?: string[];
+        gameDir?: string;
+        error?: string;
+      }>;
+      battlesisterInstallMod: () => Promise<{
+        success: boolean;
+        copiedFiles?: string[];
+        destination?: string;
+        error?: string;
+      }>;
       // Generic Screen Health Watcher API
       screenHealthExportProfile: (profile: Record<string, any>) => Promise<{
         success: boolean;
@@ -505,6 +609,18 @@ declare global {
         height?: number;
         dataUrl?: string;
       }>;
+      screenHealthEncodeCalibrationScreenshot: (payload: {
+        path?: string;
+        dataUrl?: string;
+        url?: string;
+        shot?: ScreenHealthCalibrationScreenshot;
+      }) => Promise<{ success: boolean; screenshot?: ScreenHealthCalibrationScreenshot; error?: string }>;
+      screenHealthMaterializeCalibrationScreenshot: (payload: {
+        path?: string;
+        dataUrl?: string;
+        url?: string;
+        shot?: ScreenHealthCalibrationScreenshot;
+      }) => Promise<ScreenHealthMaterializeScreenshotResult>;
       screenHealthCaptureCalibrationScreenshot: (monitorIndex?: number) => Promise<{
         success: boolean;
         filename?: string;
@@ -889,6 +1005,142 @@ export async function alyxSetLogPath(logPath: string | null): Promise<{ success:
   return await ensureBridge().alyxSetLogPath(logPath);
 }
 
+export type PistolWhipStatus = {
+  running: boolean;
+  events_received?: number;
+  last_event_ts?: number | null;
+  last_event_type?: string | null;
+  error?: string;
+};
+
+export async function pistolwhipStart(): Promise<{ success: boolean; error?: string }> {
+  return await ensureBridge().pistolwhipStart();
+}
+
+export async function pistolwhipStop(): Promise<{ success: boolean; error?: string }> {
+  return await ensureBridge().pistolwhipStop();
+}
+
+export async function pistolwhipStatus(): Promise<PistolWhipStatus> {
+  return await ensureBridge().pistolwhipStatus();
+}
+
+export async function pistolwhipGetSettings(): Promise<{
+  success: boolean;
+  gameDir?: string | null;
+  solenoidRecoil?: SolenoidRecoilSettings;
+  error?: string;
+}> {
+  return await ensureBridge().pistolwhipGetSettings();
+}
+
+export async function pistolwhipBrowseGameDir(): Promise<{
+  success: boolean;
+  gameDir?: string;
+  canceled?: boolean;
+  error?: string;
+}> {
+  return await ensureBridge().pistolwhipBrowseGameDir();
+}
+
+export async function pistolwhipGetGameDir(): Promise<{
+  success: boolean;
+  gameDir?: string | null;
+  error?: string;
+}> {
+  return await ensureBridge().pistolwhipGetGameDir();
+}
+
+export async function pistolwhipCheckModInstalled(): Promise<{
+  success: boolean;
+  installed?: boolean;
+  sourceAvailable?: boolean;
+  missingFiles?: string[];
+  gameDir?: string;
+  error?: string;
+}> {
+  return await ensureBridge().pistolwhipCheckModInstalled();
+}
+
+export async function pistolwhipInstallMod(): Promise<{
+  success: boolean;
+  copiedFiles?: string[];
+  destination?: string;
+  error?: string;
+}> {
+  return await ensureBridge().pistolwhipInstallMod();
+}
+
+export async function pistolwhipSetSolenoidRecoil(
+  solenoidRecoil: Partial<SolenoidRecoilSettings>
+): Promise<{ success: boolean; solenoidRecoil?: SolenoidRecoilSettings; error?: string }> {
+  return await ensureBridge().pistolwhipSetSolenoidRecoil(solenoidRecoil);
+}
+
+export type BattleSisterStatus = {
+  running: boolean;
+  events_received?: number;
+  last_event_ts?: number | null;
+  last_event_type?: string | null;
+  error?: string;
+};
+
+export async function battlesisterStart(): Promise<{ success: boolean; error?: string }> {
+  return await ensureBridge().battlesisterStart();
+}
+
+export async function battlesisterStop(): Promise<{ success: boolean; error?: string }> {
+  return await ensureBridge().battlesisterStop();
+}
+
+export async function battlesisterStatus(): Promise<BattleSisterStatus> {
+  return await ensureBridge().battlesisterStatus();
+}
+
+export async function battlesisterGetSettings(): Promise<{
+  success: boolean;
+  gameDir?: string | null;
+  solenoidRecoil?: SolenoidRecoilSettings;
+  error?: string;
+}> {
+  return await ensureBridge().battlesisterGetSettings();
+}
+
+export async function battlesisterSetSolenoidRecoil(
+  solenoidRecoil: Partial<SolenoidRecoilSettings>
+): Promise<{ success: boolean; solenoidRecoil?: SolenoidRecoilSettings; error?: string }> {
+  return await ensureBridge().battlesisterSetSolenoidRecoil(solenoidRecoil);
+}
+
+export async function battlesisterBrowseGameDir(): Promise<{
+  success: boolean;
+  gameDir?: string;
+  canceled?: boolean;
+  error?: string;
+}> {
+  return await ensureBridge().battlesisterBrowseGameDir();
+}
+
+export async function battlesisterCheckModInstalled(): Promise<{
+  success: boolean;
+  installed?: boolean;
+  sourceAvailable?: boolean;
+  missingFiles?: string[];
+  gameDir?: string;
+  error?: string;
+}> {
+  return await ensureBridge().battlesisterCheckModInstalled();
+}
+
+export async function battlesisterInstallMod(): Promise<{
+  success: boolean;
+  copiedFiles?: string[];
+  destination?: string;
+  error?: string;
+}> {
+  return await ensureBridge().battlesisterInstallMod();
+}
+
 // -------------------------------------------------------------------------
 // Predefined Effects Library
 // -------------------------------------------------------------------------
@@ -962,6 +1214,24 @@ export async function screenHealthClearScreenshots() {
 
 export async function screenHealthSelectExistingScreenshot() {
   return await ensureBridge().screenHealthSelectExistingScreenshot();
+}
+
+export async function screenHealthEncodeCalibrationScreenshot(payload: {
+  path?: string;
+  dataUrl?: string;
+  url?: string;
+  shot?: ScreenHealthCalibrationScreenshot;
+}) {
+  return await ensureBridge().screenHealthEncodeCalibrationScreenshot(payload);
+}
+
+export async function screenHealthMaterializeCalibrationScreenshot(payload: {
+  path?: string;
+  dataUrl?: string;
+  url?: string;
+  shot?: ScreenHealthCalibrationScreenshot;
+}) {
+  return await ensureBridge().screenHealthMaterializeCalibrationScreenshot(payload);
 }
 
 export async function screenHealthCaptureCalibrationScreenshot(monitorIndex = 1) {

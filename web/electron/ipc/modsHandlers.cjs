@@ -45,6 +45,20 @@ const MOD_CONFIG = {
     externalUrl: "https://www.nexusmods.com/halflifealyx/mods/6",
     description: "Lua scripts from NexusMods for Half-Life: Alyx",
   },
+  "pistolwhip": {
+    name: "Pistol Whip",
+    directory: "pistolwhip",
+    files: ["ThirdSpace_PistolWhip.dll"],
+    targetFolder: "Mods",
+    description: "MelonLoader TCP client for Pistol Whip haptic feedback",
+  },
+  "battlesister": {
+    name: "Warhammer 40,000: Battle Sister",
+    directory: "battlesister",
+    files: ["ThirdSpace_BattleSister.dll"],
+    targetFolder: "Mods",
+    description: "MelonLoader TCP client for Battle Sister haptic feedback",
+  },
 };
 
 function registerModsHandlers(getMainWindow) {

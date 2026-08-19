@@ -78,6 +78,12 @@ These documents outline approaches, patterns, and implementation strategies for 
   - Source available: bHaptics and OWO GitHub repos
   - 📋 **PLANNED** - Ready for implementation
 
+- **`BATTLESISTER_INTEGRATION.md`** - Warhammer 40,000: Battle Sister via MelonLoader TCP
+  - Harmony patches from [BattleSister_bhaptics](https://github.com/floh-bhaptics/BattleSister_bhaptics)
+  - Events: bolter/grenade-launcher fire, melee, two-hand brace, directional hits, explosions, death, low health
+  - Steam App ID 1733890; install `ThirdSpace_BattleSister.dll` (not the NexusMods bHaptics DLL)
+  - ✅ **IMPLEMENTED** - See `battlesister-mod/`
+
 - **`MELONLOADER_INTEGRATION_STRATEGY.md`** - Comprehensive strategy for integrating MelonLoader-based game mods (Unity games like SUPERHOT VR, Drunkn Bar Fight, etc.)
   - Multiple integration approaches (file logging, HTTP/WebSocket, IPC)
   - Event mapping strategies

@@ -1,12 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { SCREEN_HEALTH_PRESETS } from "../../../data/screenHealthPresets";
 import { ScreenHealthCalibrationProvider } from "./draft/CalibrationContext";
 import {
   ScreenHealthHealthBarDraftProvider,
+  useScreenHealthHealthBarDraft,
   useScreenHealthHealthBarDraftControls,
 } from "./draft/HealthBarDraftContext";
 import {
   ScreenHealthHealthNumberDraftProvider,
+  useScreenHealthHealthNumberDraft,
   useScreenHealthHealthNumberDraftControls,
 } from "./draft/HealthNumberDraftContext";
 import {
@@ -20,24 +22,42 @@ import {
   useScreenHealthRecoilDraftControls,
 } from "./draft/RecoilDraftContext";
 import {
+  ScreenHealthColorVignetteDraftProvider,
+  useScreenHealthColorVignetteDraft,
+  useScreenHealthColorVignetteDraftControls,
+} from "./draft/ColorVignetteDraftContext";
+import {
   ScreenHealthRednessDraftProvider,
+  useScreenHealthRednessDraft,
   useScreenHealthRednessDraftControls,
 } from "./draft/RednessDraftContext";
 import { CalibrationCanvasSection } from "./sections/CalibrationCanvasSection";
 import { CaptureSettingsSection } from "./sections/CaptureSettingsSection";
-import { DetectorSelectionSection } from "./sections/DetectorSelectionSection";
+import { DrawingMaterialSection } from "./sections/DrawingMaterialSection";
 import { AmmoNumberRecoilSettings } from "./sections/AmmoNumberRecoilSettings";
+import { FillUpBarRecoilSettings } from "./sections/FillUpBarRecoilSettings";
+import { ColorVignetteSettings } from "./sections/ColorVignetteSettings";
 import { HealthBarSettings } from "./sections/HealthBarSettings";
 import { HealthNumberSettings } from "./sections/HealthNumberSettings";
 import { PresetProfilesSection } from "./sections/PresetProfilesSection";
 import { ProfileControlsSection } from "./sections/ProfileControlsSection";
-import { RecoilSelectionSection } from "./sections/RecoilSelectionSection";
 import { RednessSettings } from "./sections/RednessSettings";
 import { RoiListSection } from "./sections/RoiListSection";
 import { ScreenshotsSection } from "./sections/ScreenshotsSection";
+import { applyDetectorsFromProfile } from "./applyProfileDraft";
 import { buildScreenHealthDaemonProfile } from "./buildDaemonProfile";
-import { recoilDraftFromProfile } from "./recoilFromProfile";
-import { clamp01, clampInt } from "./utils";
+import {
+  getCalibrationScreenshot,
+  restoreCalibrationScreenshot,
+  type CalibrationScreenshot,
+  type RestoreCalibrationScreenshotLoader,
+} from "./calibrationScreenshot";
+import { getDrawnSetup } from "./drawnSetup";
+import {
+  profileWithCalibrationScreenshot,
+  resolveCalibrationScreenshotForPersist,
+  type ScreenshotPersistDecision,
+} from "./persistCalibrationScreenshot";
 import { screenHealthExportProfile, screenHealthLoadProfile } from "../../../lib/bridgeApi";
 
 type Props = {
@@ -50,6 +70,7 @@ type Props = {
   lastCapturedImage: { dataUrl: string; width: number; height: number; filename: string; path: string } | null;
   captureCalibrationScreenshot: (monitorIndex: number) => Promise<any>;
   selectExistingScreenshot?: () => Promise<any>;
+  loadCalibrationScreenshot?: RestoreCalibrationScreenshotLoader;
   evaluateProfileOnScreenshot: (
     profile: Record<string, any>,
     imagePath: string
@@ -70,20 +91,17 @@ export function ScreenHealthConfigurationPanel(props: Props) {
   return (
     <ScreenHealthProfileDraftProvider defaultPresetId={defaultPresetId}>
       <ScreenHealthRednessDraftProvider>
-        <ScreenHealthHealthBarDraftProvider>
-          <ScreenHealthHealthNumberDraftProvider>
-            <ScreenHealthRecoilDraftProvider>
-              <ScreenHealthCalibrationProvider dataUrl={dataUrl}>
-                <DraftFromSelectedPresetSync
-                  presets={SCREEN_HEALTH_PRESETS as any}
-                  loadFromProfileId={props.loadFromProfileId}
-                  profiles={props.profiles}
-                />
-                <ScreenHealthConfigurationPanelInner {...props} />
-              </ScreenHealthCalibrationProvider>
-            </ScreenHealthRecoilDraftProvider>
-          </ScreenHealthHealthNumberDraftProvider>
-        </ScreenHealthHealthBarDraftProvider>
+        <ScreenHealthColorVignetteDraftProvider>
+          <ScreenHealthHealthBarDraftProvider>
+            <ScreenHealthHealthNumberDraftProvider>
+              <ScreenHealthRecoilDraftProvider>
+                <ScreenHealthCalibrationProvider dataUrl={dataUrl}>
+                  <ScreenHealthConfigurationPanelInner {...props} />
+                </ScreenHealthCalibrationProvider>
+              </ScreenHealthRecoilDraftProvider>
+            </ScreenHealthHealthNumberDraftProvider>
+          </ScreenHealthHealthBarDraftProvider>
+        </ScreenHealthColorVignetteDraftProvider>
       </ScreenHealthRednessDraftProvider>
     </ScreenHealthProfileDraftProvider>
   );
@@ -99,11 +117,29 @@ function ScreenHealthConfigurationPanelInner(props: Props) {
     lastCapturedImage,
     captureCalibrationScreenshot,
     selectExistingScreenshot,
+    loadCalibrationScreenshot,
     evaluateProfileOnScreenshot,
   } = props;
 
+  const loadedShotRef = useRef<CalibrationScreenshot | null>(null);
+  const boundPathRef = useRef<string | null>(null);
+  const bindScreenshot = useCallback((shot: CalibrationScreenshot | null, path: string | null) => {
+    loadedShotRef.current = shot;
+    boundPathRef.current = path;
+  }, []);
+  const [screenshotRestoreError, setScreenshotRestoreError] = useState<string | null>(null);
+
   return (
     <div className="space-y-6">
+      <DraftFromSelectedPresetSync
+        presets={SCREEN_HEALTH_PRESETS as any}
+        loadFromProfileId={props.loadFromProfileId}
+        profiles={props.profiles}
+        loadCalibrationScreenshot={loadCalibrationScreenshot}
+        onBoundScreenshot={bindScreenshot}
+        onRestoreError={setScreenshotRestoreError}
+      />
+
       <PresetProfilesSection 
         presets={SCREEN_HEALTH_PRESETS as any} 
         profiles={props.profiles}
@@ -112,24 +148,23 @@ function ScreenHealthConfigurationPanelInner(props: Props) {
       <ProfileActionsController 
         presets={SCREEN_HEALTH_PRESETS as any} 
         onSaveProfile={props.onSaveProfile}
+        lastCapturedImage={lastCapturedImage}
+        loadedShotRef={loadedShotRef}
+        boundPathRef={boundPathRef}
+        loadCalibrationScreenshot={loadCalibrationScreenshot}
       />
+
+      {screenshotRestoreError && <div className="text-xs text-rose-300">{screenshotRestoreError}</div>}
 
       <CaptureSettingsSection
         onCapture={captureCalibrationScreenshot}
         onSelectExisting={selectExistingScreenshot}
       />
 
-      <DetectorSelectionSection />
-
+      <DrawingMaterialSection />
       <CalibrationCanvasSection lastCapturedImage={lastCapturedImage} />
 
-      <DetectorSettingsSwitch
-        lastCapturedImage={lastCapturedImage}
-        evaluateProfileOnScreenshot={evaluateProfileOnScreenshot}
-      />
-
-      <RecoilSelectionSection />
-      <RecoilSettingsSwitch
+      <DrawnSettings
         lastCapturedImage={lastCapturedImage}
         evaluateProfileOnScreenshot={evaluateProfileOnScreenshot}
       />
@@ -150,181 +185,180 @@ function ScreenHealthConfigurationPanelInner(props: Props) {
   );
 }
 
-function DetectorSettingsSwitch(props: {
+function DrawnSettings(props: {
   lastCapturedImage: { path: string } | null;
   evaluateProfileOnScreenshot: (
     profile: Record<string, any>,
     imagePath: string
   ) => Promise<{ success: boolean; test_result?: Record<string, any> | null; error?: string }>;
 }) {
-  const state = useScreenHealthProfileDraft();
-  if (state.detectorType === "redness_rois") return <RednessSettings />;
-  if (state.detectorType === "health_bar") return <HealthBarSettings />;
-  return (
-    <HealthNumberSettings
-      lastCapturedImage={props.lastCapturedImage}
-      evaluateProfileOnScreenshot={props.evaluateProfileOnScreenshot}
-    />
-  );
-}
-
-function RecoilSettingsSwitch(props: {
-  lastCapturedImage: { path: string } | null;
-  evaluateProfileOnScreenshot: (
-    profile: Record<string, any>,
-    imagePath: string
-  ) => Promise<{ success: boolean; test_result?: Record<string, any> | null; error?: string }>;
-}) {
+  const redness = useScreenHealthRednessDraft();
+  const colorVignette = useScreenHealthColorVignetteDraft();
+  const hb = useScreenHealthHealthBarDraft();
+  const hn = useScreenHealthHealthNumberDraft();
   const recoil = useScreenHealthRecoilDraft();
-  if (recoil.recoilType !== "ammo_number") return null;
+  const drawn = getDrawnSetup({
+    rednessRois: redness.rois,
+    colorVignetteRois: colorVignette.rois,
+    healthBarRoi: hb.roi,
+    healthNumberRoi: hn.roi,
+    ammoRoi: recoil.roi,
+  });
+  const hasAny =
+    drawn.hasRedness || drawn.hasColorVignette || drawn.hasHealthBar || drawn.hasHealthNumber || drawn.hasAmmo;
+
   return (
-    <AmmoNumberRecoilSettings
-      lastCapturedImage={props.lastCapturedImage}
-      evaluateProfileOnScreenshot={props.evaluateProfileOnScreenshot}
-    />
+    <div className="space-y-4 rounded-xl ring-1 ring-white/10 bg-slate-900/30 p-4">
+      <h3 className="text-sm font-semibold text-white">Settings</h3>
+      {!hasAny && (
+        <p className="text-sm text-slate-500">
+          Draw a box first. Hit detection is one type; recoil (ammo or fill-up bar) is optional and separate.
+        </p>
+      )}
+      {drawn.hitCount > 1 && (
+        <p className="text-xs text-amber-200/90">
+          More than one hit type is drawn. Clear the extra boxes — only one hit type is used.
+        </p>
+      )}
+      {drawn.hasRedness && (
+        <div className="space-y-3">
+          <h4 className="text-xs font-medium uppercase tracking-wide text-slate-500">Red vignette</h4>
+          <RednessSettings />
+        </div>
+      )}
+      {drawn.hasColorVignette && (
+        <div className="space-y-3">
+          <h4 className="text-xs font-medium uppercase tracking-wide text-slate-500">Color vignette</h4>
+          <ColorVignetteSettings />
+        </div>
+      )}
+      {drawn.hasHealthBar && (
+        <div className="space-y-3">
+          <h4 className="text-xs font-medium uppercase tracking-wide text-slate-500">Health bar</h4>
+          <HealthBarSettings />
+        </div>
+      )}
+      {drawn.hasHealthNumber && (
+        <div className="space-y-3">
+          <h4 className="text-xs font-medium uppercase tracking-wide text-slate-500">Health number</h4>
+          <HealthNumberSettings
+            lastCapturedImage={props.lastCapturedImage}
+            evaluateProfileOnScreenshot={props.evaluateProfileOnScreenshot}
+          />
+        </div>
+      )}
+      {drawn.hasAmmo && recoil.recoilType === "fill_up_bar" && (
+        <div className="space-y-3">
+          <h4 className="text-xs font-medium uppercase tracking-wide text-slate-500">Fill-up recoil</h4>
+          <FillUpBarRecoilSettings
+            lastCapturedImage={props.lastCapturedImage}
+            evaluateProfileOnScreenshot={props.evaluateProfileOnScreenshot}
+          />
+        </div>
+      )}
+      {drawn.hasAmmo && recoil.recoilType !== "fill_up_bar" && (
+        <div className="space-y-3">
+          <h4 className="text-xs font-medium uppercase tracking-wide text-slate-500">Ammo recoil</h4>
+          <AmmoNumberRecoilSettings
+            lastCapturedImage={props.lastCapturedImage}
+            evaluateProfileOnScreenshot={props.evaluateProfileOnScreenshot}
+          />
+        </div>
+      )}
+    </div>
   );
 }
 
-function DraftFromSelectedPresetSync(props: { 
-  presets: Array<{ preset_id: string; display_name: string; profile: any }>;
+function DraftFromSelectedPresetSync(props: {
+  presets: Array<{ preset_id: string; display_name: string; profile: any; exampleScreenshotUrl?: string }>;
   loadFromProfileId?: string;
   profiles?: Array<{ type: "preset" | "local"; id: string; name: string; profile: Record<string, any> }>;
+  loadCalibrationScreenshot?: RestoreCalibrationScreenshotLoader;
+  onBoundScreenshot: (shot: CalibrationScreenshot | null, path: string | null) => void;
+  onRestoreError: (message: string | null) => void;
 }) {
-  const { presets, loadFromProfileId, profiles } = props;
+  const { presets, loadFromProfileId, profiles, loadCalibrationScreenshot, onBoundScreenshot, onRestoreError } = props;
   const profileState = useScreenHealthProfileDraft();
   const {
     replaceAll: replaceProfileDraft,
     setDetectorType,
-    setSelectedPresetId,
     setEditingLocalProfileId,
   } = useScreenHealthProfileDraftControls();
   const { replaceAll: replaceRednessDraft } = useScreenHealthRednessDraftControls();
+  const { replaceAll: replaceColorVignetteDraft } = useScreenHealthColorVignetteDraftControls();
   const { replaceAll: replaceHealthBarDraft, setColorPickMode } = useScreenHealthHealthBarDraftControls();
   const { replaceAll: replaceHealthNumberDraft } = useScreenHealthHealthNumberDraftControls();
   const { replaceAll: replaceRecoilDraft } = useScreenHealthRecoilDraftControls();
   const lastAppliedPresetIdRef = useRef<string | null>(null);
   const hasLoadedFromIdRef = useRef(false);
 
-  const applyRecoil = (p: any) => {
-    replaceRecoilDraft(recoilDraftFromProfile(p));
+  const applyDetectors = (p: any) =>
+    applyDetectorsFromProfile(p, {
+      setDetectorType,
+      replaceRednessDraft,
+      replaceColorVignetteDraft,
+      replaceHealthBarDraft,
+      replaceHealthNumberDraft,
+      replaceRecoilDraft,
+      setColorPickMode,
+    });
+
+  const restoreShot = async (
+    profile: Record<string, any>,
+    exampleScreenshotUrl: string | undefined,
+    cancelled: () => boolean
+  ) => {
+    if (!loadCalibrationScreenshot) {
+      onBoundScreenshot(null, null);
+      return;
+    }
+    onRestoreError(null);
+    try {
+      const restored = await restoreCalibrationScreenshot({
+        profile,
+        exampleScreenshotUrl,
+        load: loadCalibrationScreenshot,
+      });
+      if (cancelled()) return;
+      onBoundScreenshot(restored.shot, restored.path);
+    } catch (e) {
+      if (cancelled()) return;
+      onBoundScreenshot(getCalibrationScreenshot(profile), null);
+      onRestoreError(e instanceof Error ? e.message : "Failed to load calibration screenshot");
+    }
   };
 
   // Load from profile ID on mount if specified
   useEffect(() => {
-    if (loadFromProfileId && profiles && !hasLoadedFromIdRef.current) {
-      const profile = profiles.find((p) => p.id === loadFromProfileId);
-      if (profile) {
-        hasLoadedFromIdRef.current = true;
-        setEditingLocalProfileId(profile.type === "local" ? profile.id : null);
-        // Load the profile similar to onLoad in ProfileActionsController
-        const p: any = profile.profile;
-        replaceProfileDraft({
-          selectedPresetId: "__custom__",
-          profileName: profile.name || "Loaded Profile",
-          monitorIndex: Number(p.capture?.monitor_index || 1),
-          tickMs: Number(p.capture?.tick_ms || 50),
-        });
-        // Continue with detector loading below...
-        const detectors: any[] = Array.isArray(p.detectors) ? p.detectors : [];
-        const hbD = detectors.find((d: any) => d.type === "health_bar");
-        const hnD = detectors.find((d: any) => d.type === "health_number");
-        const redD = detectors.find((d: any) => d.type === "redness_rois");
-
-        if (hnD) {
-          setDetectorType("health_number");
-          replaceHealthNumberDraft({
-            roi: {
-              x: Number(hnD.roi?.x ?? 0),
-              y: Number(hnD.roi?.y ?? 0),
-              w: Number(hnD.roi?.w ?? 0.12),
-              h: Number(hnD.roi?.h ?? 0.06),
-            },
-            digits: Number(hnD.digits ?? 3),
-            invert: Boolean(hnD.preprocess?.invert ?? false),
-            threshold: Number(hnD.preprocess?.threshold ?? 0.6),
-            scale: Number(hnD.preprocess?.scale ?? 2),
-            readMin: Number(hnD.readout?.min ?? 0),
-            readMax: Number(hnD.readout?.max ?? 300),
-            stableReads: Number(hnD.readout?.stable_reads ?? 2),
-            hitMinDrop: Number(hnD.hit_on_decrease?.min_drop ?? 1),
-            hitCooldownMs: Number(hnD.hit_on_decrease?.cooldown_ms ?? 150),
-            hammingMax: Number(hnD.templates?.hamming_max ?? 120),
-            templateSize: {
-              w: Number(hnD.templates?.width ?? 16),
-              h: Number(hnD.templates?.height ?? 24),
-            },
-            templates: (hnD.templates?.digits && typeof hnD.templates.digits === "object" ? hnD.templates.digits : {}) as any,
-            calibrationError: null,
-            testResult: null,
-          });
-          applyRecoil(p);
-          setColorPickMode(null);
-          return;
-        }
-
-        if (hbD) {
-          setDetectorType("health_bar");
-          replaceHealthBarDraft({
-            roi: {
-              x: Number(hbD.roi?.x ?? 0),
-              y: Number(hbD.roi?.y ?? 0),
-              w: Number(hbD.roi?.w ?? 0.3),
-              h: Number(hbD.roi?.h ?? 0.03),
-            },
-            mode: hbD.color_sampling ? "color_sampling" : hbD.threshold_fallback ? "threshold_fallback" : "color_sampling",
-            filledRgb: Array.isArray(hbD.color_sampling?.filled_rgb)
-              ? [
-                  clampInt(Number(hbD.color_sampling.filled_rgb[0]), 0, 255),
-                  clampInt(Number(hbD.color_sampling.filled_rgb[1]), 0, 255),
-                  clampInt(Number(hbD.color_sampling.filled_rgb[2]), 0, 255),
-                ]
-              : [220, 40, 40],
-            emptyRgb: Array.isArray(hbD.color_sampling?.empty_rgb)
-              ? [
-                  clampInt(Number(hbD.color_sampling.empty_rgb[0]), 0, 255),
-                  clampInt(Number(hbD.color_sampling.empty_rgb[1]), 0, 255),
-                  clampInt(Number(hbD.color_sampling.empty_rgb[2]), 0, 255),
-                ]
-              : [40, 40, 40],
-            toleranceL1: clampInt(Number(hbD.color_sampling?.tolerance_l1 ?? 120), 0, 765),
-            fallbackMode: (hbD.threshold_fallback?.mode as any) || "brightness",
-            fallbackMin: Number(hbD.threshold_fallback?.min ?? 0.5),
-            hitMinDrop: Number(hbD.hit_on_decrease?.min_drop ?? 0.02),
-            hitCooldownMs: Number(hbD.hit_on_decrease?.cooldown_ms ?? 150),
-            colorPickMode: null,
-          });
-          applyRecoil(p);
-          setColorPickMode(null);
-          return;
-        }
-
-        setDetectorType("redness_rois");
-        replaceRednessDraft({
-          minScore: Number(redD?.threshold?.min_score ?? 0.35),
-          cooldownMs: Number(redD?.cooldown_ms ?? 200),
-          rois: (Array.isArray(redD?.rois) ? redD.rois : []).map((r: any, idx: number) => ({
-            name: String(r.name || `roi_${idx}`),
-            direction: r.direction || "",
-            rect: {
-              x: Number(r.rect?.x ?? 0),
-              y: Number(r.rect?.y ?? 0),
-              w: Number(r.rect?.w ?? 0.1),
-              h: Number(r.rect?.h ?? 0.1),
-            },
-          })),
-        });
-        applyRecoil(p);
-        setColorPickMode(null);
-      }
-    }
-  }, [loadFromProfileId, profiles, replaceProfileDraft, setDetectorType, replaceHealthNumberDraft, replaceHealthBarDraft, replaceRednessDraft, replaceRecoilDraft, setColorPickMode]);
+    if (!loadFromProfileId || !profiles || hasLoadedFromIdRef.current) return;
+    const profile = profiles.find((p) => p.id === loadFromProfileId);
+    if (!profile) return;
+    hasLoadedFromIdRef.current = true;
+    lastAppliedPresetIdRef.current = loadFromProfileId;
+    setEditingLocalProfileId(profile.type === "local" ? profile.id : null);
+    const p: any = profile.profile;
+    replaceProfileDraft({
+      selectedPresetId: "__custom__",
+      profileName: profile.name || "Loaded Profile",
+      monitorIndex: Number(p.capture?.monitor_index || 1),
+      tickMs: Number(p.capture?.tick_ms || 50),
+    });
+    applyDetectors(p);
+    const exampleScreenshotUrl =
+      profile.type === "preset" ? presets.find((item) => item.preset_id === profile.id)?.exampleScreenshotUrl : undefined;
+    let cancelled = false;
+    void restoreShot(p, exampleScreenshotUrl, () => cancelled);
+    return () => {
+      cancelled = true;
+    };
+  }, [loadFromProfileId, profiles, replaceProfileDraft, setEditingLocalProfileId]);
 
   useEffect(() => {
     const presetId = profileState.selectedPresetId;
     if (!presetId || presetId === "__custom__") return;
     if (lastAppliedPresetIdRef.current === presetId) return;
 
-    // Check if it's a local profile first
+    let cancelled = false;
     if (profiles) {
       const localProfile = profiles.find((p) => p.id === presetId && p.type === "local");
       if (localProfile) {
@@ -337,216 +371,30 @@ function DraftFromSelectedPresetSync(props: {
           monitorIndex: Number(p.capture?.monitor_index || 1),
           tickMs: Number(p.capture?.tick_ms || 50),
         });
-        // Load detector data (same logic as below)
-        const detectors: any[] = Array.isArray(p.detectors) ? p.detectors : [];
-        const hbD = detectors.find((d: any) => d.type === "health_bar");
-        const hnD = detectors.find((d: any) => d.type === "health_number");
-        const redD = detectors.find((d: any) => d.type === "redness_rois");
-
-        if (hnD) {
-          setDetectorType("health_number");
-          replaceHealthNumberDraft({
-            roi: {
-              x: Number(hnD.roi?.x ?? 0),
-              y: Number(hnD.roi?.y ?? 0),
-              w: Number(hnD.roi?.w ?? 0.12),
-              h: Number(hnD.roi?.h ?? 0.06),
-            },
-            digits: Number(hnD.digits ?? 3),
-            invert: Boolean(hnD.preprocess?.invert ?? false),
-            threshold: Number(hnD.preprocess?.threshold ?? 0.6),
-            scale: Number(hnD.preprocess?.scale ?? 2),
-            readMin: Number(hnD.readout?.min ?? 0),
-            readMax: Number(hnD.readout?.max ?? 300),
-            stableReads: Number(hnD.readout?.stable_reads ?? 2),
-            hitMinDrop: Number(hnD.hit_on_decrease?.min_drop ?? 1),
-            hitCooldownMs: Number(hnD.hit_on_decrease?.cooldown_ms ?? 150),
-            hammingMax: Number(hnD.templates?.hamming_max ?? 120),
-            templateSize: {
-              w: Number(hnD.templates?.width ?? 16),
-              h: Number(hnD.templates?.height ?? 24),
-            },
-            templates: (hnD.templates?.digits && typeof hnD.templates.digits === "object" ? hnD.templates.digits : {}) as any,
-            calibrationError: null,
-            testResult: null,
-          });
-          applyRecoil(p);
-          setColorPickMode(null);
-          return;
-        }
-
-        if (hbD) {
-          setDetectorType("health_bar");
-          replaceHealthBarDraft({
-            roi: {
-              x: Number(hbD.roi?.x ?? 0),
-              y: Number(hbD.roi?.y ?? 0),
-              w: Number(hbD.roi?.w ?? 0.3),
-              h: Number(hbD.roi?.h ?? 0.03),
-            },
-            mode: hbD.color_sampling ? "color_sampling" : hbD.threshold_fallback ? "threshold_fallback" : "color_sampling",
-            filledRgb: Array.isArray(hbD.color_sampling?.filled_rgb)
-              ? [
-                  clampInt(Number(hbD.color_sampling.filled_rgb[0]), 0, 255),
-                  clampInt(Number(hbD.color_sampling.filled_rgb[1]), 0, 255),
-                  clampInt(Number(hbD.color_sampling.filled_rgb[2]), 0, 255),
-                ]
-              : [220, 40, 40],
-            emptyRgb: Array.isArray(hbD.color_sampling?.empty_rgb)
-              ? [
-                  clampInt(Number(hbD.color_sampling.empty_rgb[0]), 0, 255),
-                  clampInt(Number(hbD.color_sampling.empty_rgb[1]), 0, 255),
-                  clampInt(Number(hbD.color_sampling.empty_rgb[2]), 0, 255),
-                ]
-              : [40, 40, 40],
-            toleranceL1: clampInt(Number(hbD.color_sampling?.tolerance_l1 ?? 120), 0, 765),
-            fallbackMode: (hbD.threshold_fallback?.mode as any) || "brightness",
-            fallbackMin: Number(hbD.threshold_fallback?.min ?? 0.5),
-            hitMinDrop: Number(hbD.hit_on_decrease?.min_drop ?? 0.02),
-            hitCooldownMs: Number(hbD.hit_on_decrease?.cooldown_ms ?? 150),
-            colorPickMode: null,
-          });
-          applyRecoil(p);
-          setColorPickMode(null);
-          return;
-        }
-
-        setDetectorType("redness_rois");
-        replaceRednessDraft({
-          minScore: Number(redD?.threshold?.min_score ?? 0.35),
-          cooldownMs: Number(redD?.cooldown_ms ?? 200),
-          rois: (Array.isArray(redD?.rois) ? redD.rois : []).map((r: any, idx: number) => ({
-            name: String(r.name || `roi_${idx}`),
-            direction: r.direction || "",
-            rect: {
-              x: Number(r.rect?.x ?? 0),
-              y: Number(r.rect?.y ?? 0),
-              w: Number(r.rect?.w ?? 0.1),
-              h: Number(r.rect?.h ?? 0.1),
-            },
-          })),
-        });
-        applyRecoil(p);
-        setColorPickMode(null);
-        return;
+        applyDetectors(p);
+        void restoreShot(p, undefined, () => cancelled);
+        return () => {
+          cancelled = true;
+        };
       }
     }
 
-    // Check if it's a preset
     const preset = presets.find((p) => p.preset_id === presetId);
     if (!preset) return;
 
     const p: any = preset.profile;
-
     replaceProfileDraft({
       profileName: preset.display_name || p.name || "Unnamed Profile",
       monitorIndex: Number(p.capture?.monitor_index || 1),
       tickMs: Number(p.capture?.tick_ms || 50),
     });
-    // Mark applied early to avoid loops (even if we return in a branch below).
     lastAppliedPresetIdRef.current = presetId;
-
-    const detectors: any[] = Array.isArray(p.detectors) ? p.detectors : [];
-    const hbD = detectors.find((d: any) => d.type === "health_bar");
-    const hnD = detectors.find((d: any) => d.type === "health_number");
-    const redD = detectors.find((d: any) => d.type === "redness_rois");
-
-    if (hnD) {
-      setDetectorType("health_number");
-      replaceHealthNumberDraft({
-        roi: {
-          x: Number(hnD.roi?.x ?? 0),
-          y: Number(hnD.roi?.y ?? 0),
-          w: Number(hnD.roi?.w ?? 0.12),
-          h: Number(hnD.roi?.h ?? 0.06),
-        },
-        digits: Number(hnD.digits ?? 3),
-        invert: Boolean(hnD.preprocess?.invert ?? false),
-        threshold: Number(hnD.preprocess?.threshold ?? 0.6),
-        scale: Number(hnD.preprocess?.scale ?? 2),
-        readMin: Number(hnD.readout?.min ?? 0),
-        readMax: Number(hnD.readout?.max ?? 300),
-        stableReads: Number(hnD.readout?.stable_reads ?? 2),
-        hitMinDrop: Number(hnD.hit_on_decrease?.min_drop ?? 1),
-        hitCooldownMs: Number(hnD.hit_on_decrease?.cooldown_ms ?? 150),
-        hammingMax: Number(hnD.templates?.hamming_max ?? 120),
-        templateSize: {
-          w: Number(hnD.templates?.width ?? 16),
-          h: Number(hnD.templates?.height ?? 24),
-        },
-        templates: (hnD.templates?.digits && typeof hnD.templates.digits === "object" ? hnD.templates.digits : {}) as any,
-        calibrationError: null,
-        testResult: null,
-      });
-      applyRecoil(p);
-      setColorPickMode(null);
-      return;
-    }
-
-    if (hbD) {
-      setDetectorType("health_bar");
-      replaceHealthBarDraft({
-        roi: {
-          x: Number(hbD.roi?.x ?? 0),
-          y: Number(hbD.roi?.y ?? 0),
-          w: Number(hbD.roi?.w ?? 0.3),
-          h: Number(hbD.roi?.h ?? 0.03),
-        },
-        mode: hbD.color_sampling ? "color_sampling" : hbD.threshold_fallback ? "threshold_fallback" : "color_sampling",
-        filledRgb: Array.isArray(hbD.color_sampling?.filled_rgb)
-          ? [
-              clampInt(Number(hbD.color_sampling.filled_rgb[0]), 0, 255),
-              clampInt(Number(hbD.color_sampling.filled_rgb[1]), 0, 255),
-              clampInt(Number(hbD.color_sampling.filled_rgb[2]), 0, 255),
-            ]
-          : [220, 40, 40],
-        emptyRgb: Array.isArray(hbD.color_sampling?.empty_rgb)
-          ? [
-              clampInt(Number(hbD.color_sampling.empty_rgb[0]), 0, 255),
-              clampInt(Number(hbD.color_sampling.empty_rgb[1]), 0, 255),
-              clampInt(Number(hbD.color_sampling.empty_rgb[2]), 0, 255),
-            ]
-          : [40, 40, 40],
-        toleranceL1: clampInt(Number(hbD.color_sampling?.tolerance_l1 ?? 120), 0, 765),
-        fallbackMode: (hbD.threshold_fallback?.mode as any) || "brightness",
-        fallbackMin: Number(hbD.threshold_fallback?.min ?? 0.5),
-        hitMinDrop: Number(hbD.hit_on_decrease?.min_drop ?? 0.02),
-        hitCooldownMs: Number(hbD.hit_on_decrease?.cooldown_ms ?? 150),
-        colorPickMode: null,
-      });
-      applyRecoil(p);
-      return;
-    }
-
-    setDetectorType("redness_rois");
-    replaceRednessDraft({
-      minScore: Number(redD?.threshold?.min_score ?? 0.35),
-      cooldownMs: Number(redD?.cooldown_ms ?? 200),
-      rois: (Array.isArray(redD?.rois) ? redD.rois : []).map((r: any, idx: number) => ({
-        name: String(r.name || `roi_${idx}`),
-        direction: r.direction || "",
-        rect: {
-          x: Number(r.rect?.x ?? 0),
-          y: Number(r.rect?.y ?? 0),
-          w: Number(r.rect?.w ?? 0.1),
-          h: Number(r.rect?.h ?? 0.1),
-        },
-      })),
-    });
-    applyRecoil(p);
-    setColorPickMode(null);
-  }, [
-    presets,
-    profileState.selectedPresetId,
-    replaceProfileDraft,
-    setDetectorType,
-    replaceRednessDraft,
-    replaceHealthBarDraft,
-    setColorPickMode,
-    replaceHealthNumberDraft,
-    replaceRecoilDraft,
-    setEditingLocalProfileId,
-  ]);
+    applyDetectors(p);
+    void restoreShot(p, preset.exampleScreenshotUrl, () => cancelled);
+    return () => {
+      cancelled = true;
+    };
+  }, [presets, profileState.selectedPresetId, replaceProfileDraft, setEditingLocalProfileId, profiles]);
 
   return null;
 }
@@ -558,8 +406,12 @@ function ProfileActionsController(props: {
     profile: Record<string, any>,
     options?: { updateId?: string | null }
   ) => Promise<any>;
+  lastCapturedImage: { path: string; dataUrl?: string } | null;
+  loadedShotRef: { current: CalibrationScreenshot | null };
+  boundPathRef: { current: string | null };
+  loadCalibrationScreenshot?: RestoreCalibrationScreenshotLoader;
 }) {
-  const { presets, onSaveProfile } = props;
+  const { presets, onSaveProfile, lastCapturedImage, loadedShotRef, boundPathRef, loadCalibrationScreenshot } = props;
   const profileState = useScreenHealthProfileDraft();
   const {
     setProfileName,
@@ -568,40 +420,63 @@ function ProfileActionsController(props: {
     setEditingLocalProfileId,
     setDetectorType,
   } = useScreenHealthProfileDraftControls();
-  const { readDraft: readRednessDraft } = useScreenHealthRednessDraftControls();
-  const { readDraft: readHealthBarDraft, replaceAll: replaceHealthBarDraft, setColorPickMode } = useScreenHealthHealthBarDraftControls();
-  const { readDraft: readHealthNumberDraft, replaceAll: replaceHealthNumberDraft } = useScreenHealthHealthNumberDraftControls();
-  const { replaceAll: replaceRednessDraft } = useScreenHealthRednessDraftControls();
+  const { readDraft: readRednessDraft, replaceAll: replaceRednessDraft } = useScreenHealthRednessDraftControls();
+  const { readDraft: readColorVignetteDraft, replaceAll: replaceColorVignetteDraft } =
+    useScreenHealthColorVignetteDraftControls();
+  const { readDraft: readHealthBarDraft, replaceAll: replaceHealthBarDraft, setColorPickMode } =
+    useScreenHealthHealthBarDraftControls();
+  const { readDraft: readHealthNumberDraft, replaceAll: replaceHealthNumberDraft } =
+    useScreenHealthHealthNumberDraftControls();
   const { readDraft: readRecoilDraft, replaceAll: replaceRecoilDraft } = useScreenHealthRecoilDraftControls();
-
-  const applyRecoil = (p: any) => {
-    replaceRecoilDraft(recoilDraftFromProfile(p));
-  };
 
   const [exportError, setExportError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccessKind, setSaveSuccessKind] = useState<"none" | "update" | "new">("none");
+  const [imagePrompt, setImagePrompt] = useState<"export" | "update" | "new" | null>(null);
+  const [encodingImage, setEncodingImage] = useState(false);
 
   const buildDaemonProfile = () =>
     buildScreenHealthDaemonProfile({
       profileDraft: readProfileDraft(),
       redness: readRednessDraft(),
+      colorVignette: readColorVignetteDraft(),
       hb: readHealthBarDraft(),
       hn: readHealthNumberDraft(),
       recoil: readRecoilDraft(),
       presets,
     });
 
-  const onExport = async () => {
+  const persistWithScreenshot = async (kind: "export" | "update" | "new", decision?: ScreenshotPersistDecision) => {
+    const resolved = await resolveCalibrationScreenshotForPersist({
+      currentImage: lastCapturedImage,
+      loadedShot: loadedShotRef.current,
+      boundPath: boundPathRef.current,
+      decision,
+    });
+    if (resolved.status === "needs-prompt") {
+      setImagePrompt(kind);
+      return;
+    }
+    setImagePrompt(null);
+    loadedShotRef.current = resolved.shot;
+    boundPathRef.current = resolved.boundPath;
+    return profileWithCalibrationScreenshot(buildDaemonProfile(), resolved.shot);
+  };
+
+  const onExport = async (decision?: ScreenshotPersistDecision) => {
     setExportError(null);
+    setEncodingImage(true);
     try {
-      const profile = buildDaemonProfile();
+      const profile = await persistWithScreenshot("export", decision);
+      if (!profile) return;
       const result = await screenHealthExportProfile(profile);
       if (!result.success && !result.canceled) throw new Error(result.error || "Failed to export profile");
     } catch (e) {
       setExportError(e instanceof Error ? e.message : "Failed to export profile");
+    } finally {
+      setEncodingImage(false);
     }
   };
 
@@ -625,119 +500,60 @@ function ProfileActionsController(props: {
         monitorIndex: Number(p.capture?.monitor_index || 1),
         tickMs: Number(p.capture?.tick_ms || 50),
       });
-
-      const detectors: any[] = Array.isArray(p.detectors) ? p.detectors : [];
-      const hbD = detectors.find((d: any) => d.type === "health_bar");
-      const hnD = detectors.find((d: any) => d.type === "health_number");
-      const redD = detectors.find((d: any) => d.type === "redness_rois");
-
-      if (hnD) {
-        setDetectorType("health_number");
-        replaceHealthNumberDraft({
-          roi: {
-            x: Number(hnD.roi?.x ?? 0),
-            y: Number(hnD.roi?.y ?? 0),
-            w: Number(hnD.roi?.w ?? 0.12),
-            h: Number(hnD.roi?.h ?? 0.06),
-          },
-          digits: Number(hnD.digits ?? 3),
-          invert: Boolean(hnD.preprocess?.invert ?? false),
-          threshold: Number(hnD.preprocess?.threshold ?? 0.6),
-          scale: Number(hnD.preprocess?.scale ?? 2),
-          readMin: Number(hnD.readout?.min ?? 0),
-          readMax: Number(hnD.readout?.max ?? 300),
-          stableReads: Number(hnD.readout?.stable_reads ?? 2),
-          hitMinDrop: Number(hnD.hit_on_decrease?.min_drop ?? 1),
-          hitCooldownMs: Number(hnD.hit_on_decrease?.cooldown_ms ?? 150),
-          hammingMax: Number(hnD.templates?.hamming_max ?? 120),
-          templateSize: {
-            w: Number(hnD.templates?.width ?? 16),
-            h: Number(hnD.templates?.height ?? 24),
-          },
-          templates: (hnD.templates?.digits && typeof hnD.templates.digits === "object" ? hnD.templates.digits : {}) as any,
-          calibrationError: null,
-          testResult: null,
-        });
-        applyRecoil(p);
-        setColorPickMode(null);
-        return;
-      }
-
-      if (hbD) {
-        setDetectorType("health_bar");
-        replaceHealthBarDraft({
-          roi: {
-            x: Number(hbD.roi?.x ?? 0),
-            y: Number(hbD.roi?.y ?? 0),
-            w: Number(hbD.roi?.w ?? 0.3),
-            h: Number(hbD.roi?.h ?? 0.03),
-          },
-          mode: hbD.color_sampling ? "color_sampling" : hbD.threshold_fallback ? "threshold_fallback" : "color_sampling",
-          filledRgb: Array.isArray(hbD.color_sampling?.filled_rgb)
-            ? [
-                clampInt(Number(hbD.color_sampling.filled_rgb[0]), 0, 255),
-                clampInt(Number(hbD.color_sampling.filled_rgb[1]), 0, 255),
-                clampInt(Number(hbD.color_sampling.filled_rgb[2]), 0, 255),
-              ]
-            : [220, 40, 40],
-          emptyRgb: Array.isArray(hbD.color_sampling?.empty_rgb)
-            ? [
-                clampInt(Number(hbD.color_sampling.empty_rgb[0]), 0, 255),
-                clampInt(Number(hbD.color_sampling.empty_rgb[1]), 0, 255),
-                clampInt(Number(hbD.color_sampling.empty_rgb[2]), 0, 255),
-              ]
-            : [40, 40, 40],
-          toleranceL1: clampInt(Number(hbD.color_sampling?.tolerance_l1 ?? 120), 0, 765),
-          fallbackMode: (hbD.threshold_fallback?.mode as any) || "brightness",
-          fallbackMin: Number(hbD.threshold_fallback?.min ?? 0.5),
-          hitMinDrop: Number(hbD.hit_on_decrease?.min_drop ?? 0.02),
-          hitCooldownMs: Number(hbD.hit_on_decrease?.cooldown_ms ?? 150),
-          colorPickMode: null,
-        });
-        applyRecoil(p);
-        setColorPickMode(null);
-        return;
-      }
-
-      setDetectorType("redness_rois");
-      replaceRednessDraft({
-        minScore: Number(redD?.threshold?.min_score ?? 0.35),
-        cooldownMs: Number(redD?.cooldown_ms ?? 200),
-        rois: (Array.isArray(redD?.rois) ? redD.rois : []).map((r: any, idx: number) => ({
-          name: String(r.name || `roi_${idx}`),
-          direction: r.direction || "",
-          rect: {
-            x: Number(r.rect?.x ?? 0),
-            y: Number(r.rect?.y ?? 0),
-            w: Number(r.rect?.w ?? 0.1),
-            h: Number(r.rect?.h ?? 0.1),
-          },
-        })),
+      applyDetectorsFromProfile(p, {
+        setDetectorType,
+        replaceRednessDraft,
+        replaceColorVignetteDraft,
+        replaceHealthBarDraft,
+        replaceHealthNumberDraft,
+        replaceRecoilDraft,
+        setColorPickMode,
       });
-      applyRecoil(p);
-      setColorPickMode(null);
+      if (loadCalibrationScreenshot) {
+        try {
+          const restored = await restoreCalibrationScreenshot({
+            profile: p,
+            load: loadCalibrationScreenshot,
+          });
+          loadedShotRef.current = restored.shot;
+          boundPathRef.current = restored.path;
+        } catch (e) {
+          loadedShotRef.current = getCalibrationScreenshot(p);
+          boundPathRef.current = null;
+          setLoadError(
+            e instanceof Error
+              ? `Profile loaded, but the calibration screenshot could not be shown: ${e.message}`
+              : "Profile loaded, but the calibration screenshot could not be shown"
+          );
+        }
+      } else {
+        loadedShotRef.current = getCalibrationScreenshot(p);
+        boundPathRef.current = null;
+      }
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : "Failed to load profile");
     }
   };
 
-  const runSave = async (kind: "update" | "new") => {
+  const runSave = async (kind: "update" | "new", decision?: ScreenshotPersistDecision) => {
     if (!onSaveProfile) return;
-    setSaving(true);
+    const name = profileState.profileName.trim();
+    if (!name) {
+      setSaveError("Profile name is required");
+      return;
+    }
+    const updateId = kind === "update" ? profileState.editingLocalProfileId : null;
+    if (kind === "update" && !updateId) {
+      setSaveError("Nothing to update — open a local profile or pick one from Local Profiles.");
+      return;
+    }
     setSaveError(null);
     setSaveSuccessKind("none");
+    setEncodingImage(true);
     try {
-      const profile = buildDaemonProfile();
-      const name = profileState.profileName.trim();
-      if (!name) {
-        setSaveError("Profile name is required");
-        return;
-      }
-      const updateId = kind === "update" ? profileState.editingLocalProfileId : null;
-      if (kind === "update" && !updateId) {
-        setSaveError("Nothing to update — open a local profile or pick one from Local Profiles.");
-        return;
-      }
+      const profile = await persistWithScreenshot(kind, decision);
+      if (!profile) return;
+      setSaving(true);
       const saved = await onSaveProfile(name, profile, updateId ? { updateId } : undefined);
       if (saved) {
         setSaveSuccessKind(kind);
@@ -749,7 +565,14 @@ function ProfileActionsController(props: {
       setSaveError(e instanceof Error ? e.message : "Failed to save profile");
     } finally {
       setSaving(false);
+      setEncodingImage(false);
     }
+  };
+
+  const onImagePromptDecision = (decision: ScreenshotPersistDecision) => {
+    if (!imagePrompt) return;
+    if (imagePrompt === "export") void onExport(decision);
+    else void runSave(imagePrompt, decision);
   };
 
   const isPresetSelected = presets.some((p) => p.preset_id === profileState.selectedPresetId);
@@ -761,7 +584,7 @@ function ProfileActionsController(props: {
     <div className="space-y-3">
       <ProfileControlsSection
         onLoad={onLoad}
-        onExport={onExport}
+        onExport={() => onExport()}
         onUpdateProfile={showUpdate ? () => runSave("update") : undefined}
         onSaveNewCopy={showSaveNewCopy ? () => runSave("new") : undefined}
         saveNewCopyLabel="Save a new copy"
@@ -785,6 +608,83 @@ function ProfileActionsController(props: {
       {saveSuccessKind === "new" && (
         <div className="text-xs text-emerald-300">New local profile saved (separate copy).</div>
       )}
+
+      {imagePrompt && (
+        <UpdateCalibrationImageModal
+          busy={encodingImage}
+          onKeep={() => onImagePromptDecision("keep")}
+          onUpdate={() => onImagePromptDecision("update")}
+          onCancel={() => setImagePrompt(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function UpdateCalibrationImageModal(props: {
+  busy: boolean;
+  onKeep: () => void;
+  onUpdate: () => void;
+  onCancel: () => void;
+}) {
+  const { busy, onKeep, onUpdate, onCancel } = props;
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !busy) onCancel();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [busy, onCancel]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      onClick={() => {
+        if (!busy) onCancel();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="update-calibration-image-title"
+        className="w-full max-w-md rounded-xl bg-slate-900 p-5 ring-1 ring-white/10 space-y-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 id="update-calibration-image-title" className="text-base font-semibold text-white">
+          Update calibration image?
+        </h3>
+        <p className="text-sm text-slate-300">
+          The screenshot on the canvas is different from the one stored in this profile. Do you want to update the
+          image?
+        </p>
+        <div className="flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onCancel}
+            className="rounded-lg bg-slate-700/80 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onKeep}
+            className="rounded-lg bg-slate-600/80 px-3 py-2 text-sm font-medium text-white hover:bg-slate-600 disabled:opacity-50"
+          >
+            Keep previous
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onUpdate}
+            className="rounded-lg bg-emerald-600/90 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
+          >
+            {busy ? "Encoding…" : "Update image"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

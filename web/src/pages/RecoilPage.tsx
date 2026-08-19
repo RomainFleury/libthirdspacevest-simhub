@@ -15,9 +15,12 @@ import {
 } from "../lib/bridgeApi";
 
 const DEFAULT_PULSE_MS = 40;
+const MIN_PULSE_MS = 40;
 const DEFAULT_ADDRESS = 1;
 const DEFAULT_BAUD = 9600;
 const DEFAULT_FIRE_RATE_RPM = 600;
+const MIN_FIRE_RATE_RPM = 60;
+const MAX_FIRE_RATE_RPM = 1500; // 40 ms between pulse starts
 const DEFAULT_BURST_COUNT = 3;
 
 /** WCH CH340 — USB VID:PID used by common LC USB relay sticks */
@@ -68,14 +71,14 @@ export function RecoilPage() {
   const connected = Boolean(relay?.connected);
   const shotIntervalMs = Math.max(
     pulseMs,
-    Math.round(60000 / Math.max(60, Math.min(1200, fireRateRpm)))
+    Math.round(60000 / Math.max(MIN_FIRE_RATE_RPM, Math.min(MAX_FIRE_RATE_RPM, fireRateRpm)))
   );
 
   const mouseOptions = useCallback(
     () => ({
-      durationMs: pulseMs,
+      durationMs: Math.max(MIN_PULSE_MS, pulseMs),
       fireMode,
-      fireRateRpm,
+      fireRateRpm: Math.max(MIN_FIRE_RATE_RPM, Math.min(MAX_FIRE_RATE_RPM, fireRateRpm)),
       burstCount,
     }),
     [pulseMs, fireMode, fireRateRpm, burstCount]
@@ -212,7 +215,7 @@ export function RecoilPage() {
     setBusy(true);
     setError(null);
     try {
-      const result = await relayPulse(pulseMs);
+      const result = await relayPulse(Math.max(MIN_PULSE_MS, pulseMs));
       if (!result.success) {
         setError(result.error || "Pulse failed");
         return;
@@ -406,17 +409,17 @@ export function RecoilPage() {
           <input
             type="number"
             className="w-full rounded-lg bg-slate-900 border border-slate-600 px-3 py-2 text-white"
-            value={pulseMs}
+            value={Math.max(MIN_PULSE_MS, pulseMs)}
             onChange={(e) =>
-              setPulseMs(Math.max(25, Math.min(1000, Number(e.target.value) || DEFAULT_PULSE_MS)))
+              setPulseMs(Math.max(MIN_PULSE_MS, Math.min(1000, Number(e.target.value) || DEFAULT_PULSE_MS)))
             }
             disabled={busy || !connected}
-            min={25}
+            min={MIN_PULSE_MS}
             max={1000}
           />
         </label>
         <p className="text-xs text-slate-500">
-          Minimum 25 ms (OFF is unreliable below ~20 ms). Any ON is force-cleared after 1 s.
+          Minimum {MIN_PULSE_MS} ms. Any ON is force-cleared after 1 s.
         </p>
 
         <div className="flex flex-wrap gap-2">
@@ -529,18 +532,25 @@ export function RecoilPage() {
             <input
               type="number"
               className="w-full rounded-lg bg-slate-900 border border-slate-600 px-3 py-2 text-white"
-              value={fireRateRpm}
+              value={Math.max(MIN_FIRE_RATE_RPM, Math.min(MAX_FIRE_RATE_RPM, fireRateRpm))}
               onChange={(e) =>
-                setFireRateRpm(Math.max(60, Math.min(1200, Number(e.target.value) || DEFAULT_FIRE_RATE_RPM)))
+                setFireRateRpm(
+                  Math.max(
+                    MIN_FIRE_RATE_RPM,
+                    Math.min(MAX_FIRE_RATE_RPM, Number(e.target.value) || DEFAULT_FIRE_RATE_RPM)
+                  )
+                )
               }
               disabled={busy || fireMode === "single"}
-              min={60}
-              max={1200}
+              min={MIN_FIRE_RATE_RPM}
+              max={MAX_FIRE_RATE_RPM}
               step={10}
             />
             <span className="text-xs text-slate-500">
               Shot spacing ≈ <span className="font-mono text-slate-300">{shotIntervalMs} ms</span>
-              {fireMode === "single" ? " (unused in one-by-one)" : ""}
+              {fireMode === "single"
+                ? " (unused in one-by-one)"
+                : ` · max ${MAX_FIRE_RATE_RPM} RPM ≈ ${MIN_PULSE_MS} ms`}
             </span>
           </label>
 
@@ -561,7 +571,7 @@ export function RecoilPage() {
             </label>
           ) : (
             <div className="text-xs text-slate-500 self-end pb-2">
-              Pulse length still uses the Control section duration ({pulseMs} ms).
+              Pulse length still uses the Control section duration ({Math.max(MIN_PULSE_MS, pulseMs)} ms).
             </div>
           )}
         </div>

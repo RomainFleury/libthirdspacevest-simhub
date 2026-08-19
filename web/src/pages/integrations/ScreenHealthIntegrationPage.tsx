@@ -78,7 +78,7 @@ export function ScreenHealthIntegrationPage() {
       <ol className="list-decimal list-inside space-y-2 text-slate-400">
         <li>Run your game in borderless/windowed mode (recommended for capture reliability).</li>
         <li>Open “Calibration & settings”.</li>
-        <li>Capture a screenshot and draw ROIs for your detector.</li>
+        <li>Capture a screenshot. Under Draw, pick one hit type (vignette, health bar, or health number) and optionally Ammo, then drag the boxes. Settings appear for what you drew.</li>
         <li>Tune settings and export the JSON (developer workflow).</li>
         <li>Click “Start” to enable the watcher in the daemon.</li>
       </ol>
