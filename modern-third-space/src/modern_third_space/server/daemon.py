@@ -93,6 +93,13 @@ from .protocol import (
     response_l4d2_start,
     response_l4d2_stop,
     response_l4d2_status,
+    event_swbf2_started,
+    event_swbf2_stopped,
+    event_swbf2_state_changed,
+    event_swbf2_game_event,
+    response_swbf2_start,
+    response_swbf2_stop,
+    response_swbf2_status,
     event_screen_health_started,
     event_screen_health_stopped,
     event_screen_health_hit,
@@ -132,6 +139,7 @@ from .protocol import (
 )
 from ..relay import RelayController, list_ports as list_relay_ports, DEFAULT_ADDRESS, DEFAULT_BAUD
 from ..relay.mouse_recoil import MouseRecoilListener
+from .swbf2_kyber_manager import DEFAULT_KYBER_PORT, SWBF2KyberManager
 
 logger = logging.getLogger(__name__)
 
@@ -183,6 +191,14 @@ class VestDaemon:
         self._l4d2_manager = L4D2Manager(
             on_game_event=self._on_l4d2_game_event,
             on_trigger=self._on_l4d2_trigger,
+            on_recoil=self._on_solenoid_recoil,
+        )
+
+        # EA Battlefront II (2017) KYBER LAN manager
+        self._swbf2_manager = SWBF2KyberManager(
+            on_game_event=self._on_swbf2_game_event,
+            on_status_change=self._on_swbf2_status_change,
+            on_trigger=self._on_swbf2_trigger,
             on_recoil=self._on_solenoid_recoil,
         )
 
@@ -240,6 +256,9 @@ class VestDaemon:
         # Stop Alyx integration if running
         if self._alyx_manager.is_running:
             self._alyx_manager.stop()
+
+        if self._swbf2_manager.is_running:
+            await self._swbf2_manager.stop()
 
         # Disconnect USB relay if connected
         try:
@@ -466,6 +485,16 @@ class VestDaemon:
         
         if cmd_type == CommandType.L4D2_STATUS:
             return await self._cmd_l4d2_status(command)
+
+        # EA Battlefront II (2017) KYBER commands
+        if cmd_type == CommandType.SWBF2_START:
+            return await self._cmd_swbf2_start(command)
+
+        if cmd_type == CommandType.SWBF2_STOP:
+            return await self._cmd_swbf2_stop(command)
+
+        if cmd_type == CommandType.SWBF2_STATUS:
+            return await self._cmd_swbf2_status(command)
 
         # Generic Screen Health Watcher commands
         if cmd_type == CommandType.SCREEN_HEALTH_START:
@@ -1491,6 +1520,65 @@ class VestDaemon:
                 self._clients.broadcast(event),
                 self._loop,
             )
+
+    # -------------------------------------------------------------------------
+    # EA Battlefront II (2017) KYBER commands and callbacks
+    # -------------------------------------------------------------------------
+
+    async def _cmd_swbf2_start(self, command: Command) -> Response:
+        """Start the reconnecting KYBER LAN telemetry client."""
+        success, error = self._swbf2_manager.start(
+            host=command.kyber_host or "",
+            port=command.kyber_port or DEFAULT_KYBER_PORT,
+            player_name=command.player_name or "",
+            solenoid_recoil=command.solenoid_recoil,
+        )
+        status = self._swbf2_manager.status()
+        if success:
+            await self._clients.broadcast(event_swbf2_started(status))
+        return response_swbf2_start(
+            success=success,
+            status=status,
+            error=error,
+            req_id=command.req_id,
+        )
+
+    async def _cmd_swbf2_stop(self, command: Command) -> Response:
+        """Stop the KYBER telemetry client."""
+        success = await self._swbf2_manager.stop()
+        if success:
+            await self._clients.broadcast(event_swbf2_stopped())
+        return response_swbf2_stop(
+            success=success,
+            error=None if success else "Battlefront II KYBER integration is not running",
+            req_id=command.req_id,
+        )
+
+    async def _cmd_swbf2_status(self, command: Command) -> Response:
+        """Return KYBER connection, roster, and subscription state."""
+        return response_swbf2_status(
+            status=self._swbf2_manager.status(),
+            req_id=command.req_id,
+        )
+
+    def _on_swbf2_game_event(self, event_type: str, params: dict) -> None:
+        if self._loop is None:
+            return
+        asyncio.run_coroutine_threadsafe(
+            self._clients.broadcast(event_swbf2_game_event(event_type, params)),
+            self._loop,
+        )
+
+    def _on_swbf2_status_change(self, status: dict) -> None:
+        if self._loop is None:
+            return
+        asyncio.run_coroutine_threadsafe(
+            self._clients.broadcast(event_swbf2_state_changed(status)),
+            self._loop,
+        )
+
+    def _on_swbf2_trigger(self, cell: int, speed: int) -> None:
+        self._on_l4d2_trigger(cell, speed)
 
     # -------------------------------------------------------------------------
     # Generic Screen Health Watcher commands

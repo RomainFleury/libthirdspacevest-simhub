@@ -65,6 +65,10 @@ class CommandType(Enum):
     L4D2_START = "l4d2_start"
     L4D2_STOP = "l4d2_stop"
     L4D2_STATUS = "l4d2_status"
+    # EA Battlefront II (2017) KYBER integration
+    SWBF2_START = "swbf2_start"
+    SWBF2_STOP = "swbf2_stop"
+    SWBF2_STATUS = "swbf2_status"
     # Generic Screen Health Watcher (screen capture)
     SCREEN_HEALTH_START = "screen_health_start"
     SCREEN_HEALTH_STOP = "screen_health_stop"
@@ -131,6 +135,11 @@ class EventType(Enum):
     L4D2_STARTED = "l4d2_started"
     L4D2_STOPPED = "l4d2_stopped"
     L4D2_GAME_EVENT = "l4d2_game_event"
+    # EA Battlefront II (2017) KYBER integration
+    SWBF2_STARTED = "swbf2_started"
+    SWBF2_STOPPED = "swbf2_stopped"
+    SWBF2_STATE_CHANGED = "swbf2_state_changed"
+    SWBF2_GAME_EVENT = "swbf2_game_event"
     # Generic Screen Health Watcher (screen capture)
     SCREEN_HEALTH_STARTED = "screen_health_started"
     SCREEN_HEALTH_STOPPED = "screen_health_stopped"
@@ -174,6 +183,10 @@ class Command:
     #   "enabled_events": { "PlayerHurt": true, "PlayerShootWeapon": false, ... }
     # }
     alyx_settings: Optional[Dict[str, Any]] = None
+    # EA Battlefront II (2017) KYBER settings
+    kyber_host: Optional[str] = None
+    kyber_port: Optional[int] = None
+    player_name: Optional[str] = None
     # Generic params
     message: Optional[str] = None  # Used for player name or other messages
     # Generic game event params (for TCP client integrations)
@@ -225,6 +238,9 @@ class Command:
             gsi_port=data.get("gsi_port"),
             log_path=data.get("log_path"),
             alyx_settings=data.get("alyx_settings"),
+            kyber_host=data.get("kyber_host"),
+            kyber_port=data.get("kyber_port"),
+            player_name=data.get("player_name"),
             message=data.get("message"),
             event=data.get("event"),
             hand=data.get("hand"),
@@ -364,6 +380,8 @@ class Response:
     # Half-Life: Alyx response
     log_path: Optional[str] = None
     mod_info: Optional[Dict[str, Any]] = None
+    # Game-integration state payload
+    integration_status: Optional[Dict[str, Any]] = None
     # Generic screen health watcher response
     profile_name: Optional[str] = None
     last_hit_ts: Optional[float] = None
@@ -920,6 +938,82 @@ def response_l4d2_status(
         events_received=events_received,
         last_event_ts=last_event_ts,
         last_event_type=last_event_type,
+    )
+
+
+# =============================================================================
+# EA Battlefront II (2017) KYBER Integration Protocol
+# =============================================================================
+
+def event_swbf2_started(status: Dict[str, Any]) -> Event:
+    """Event when the daemon starts its KYBER connection loop."""
+    return Event(event=EventType.SWBF2_STARTED.value, params=status)
+
+
+def event_swbf2_stopped() -> Event:
+    """Event when the KYBER connection loop stops."""
+    return Event(event=EventType.SWBF2_STOPPED.value)
+
+
+def event_swbf2_state_changed(status: Dict[str, Any]) -> Event:
+    """Broadcast a KYBER connection, roster, or subscription state change."""
+    return Event(event=EventType.SWBF2_STATE_CHANGED.value, params=status)
+
+
+def event_swbf2_game_event(
+    event_type: str,
+    params: Optional[Dict[str, Any]] = None,
+) -> Event:
+    """Broadcast an authoritative KYBER gameplay event."""
+    return Event(
+        event=EventType.SWBF2_GAME_EVENT.value,
+        event_type=event_type,
+        params=params,
+    )
+
+
+def response_swbf2_start(
+    success: bool,
+    status: Dict[str, Any],
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    return Response(
+        response="swbf2_start",
+        req_id=req_id,
+        success=success,
+        message=error,
+        running=bool(status.get("running")),
+        integration_status=status,
+    )
+
+
+def response_swbf2_stop(
+    success: bool,
+    error: Optional[str] = None,
+    req_id: Optional[str] = None,
+) -> Response:
+    return Response(
+        response="swbf2_stop",
+        req_id=req_id,
+        success=success,
+        message=error,
+    )
+
+
+def response_swbf2_status(
+    status: Dict[str, Any],
+    req_id: Optional[str] = None,
+) -> Response:
+    return Response(
+        response="swbf2_status",
+        req_id=req_id,
+        success=True,
+        running=bool(status.get("running")),
+        events_received=int(status.get("events_received") or 0),
+        last_event_ts=status.get("last_event_ts"),
+        last_event_type=status.get("last_event_type"),
+        integration_status=status,
     )
 
 

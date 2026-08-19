@@ -22,6 +22,7 @@ class IntegrationType(Enum):
     HTTP_GSI = "http_gsi"           # HTTP POST endpoint (e.g., CS2 GSI)
     LOG_FILE = "log_file"           # Console.log file watching (e.g., Alyx, L4D2)
     TCP_CLIENT = "tcp_client"       # Game mod connects to daemon as TCP client (e.g., SimHub plugin)
+    TCP_STREAM = "tcp_stream"       # Daemon connects to an external telemetry stream
     PLUGIN = "plugin"               # External plugin (e.g., SimHub)
     SCREEN_CAPTURE = "screen_capture"  # Visual signal detection via screen capture (generic)
 
@@ -172,6 +173,24 @@ register_integration(GameIntegrationSpec(
     launch_options="-condebug",
 ))
 
+# EA Battlefront II (2017) via KYBER private server telemetry
+register_integration(GameIntegrationSpec(
+    game_id="swbf2",
+    game_name="EA Star Wars Battlefront II (2017)",
+    integration_type=IntegrationType.TCP_STREAM,
+    status=IntegrationStatus.BETA,
+    manager_module="swbf2_kyber_manager",
+    manager_class="SWBF2KyberManager",
+    daemon_commands=["swbf2_start", "swbf2_stop", "swbf2_status"],
+    event_types=[
+        "shot_fired", "damage_received", "player_killed", "player_spawned",
+    ],
+    has_directional_damage=True,
+    docs_file="docs-external-integrations-ideas/EA_BATTLEFRONT2_2017_KYBER_PLAN.md",
+    requires_external_mod=True,
+    mod_url="https://github.com/ArmchairDevelopers/Kyber",
+))
+
 # Generic Screen Health Watcher (screen capture)
 register_integration(GameIntegrationSpec(
     game_id="screen_health",
@@ -286,8 +305,8 @@ def check_manager_has_required_methods(spec: GameIntegrationSpec) -> List[str]:
     
     missing = []
     
-    if spec.integration_type == IntegrationType.LOG_FILE:
-        # Log file watchers should have start/stop
+    if spec.integration_type in (IntegrationType.LOG_FILE, IntegrationType.TCP_STREAM):
+        # Long-running watchers/streams should have start/stop
         required = ["start", "stop"]
         properties = ["is_running"]
     elif spec.integration_type == IntegrationType.TCP_CLIENT:

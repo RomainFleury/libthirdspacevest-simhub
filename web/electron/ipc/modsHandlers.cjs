@@ -45,6 +45,19 @@ const MOD_CONFIG = {
     externalUrl: "https://www.nexusmods.com/halflifealyx/mods/6",
     description: "Lua scripts from NexusMods for Half-Life: Alyx",
   },
+  "swbf2_kyber": {
+    name: "EA Battlefront II (2017) KYBER",
+    directory: path.join("swbf2-kyber", "ThirdSpaceVestTelemetry"),
+    files: [
+      "plugin.json",
+      "README.md",
+      path.join("server", "__init__.lua"),
+      path.join("server", "json.lua"),
+    ],
+    targetFolder: "KYBER plugins directory",
+    destinationSubfolder: "ThirdSpaceVestTelemetry",
+    description: "KYBER server plugin for multi-client LAN haptic telemetry",
+  },
 };
 
 function registerModsHandlers(getMainWindow) {
@@ -148,7 +161,10 @@ function registerModsHandlers(getMainWindow) {
         return { success: false, canceled: true };
       }
 
-      const destFolder = result.filePaths[0];
+      const selectedFolder = result.filePaths[0];
+      const destFolder = config.destinationSubfolder
+        ? path.join(selectedFolder, config.destinationSubfolder)
+        : selectedFolder;
       const copiedFiles = [];
       const errors = [];
 
@@ -162,6 +178,7 @@ function registerModsHandlers(getMainWindow) {
         }
 
         try {
+          fs.mkdirSync(path.dirname(destPath), { recursive: true });
           fs.copyFileSync(srcPath, destPath);
           copiedFiles.push(file);
           console.log(`[mods] Copied: ${file} -> ${destPath}`);
