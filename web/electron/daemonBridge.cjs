@@ -950,6 +950,62 @@ class DaemonBridge extends EventEmitter {
   }
 
   // -------------------------------------------------------------------------
+  // EA Battlefront II (2017) KYBER Integration API
+  // -------------------------------------------------------------------------
+
+  async swbf2Start(settings) {
+    try {
+      const response = await this.sendCommand("swbf2_start", {
+        kyber_host: settings.host,
+        kyber_port: settings.port,
+        player_name: settings.playerName,
+        solenoid_recoil: {
+          enabled: settings.solenoidRecoil?.enabled ?? true,
+          duration_ms: settings.solenoidRecoil?.durationMs ?? 40,
+        },
+      });
+      return {
+        success: response.success ?? false,
+        status: response.integration_status ?? null,
+        error: response.message,
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  async swbf2Stop() {
+    try {
+      const response = await this.sendCommand("swbf2_stop");
+      return {
+        success: response.success ?? false,
+        error: response.message,
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  async swbf2Status() {
+    try {
+      const response = await this.sendCommand("swbf2_status");
+      return {
+        success: response.success ?? true,
+        status: response.integration_status ?? {
+          running: response.running ?? false,
+          events_received: response.events_received ?? 0,
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        status: { running: false, connection_state: "stopped" },
+        error: error.message,
+      };
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Generic Screen Health Watcher API
   // -------------------------------------------------------------------------
 

@@ -79,6 +79,13 @@ contextBridge.exposeInMainWorld("vestBridge", {
   l4d2CheckModInstalled: () => ipcRenderer.invoke("l4d2:checkModInstalled"),
   l4d2InstallMod: () => ipcRenderer.invoke("l4d2:installMod"),
 
+  // EA Battlefront II (2017) KYBER Integration API
+  swbf2GetSettings: () => ipcRenderer.invoke("swbf2:getSettings"),
+  swbf2SetSettings: (settings) => ipcRenderer.invoke("swbf2:setSettings", settings),
+  swbf2Start: (settings) => ipcRenderer.invoke("swbf2:start", settings),
+  swbf2Stop: () => ipcRenderer.invoke("swbf2:stop"),
+  swbf2Status: () => ipcRenderer.invoke("swbf2:status"),
+
   // Predefined Effects Library API
   playEffect: (effectName) => ipcRenderer.invoke("effects:play", effectName),
   listEffectsLibrary: () => ipcRenderer.invoke("effects:list"),

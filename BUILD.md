@@ -12,6 +12,7 @@ Build all mods:
 Build specific mods:
 ```powershell
 .\build-all-mods.ps1 -Mods simhub
+.\build-all-mods.ps1 -Mods kyber
 ```
 
 Clean and rebuild:
@@ -24,6 +25,7 @@ Clean and rebuild:
 | Mod Key | Name | Path | Description |
 |---------|------|------|-------------|
 | `simhub` | SimHub Plugin | `simhub-plugin/` | C# plugin for SimHub telemetry |
+| `kyber` | KYBER Battlefront II Telemetry Plugin | `mods/swbf2-kyber/` | Validated ZIP for KYBER server administrators |
 
 **Note**: Other mods (SUPERHOT VR, GTA V, Pistol Whip) have been moved to `misc-documentations/archived-untested-mods/` as they are untested.
 
@@ -36,6 +38,9 @@ Clean and rebuild:
 2. **Mod-specific dependencies** (optional, but recommended):
    - **SimHub**: Either install SimHub, or copy SDK DLLs to `simhub-plugin\libs\`
 
+The KYBER Lua plugin has no compiler dependency. Build it independently with
+`.\build-all-mods.ps1 -Mods kyber`; this path does not require MSBuild.
+
 ## Build Script Options
 
 ```powershell
@@ -44,8 +49,8 @@ Clean and rebuild:
 
 ### Options
 
-- `-Mods <mod1,mod2,...>` - Build specific mods (default: simhub)
-  - Example: `-Mods simhub`
+- `-Mods <mod1,mod2,...>` - Build specific mods (default: simhub and kyber)
+  - Example: `-Mods simhub,kyber`
   
 - `-Clean` - Clean previous builds before building
   
@@ -60,6 +65,9 @@ Clean and rebuild:
 # Build SimHub plugin only
 .\build-all-mods.ps1 -Mods simhub
 
+# Package the KYBER Lua plugin only
+.\build-all-mods.ps1 -Mods kyber
+
 # Clean rebuild
 .\build-all-mods.ps1 -Mods simhub -Clean
 ```
@@ -69,6 +77,7 @@ Clean and rebuild:
 Some mods have their own specialized build scripts that handle mod-specific requirements:
 
 - **SimHub**: `simhub-plugin\build.ps1` - Handles SimHub SDK detection and optional installation
+- **KYBER**: `mods\swbf2-kyber\build.ps1` - Validates the plugin and creates its server-install ZIP
 
 The unified script will automatically use these if they exist, otherwise it uses the standard MSBuild process.
 
@@ -77,6 +86,7 @@ The unified script will automatically use these if they exist, otherwise it uses
 After a successful build, DLLs are created in:
 
 - `simhub-plugin\ThirdSpaceSimHub\bin\Release\ThirdSpaceSimHub.dll`
+- `mods\swbf2-kyber\dist\thirdspace-vest-kyber-plugin-v0.1.0.zip`
 
 ## Troubleshooting
 

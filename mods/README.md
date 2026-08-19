@@ -8,15 +8,25 @@ This directory contains pre-built game mod files that are bundled with the Third
 mods/
 ├── alyx/                  # Half-Life: Alyx scripts
 │   └── (Lua scripts from NexusMods)
-└── l4d2/                  # Left 4 Dead 2 VScripts (in misc-documentations/)
-    └── (Copied from misc-documentations during build)
+├── l4d2/                  # Left 4 Dead 2 VScripts (in misc-documentations/)
+│   └── (Copied from misc-documentations during build)
+└── swbf2-kyber/           # KYBER LAN telemetry server plugin
+    └── ThirdSpaceVestTelemetry/
 ```
 
 ## Building Mods
 
-Currently, no mods require building in this directory. The mods here are either:
+Most mods here are plain scripts:
 - Pre-built files from external sources (Alyx scripts from NexusMods)
 - Copied from `misc-documentations/` during the build process (L4D2 scripts)
+
+Package the KYBER server plugin with:
+
+```powershell
+.\build-all-mods.ps1 -Mods kyber
+```
+
+The resulting ZIP is written under `mods/swbf2-kyber/dist/`.
 
 For archived/untested mods, see `misc-documentations/archived-untested-mods/`.
 

@@ -1,6 +1,6 @@
 # EA Battlefront II (2017): Exact Event Integration with KYBER
 
-> **Status: SOURCE INVESTIGATION COMPLETE / RUNTIME SPIKE REQUIRED**
+> **Status: DAEMON, UI, AND LAN PLUGIN IMPLEMENTED / NATIVE SPIKE REQUIRED**
 >
 > **Decision:** pursue exact, server-authoritative combat events through a KYBER
 > native extension and expose them to multiple vest daemons on a trusted LAN.
@@ -70,6 +70,24 @@ Verified capabilities at those revisions:
 KYBER does **not** currently expose a documented event for each accepted shot
 or each nonlethal damage application. Those two native events are the work
 required by this plan and cannot be validated by source inspection alone.
+
+### Implemented in this repository
+
+- `server/swbf2_kyber_manager.py`: reconnecting NDJSON client, roster/name
+  resolution, subscription state machine, validation, event mapping, and
+  diagnostics.
+- Daemon protocol: `swbf2_start`, `swbf2_stop`, `swbf2_status`, state
+  broadcasts, and gameplay-event broadcasts.
+- Electron UI: persistent server host, port, player name, solenoid settings,
+  live connection/subscription status, roster count, diagnostics, and events.
+- `mods/swbf2-kyber/ThirdSpaceVestTelemetry`: bounded multi-client KYBER Lua
+  plugin with roster reconciliation and per-player routing.
+- Automated manager, protocol, mapping, duplicate-name, and local TCP
+  end-to-end tests.
+
+The remaining native spike belongs in a KYBER fork because the required
+Frostbite layouts and hook addresses are external to this repository. This
+repository intentionally does not ship guessed offsets.
 
 ### Source-investigation conclusions
 

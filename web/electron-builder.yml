@@ -47,6 +47,12 @@ extraResources:
       - "*.lua"
       - "README.md"
 
+  # EA Battlefront II (2017) KYBER server telemetry plugin
+  - from: "../mods/swbf2-kyber/"
+    to: "mods/swbf2-kyber/"
+    filter:
+      - "**/*"
+
 # Don't pack into asar (easier debugging, daemon access)
 asar: true
 asarUnpack:

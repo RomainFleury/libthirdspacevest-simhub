@@ -481,6 +481,13 @@ class TestIntegrationSnapshot:
             "has_manager": True,
             "event_count_min": 4,
         },
+        "swbf2": {
+            "game_name": "EA Star Wars Battlefront II (2017)",
+            "integration_type": "tcp_stream",
+            "status": "beta",
+            "has_manager": True,
+            "event_count_min": 4,
+        },
         "screen_health": {
             "game_name": "Generic Screen Health (Screen Capture)",
             "integration_type": "screen_capture",

@@ -46,6 +46,17 @@ export const integratedGames: IntegratedGameConfig[] = [
     hasSetupGuide: true,
     tags: ["fps", "coop", "valve", "zombie"],
   },
+  {
+    id: "swbf2",
+    name: "EA Star Wars Battlefront II (2017)",
+    description: "Server-authoritative haptics through a KYBER private server",
+    icon: "⚔️",
+    steamAppId: 1237950,
+    hasConfiguration: true,
+    hasSetupGuide: true,
+    requiresMod: true,
+    tags: ["fps", "star-wars", "kyber", "lan", "beta"],
+  },
 ];
 
 /**

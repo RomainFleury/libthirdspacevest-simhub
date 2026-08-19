@@ -148,6 +148,38 @@ export type SolenoidRecoilSettings = {
   durationMs: number;
 };
 
+export type SWBF2Settings = {
+  host: string;
+  port: number;
+  playerName: string;
+  solenoidRecoil: SolenoidRecoilSettings;
+};
+
+export type SWBF2Player = {
+  player_id: string;
+  name: string;
+  is_bot: boolean;
+};
+
+export type SWBF2Status = {
+  running: boolean;
+  connection_state: string;
+  host?: string | null;
+  port: number;
+  player_name?: string | null;
+  matched_player_id?: string | null;
+  matched_player_name?: string | null;
+  players: SWBF2Player[];
+  epoch?: string | null;
+  last_seq?: number | null;
+  events_received: number;
+  last_event_ts?: number | null;
+  last_event_type?: string | null;
+  reconnect_count: number;
+  sequence_gaps: number;
+  last_error?: string | null;
+};
+
 export type AlyxSettingsResult = {
   success: boolean;
   logPath?: string | null;
@@ -456,6 +488,36 @@ declare global {
       l4d2SetSolenoidRecoil: (
         solenoidRecoil: Partial<SolenoidRecoilSettings>
       ) => Promise<{ success: boolean; solenoidRecoil?: SolenoidRecoilSettings; error?: string }>;
+      // EA Battlefront II (2017) KYBER Integration API
+      swbf2GetSettings: () => Promise<{
+        success: boolean;
+        settings?: SWBF2Settings;
+        error?: string;
+      }>;
+      swbf2SetSettings: (settings: SWBF2Settings) => Promise<{
+        success: boolean;
+        settings?: SWBF2Settings;
+        error?: string;
+      }>;
+      swbf2Start: (settings: SWBF2Settings) => Promise<{
+        success: boolean;
+        status?: SWBF2Status;
+        error?: string;
+      }>;
+      swbf2Stop: () => Promise<{ success: boolean; error?: string }>;
+      swbf2Status: () => Promise<{
+        success: boolean;
+        status: SWBF2Status;
+        error?: string;
+      }>;
+      modsSaveToFolder: (modId: string) => Promise<{
+        success: boolean;
+        canceled?: boolean;
+        copiedFiles?: string[];
+        destination?: string;
+        error?: string;
+        errors?: string[];
+      }>;
       // Generic Screen Health Watcher API
       screenHealthExportProfile: (profile: Record<string, any>) => Promise<{
         success: boolean;
