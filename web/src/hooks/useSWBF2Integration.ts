@@ -54,9 +54,7 @@ export function useSWBF2Integration() {
       const result = await window.vestBridge?.swbf2Status?.();
       if (result?.success && result.status) {
         setStatus(result.status);
-        if (result.status.last_error) {
-          setError(result.status.last_error);
-        }
+        setError(result.status.last_error || null);
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Failed to get KYBER status");
@@ -131,9 +129,7 @@ export function useSWBF2Integration() {
     return bridge.onDaemonEvent((event: any) => {
       if (event.event === "swbf2_state_changed" && event.params) {
         setStatus(event.params as SWBF2Status);
-        if (event.params.last_error) {
-          setError(String(event.params.last_error));
-        }
+        setError(event.params.last_error ? String(event.params.last_error) : null);
       } else if (event.event === "swbf2_started" && event.params) {
         setStatus(event.params as SWBF2Status);
       } else if (event.event === "swbf2_stopped") {

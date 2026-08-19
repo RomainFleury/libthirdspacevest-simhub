@@ -268,6 +268,7 @@ class SWBF2KyberManager:
             except asyncio.CancelledError:
                 pass
         self._clear_stream_state()
+        self._last_error = None
         self._set_state("stopped")
         return True
 
@@ -403,6 +404,7 @@ class SWBF2KyberManager:
         ]
         if not matches:
             self._pending_player_id = None
+            self._last_error = None
             self._set_state("waiting_for_player")
             return
         if len(matches) > 1:
