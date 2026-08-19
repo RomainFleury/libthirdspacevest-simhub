@@ -4,6 +4,7 @@ import {
   ScreenHealthSettings,
   screenHealthCaptureCalibrationScreenshot,
   screenHealthSelectExistingScreenshot,
+  screenHealthMaterializeCalibrationScreenshot,
   screenHealthTestProfileOnScreenshot,
   screenHealthClearScreenshots,
   screenHealthDeleteScreenshot,
@@ -14,6 +15,7 @@ import {
   screenHealthOpenScreenshotsDir,
   screenHealthSetSettings,
 } from "../../lib/bridgeApi";
+import type { CalibrationScreenshot } from "../../pages/integrations/screenHealth/calibrationScreenshot";
 
 export function useScreenHealthScreenshots() {
   const [settings, setSettingsState] = useState<ScreenHealthSettings | null>(null);
@@ -75,6 +77,37 @@ export function useScreenHealthScreenshots() {
     return result;
   }, []);
 
+  const loadCalibrationScreenshot = useCallback(
+    async (payload: { path?: string; dataUrl?: string; shot?: CalibrationScreenshot; url?: string }) => {
+      const resolvedUrl = payload.url
+        ? /^(https?:|data:|file:|blob:)/i.test(payload.url)
+          ? payload.url
+          : payload.url.startsWith("/")
+            ? `${window.location.origin}${payload.url}`
+            : `${window.location.origin}/${payload.url.replace(/^\.\//, "")}`
+        : undefined;
+      const result = await screenHealthMaterializeCalibrationScreenshot({
+        path: payload.path,
+        dataUrl: payload.dataUrl,
+        shot: payload.shot,
+        url: resolvedUrl || payload.url,
+      });
+      if (!result.success || !result.dataUrl || !result.path || !result.filename) {
+        throw new Error(result.error || "Failed to load calibration screenshot");
+      }
+      const image = {
+        dataUrl: result.dataUrl,
+        width: result.width || 0,
+        height: result.height || 0,
+        filename: result.filename,
+        path: result.path,
+      };
+      setLastCapturedImage(image);
+      return { image, screenshot: result.screenshot || null };
+    },
+    []
+  );
+
   const captureCalibrationScreenshot = useCallback(
     async (monitorIndex: number) => {
       const result = await screenHealthCaptureCalibrationScreenshot(monitorIndex);
@@ -130,6 +163,7 @@ export function useScreenHealthScreenshots() {
     chooseScreenshotsDir,
     openScreenshotsDir,
     selectExistingScreenshot,
+    loadCalibrationScreenshot,
     captureCalibrationScreenshot,
     evaluateProfileOnScreenshot,
     deleteScreenshot,

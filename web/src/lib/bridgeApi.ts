@@ -305,12 +305,23 @@ export type ScreenHealthScreenshotFile = {
   mtimeMs: number;
 };
 
-export type ScreenHealthCapturedImage = {
-  filename: string;
-  path: string;
+export type ScreenHealthCalibrationScreenshot = {
+  mime: string;
+  data: string;
   width: number;
   height: number;
-  dataUrl: string;
+  sha256: string;
+};
+
+export type ScreenHealthMaterializeScreenshotResult = {
+  success: boolean;
+  screenshot?: ScreenHealthCalibrationScreenshot;
+  filename?: string;
+  path?: string;
+  width?: number;
+  height?: number;
+  dataUrl?: string;
+  error?: string;
 };
 
 export type ScreenHealthLocalProfile = {
@@ -598,6 +609,18 @@ declare global {
         height?: number;
         dataUrl?: string;
       }>;
+      screenHealthEncodeCalibrationScreenshot: (payload: {
+        path?: string;
+        dataUrl?: string;
+        url?: string;
+        shot?: ScreenHealthCalibrationScreenshot;
+      }) => Promise<{ success: boolean; screenshot?: ScreenHealthCalibrationScreenshot; error?: string }>;
+      screenHealthMaterializeCalibrationScreenshot: (payload: {
+        path?: string;
+        dataUrl?: string;
+        url?: string;
+        shot?: ScreenHealthCalibrationScreenshot;
+      }) => Promise<ScreenHealthMaterializeScreenshotResult>;
       screenHealthCaptureCalibrationScreenshot: (monitorIndex?: number) => Promise<{
         success: boolean;
         filename?: string;
@@ -1191,6 +1214,24 @@ export async function screenHealthClearScreenshots() {
 
 export async function screenHealthSelectExistingScreenshot() {
   return await ensureBridge().screenHealthSelectExistingScreenshot();
+}
+
+export async function screenHealthEncodeCalibrationScreenshot(payload: {
+  path?: string;
+  dataUrl?: string;
+  url?: string;
+  shot?: ScreenHealthCalibrationScreenshot;
+}) {
+  return await ensureBridge().screenHealthEncodeCalibrationScreenshot(payload);
+}
+
+export async function screenHealthMaterializeCalibrationScreenshot(payload: {
+  path?: string;
+  dataUrl?: string;
+  url?: string;
+  shot?: ScreenHealthCalibrationScreenshot;
+}) {
+  return await ensureBridge().screenHealthMaterializeCalibrationScreenshot(payload);
 }
 
 export async function screenHealthCaptureCalibrationScreenshot(monitorIndex = 1) {

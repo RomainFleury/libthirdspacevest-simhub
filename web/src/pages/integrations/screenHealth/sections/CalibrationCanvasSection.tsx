@@ -60,7 +60,14 @@ export function CalibrationCanvasSection(props: { lastCapturedImage: { dataUrl: 
   const hn = useScreenHealthHealthNumberDraft();
   const { setRoi: setHealthNumberRoi } = useScreenHealthHealthNumberDraftControls();
   const recoil = useScreenHealthRecoilDraft();
-  const { setRoi: setRecoilRoi, setRecoilType } = useScreenHealthRecoilDraftControls();
+  const {
+    setRoi: setRecoilRoi,
+    setRecoilType,
+    setFilledRgb: setRecoilFilledRgb,
+    setEmptyRgb: setRecoilEmptyRgb,
+    setOverheatRgb: setRecoilOverheatRgb,
+    setColorPickMode: setRecoilColorPickMode,
+  } = useScreenHealthRecoilDraftControls();
 
   const detectorType = profile.detectorType;
   const editingRecoil = profile.canvasEditTarget === "recoil";
@@ -86,7 +93,8 @@ export function CalibrationCanvasSection(props: { lastCapturedImage: { dataUrl: 
     (e: React.MouseEvent) => {
       const pickingVignette = colorVignette.pickingColor;
       const pickingBar = Boolean(hb.colorPickMode);
-      if (!pickingVignette && !pickingBar) return false;
+      const pickingFillUp = Boolean(recoil.colorPickMode);
+      if (!pickingVignette && !pickingBar && !pickingFillUp) return false;
       if (!imgContainerRef.current) return false;
       const canvas = offscreenCanvasRef.current;
       if (!canvas || !imageLoadedRef.current) return false;
@@ -105,6 +113,13 @@ export function CalibrationCanvasSection(props: { lastCapturedImage: { dataUrl: 
         setPickingColor(false);
         return true;
       }
+      if (pickingFillUp) {
+        if (recoil.colorPickMode === "filled") setRecoilFilledRgb(rgb);
+        else if (recoil.colorPickMode === "empty") setRecoilEmptyRgb(rgb);
+        else setRecoilOverheatRgb(rgb);
+        setRecoilColorPickMode(null);
+        return true;
+      }
       if (hb.colorPickMode === "filled") setFilledRgb(rgb);
       else setEmptyRgb(rgb);
       setColorPickMode(null);
@@ -113,12 +128,17 @@ export function CalibrationCanvasSection(props: { lastCapturedImage: { dataUrl: 
     [
       colorVignette.pickingColor,
       hb.colorPickMode,
+      recoil.colorPickMode,
       imgContainerRef,
       offscreenCanvasRef,
       imageLoadedRef,
       setEmptyRgb,
       setFilledRgb,
       setColorPickMode,
+      setRecoilFilledRgb,
+      setRecoilEmptyRgb,
+      setRecoilOverheatRgb,
+      setRecoilColorPickMode,
       setTargetRgb,
       setPickingColor,
     ]
@@ -163,7 +183,7 @@ export function CalibrationCanvasSection(props: { lastCapturedImage: { dataUrl: 
     const newRect = { x: clamp01(x1 / rect.width), y: clamp01(y1 / rect.height), w: clamp01(w / rect.width), h: clamp01(h / rect.height) };
     if (editingRecoil) {
       setRecoilRoi(newRect);
-      setRecoilType("ammo_number");
+      setRecoilType(recoil.recoilDrawKind);
       return;
     }
     if (detectorType === "health_bar") {
@@ -196,6 +216,7 @@ export function CalibrationCanvasSection(props: { lastCapturedImage: { dataUrl: 
     detectorType,
     editingRecoil,
     imgContainerRef,
+    recoil.recoilDrawKind,
     setHealthBarRoi,
     setHealthNumberRoi,
     setRecoilRoi,
@@ -204,7 +225,7 @@ export function CalibrationCanvasSection(props: { lastCapturedImage: { dataUrl: 
     setColorVignetteRois,
   ]);
 
-  const cursor = hb.colorPickMode || colorVignette.pickingColor ? "copy" : "crosshair";
+  const cursor = hb.colorPickMode || colorVignette.pickingColor || recoil.colorPickMode ? "copy" : "crosshair";
   const overlays = useMemo(
     () => ({
       rois: detectorType === "redness_rois" ? redness.rois : detectorType === "color_vignette" ? colorVignette.rois : [],
@@ -217,8 +238,12 @@ export function CalibrationCanvasSection(props: { lastCapturedImage: { dataUrl: 
 
   if (!lastCapturedImage) return null;
 
-  const drawHint = editingRecoil
-    ? "Drawing ammo counter (amber)."
+  const drawHint = recoil.colorPickMode
+    ? "Click the screenshot to pick the fill-up bar color."
+    : editingRecoil
+    ? recoil.recoilDrawKind === "fill_up_bar"
+      ? "Drawing fill-up bar (amber)."
+      : "Drawing ammo counter (amber)."
     : detectorType === "health_bar"
       ? "Drawing health bar (green)."
       : detectorType === "health_number"
@@ -275,7 +300,7 @@ export function CalibrationCanvasSection(props: { lastCapturedImage: { dataUrl: 
           <RoiZoneOverlay
             rect={recoil.roi}
             className="border-2 border-amber-400/80 bg-amber-400/10"
-            lines={zoneLines("Ammo box")}
+            lines={zoneLines(recoil.recoilType === "fill_up_bar" ? "Fill-up bar" : "Ammo box")}
             onHover={drawing ? () => undefined : updateHoverTip}
           />
         )}

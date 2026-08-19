@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { ScreenHealthStatus, screenHealthStart, screenHealthStatus, screenHealthStop } from "../../lib/bridgeApi";
 import { SCREEN_HEALTH_PRESETS } from "../../data/screenHealthPresets";
+import { stripCalibrationScreenshot } from "../../pages/integrations/screenHealth/calibrationScreenshot";
 
 export function useScreenHealthDaemonStatus() {
   const [status, setStatus] = useState<ScreenHealthStatus>({ running: false });
@@ -18,7 +19,7 @@ export function useScreenHealthDaemonStatus() {
     setError(null);
     try {
       if (!profile || typeof profile !== "object") throw new Error("profile is required");
-      const result = await screenHealthStart(profile);
+      const result = await screenHealthStart(stripCalibrationScreenshot(profile));
       if (!result.success) setError(result.error || "Failed to start");
       await refreshStatus();
     } catch (e) {

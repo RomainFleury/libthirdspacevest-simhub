@@ -49,6 +49,9 @@ async function createWindow() {
     },
   });
 
+  // Register IPC before loading the renderer so the first UI actions can invoke handlers.
+  registerAllHandlers(getDaemonBridgeInstance, getMainWindow, connectToDaemon);
+
   if (isDev && process.env.VITE_DEV_SERVER_URL) {
     await mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
     // DevTools can be opened manually with Ctrl+Shift+I if needed
@@ -58,9 +61,6 @@ async function createWindow() {
     const htmlPath = path.join(app.getAppPath(), "dist", "index.html");
     await mainWindow.loadFile(htmlPath);
   }
-
-  // Set up IPC handlers (using modular structure)
-  registerAllHandlers(getDaemonBridgeInstance, getMainWindow, connectToDaemon);
 
   // Connect to daemon
   await connectToDaemon();

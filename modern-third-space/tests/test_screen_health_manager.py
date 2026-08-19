@@ -737,3 +737,146 @@ def test_debug_write_bmp_bgra_writes_valid_header(tmp_path):
     assert len(data) == 54 + (2 * 1 * 4)
 
 
+def _fill_up_profile(**overrides):
+    recoil = {
+        "type": "fill_up_bar",
+        "duration_ms": 40,
+        "roi": {"x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0},
+        "color_sampling": {
+            "filled_rgb": [220, 220, 210],
+            "empty_rgb": [30, 30, 30],
+            "overheat_rgb": [200, 40, 40],
+            "tolerance_l1": 0,
+        },
+        "fill_up": {
+            "min_rise": 0.1,
+            "cooldown_ms": 0,
+            "overheat_min_score": 0.4,
+            "empty_threshold": 0.08,
+        },
+    }
+    recoil.update(overrides.pop("recoil", {}))
+    profile = {
+        "schema_version": 0,
+        "name": "fill_up_only",
+        "capture": {"monitor_index": 1, "tick_ms": 10},
+        "detectors": [],
+        "recoil": recoil,
+    }
+    profile.update(overrides)
+    return profile
+
+
+def _horizontal_bar_bgra(width: int, height: int, *, filled_frac: float = 0.0, overheat: bool = False) -> bytes:
+    filled = (220, 220, 210)
+    empty = (30, 30, 30)
+    red = (200, 40, 40)
+    filled_cols = 0 if overheat else int(width * filled_frac)
+    raw = bytearray()
+    for _y in range(height):
+        for x in range(width):
+            rgb = red if overheat else (filled if x < filled_cols else empty)
+            r, g, b = rgb
+            raw.extend((b, g, r, 255))
+    return bytes(raw)
+
+
+def test_parse_profile_recoil_fill_up_bar():
+    manager = shm.ScreenHealthManager()
+    parsed = manager._parse_profile(_fill_up_profile())
+    assert len(parsed.fill_up_bars) == 1
+    assert parsed.ammo_numbers == []
+    bar = parsed.fill_up_bars[0]
+    assert bar.name == "fill_up_bar"
+    assert parsed.recoil_duration_ms == 40
+    assert bar.filled.as_tuple() == (220, 220, 210)
+    assert bar.overheat.as_tuple() == (200, 40, 40)
+    assert bar.min_rise == pytest.approx(0.1)
+
+
+def test_fill_up_recoil_state_machine_ignores_overheat_and_reset():
+    manager = shm.ScreenHealthManager()
+    bar = shm.FillUpBarDetector(
+        rect=shm.NormalizedRect(x=0, y=0, w=1, h=1),
+        filled=shm.RGB(220, 220, 210),
+        empty=shm.RGB(30, 30, 30),
+        overheat=shm.RGB(200, 40, 40),
+        tolerance_l1=40,
+        min_rise=0.1,
+        cooldown_ms=0,
+        duration_ms=40,
+    )
+    bar.validate()
+    now = 1000.0
+    assert manager._tick_fill_up_recoil(bar, 0.1, False, now) is None
+    shot = manager._tick_fill_up_recoil(bar, 0.3, False, now)
+    assert shot is not None
+    assert shot["source"] == "fill_up_bar"
+    assert shot["rise"] == pytest.approx(0.2)
+    assert manager._tick_fill_up_recoil(bar, 0.32, False, now) is None
+    assert manager._tick_fill_up_recoil(bar, 1.0, True, now) is None
+    assert manager._tick_fill_up_recoil(bar, 0.0, False, now) is None
+    shot2 = manager._tick_fill_up_recoil(bar, 0.25, False, now)
+    assert shot2 is not None
+    assert shot2["percent"] == pytest.approx(0.25)
+
+
+def test_test_profile_once_fill_up_bar():
+    manager = shm.ScreenHealthManager()
+    raw = _horizontal_bar_bgra(10, 4, filled_frac=0.5)
+    ok, result, err = manager.test_profile_once(
+        _fill_up_profile(),
+        frame_bgra_bytes=raw,
+        frame_width=10,
+        frame_height=4,
+    )
+    assert ok, err
+    det = next(d for d in result["detectors"] if d["type"] == "fill_up_bar")
+    assert det["percent"] == pytest.approx(0.5)
+    assert det["overheat"] is False
+
+
+def test_manager_fill_up_bar_recoil_on_rise(monkeypatch):
+    class FakeCapture:
+        def __init__(self, monitor_index: int):
+            self.monitor_index = monitor_index
+            self._calls = 0
+
+        def get_frame_size(self):
+            return 10, 4
+
+        def capture_bgra(self, left: int, top: int, width: int, height: int) -> bytes:
+            self._calls += 1
+            if self._calls <= 3:
+                return _horizontal_bar_bgra(width, height, filled_frac=0.2)
+            if self._calls <= 6:
+                return _horizontal_bar_bgra(width, height, filled_frac=0.6)
+            if self._calls <= 8:
+                return _horizontal_bar_bgra(width, height, overheat=True)
+            if self._calls <= 10:
+                return _horizontal_bar_bgra(width, height, filled_frac=0.0)
+            return _horizontal_bar_bgra(width, height, filled_frac=0.35)
+
+        def capture_multiple_bgra(self, regions):
+            return [self.capture_bgra(l, t, w, h) for l, t, w, h in regions]
+
+    monkeypatch.setattr(shm, "_create_capture_backend", lambda *, monitor_index: FakeCapture(monitor_index))
+    events = []
+    recoils = []
+
+    manager = shm.ScreenHealthManager(
+        on_game_event=lambda event_type, params: events.append((event_type, params)),
+        on_recoil=lambda ms: recoils.append(ms),
+    )
+    ok, err = manager.start(_fill_up_profile())
+    assert ok, err
+    try:
+        time.sleep(0.18)
+    finally:
+        manager.stop()
+
+    shots = [e for e in events if e[0] == "recoil_fired" and e[1].get("source") == "fill_up_bar"]
+    assert len(shots) >= 2
+    assert len(recoils) == len(shots)
+
+

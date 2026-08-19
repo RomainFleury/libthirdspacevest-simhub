@@ -114,6 +114,7 @@ export function ScreenHealthBuilderPage() {
           lastCapturedImage={screenshots.lastCapturedImage}
           captureCalibrationScreenshot={screenshots.captureCalibrationScreenshot}
           selectExistingScreenshot={screenshots.selectExistingScreenshot}
+          loadCalibrationScreenshot={screenshots.loadCalibrationScreenshot}
           evaluateProfileOnScreenshot={screenshots.evaluateProfileOnScreenshot}
           loadFromProfileId={fromId || undefined}
           profiles={profiles.profiles}

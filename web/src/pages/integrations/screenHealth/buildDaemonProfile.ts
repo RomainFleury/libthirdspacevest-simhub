@@ -1,4 +1,4 @@
-import type { DetectorType } from "./draft/types";
+import type { DetectorType, RecoilType } from "./draft/types";
 import { clamp01, clampInt } from "./utils";
 import type { AmmoOcrEngineId } from "./ammoOcrEngines";
 import { getDrawnSetup, lockedHitDetectorType } from "./drawnSetup";
@@ -54,13 +54,21 @@ export type HealthNumberDraftSnapshot = {
 };
 
 export type RecoilDraftSnapshot = {
-  recoilType: "off" | "ammo_number";
+  recoilType: RecoilType;
+  recoilDrawKind?: "ammo_number" | "fill_up_bar";
   ocrEngine?: AmmoOcrEngineId;
   durationMs: number;
   roi: { x: number; y: number; w: number; h: number } | null;
   stableReads: number;
   hitMinDrop: number;
   hitCooldownMs: number;
+  filledRgb?: number[];
+  emptyRgb?: number[];
+  overheatRgb?: number[];
+  toleranceL1?: number;
+  minRise?: number;
+  overheatMinScore?: number;
+  emptyThreshold?: number;
 };
 
 function attachRecoil(profile: Record<string, any>, recoil?: RecoilDraftSnapshot): Record<string, any> {
@@ -68,6 +76,37 @@ function attachRecoil(profile: Record<string, any>, recoil?: RecoilDraftSnapshot
     return profile;
   }
   const roi = recoil.roi;
+  const kind =
+    recoil.recoilType === "fill_up_bar"
+      ? "fill_up_bar"
+      : recoil.recoilType === "ammo_number"
+        ? "ammo_number"
+        : recoil.recoilDrawKind === "fill_up_bar"
+          ? "fill_up_bar"
+          : "ammo_number";
+  if (kind === "fill_up_bar") {
+    return {
+      ...profile,
+      recoil: {
+        type: "fill_up_bar",
+        duration_ms: Math.max(25, Math.floor(recoil.durationMs)),
+        roi: { x: clamp01(roi.x), y: clamp01(roi.y), w: clamp01(roi.w), h: clamp01(roi.h) },
+        orientation: "horizontal",
+        color_sampling: {
+          filled_rgb: (recoil.filledRgb ?? [220, 220, 210]).map((v) => clampInt(v, 0, 255)),
+          empty_rgb: (recoil.emptyRgb ?? [30, 30, 30]).map((v) => clampInt(v, 0, 255)),
+          overheat_rgb: (recoil.overheatRgb ?? [200, 40, 40]).map((v) => clampInt(v, 0, 255)),
+          tolerance_l1: clampInt(recoil.toleranceL1 ?? 120, 0, 765),
+        },
+        fill_up: {
+          min_rise: Math.max(0.01, Math.min(1, recoil.minRise ?? 0.04)),
+          cooldown_ms: Math.max(0, Math.floor(recoil.hitCooldownMs)),
+          overheat_min_score: Math.max(0, Math.min(1, recoil.overheatMinScore ?? 0.25)),
+          empty_threshold: Math.max(0, Math.min(1, recoil.emptyThreshold ?? 0.08)),
+        },
+      },
+    };
+  }
   return {
     ...profile,
     recoil: {
@@ -75,7 +114,7 @@ function attachRecoil(profile: Record<string, any>, recoil?: RecoilDraftSnapshot
       engine: "daemon",
       duration_ms: Math.max(25, Math.floor(recoil.durationMs)),
       roi: { x: clamp01(roi.x), y: clamp01(roi.y), w: clamp01(roi.w), h: clamp01(roi.h) },
-          // Schema placeholder only — text OCR accepts variable 1–3 digit ammo
+      // Schema placeholder only — text OCR accepts variable 1–3 digit ammo
       digits: 3,
       readout: {
         min: 0,

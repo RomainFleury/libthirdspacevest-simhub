@@ -154,6 +154,7 @@ export function RoiListSection(props: {
                     {d.type}:{d.name}{" "}
                     {typeof d.score === "number" ? `score=${d.score.toFixed(3)}` : ""}
                     {typeof d.percent === "number" ? ` percent=${(d.percent * 100).toFixed(1)}%` : ""}
+                    {typeof d.overheat_score === "number" ? ` overheat=${d.overheat_score.toFixed(2)}` : ""}
                     {typeof d.read === "number" ? ` read=${d.read}` : d?.read === null ? " read=null" : ""}
                     {typeof d.image_path === "string" ? ` file=${d.image_path}` : ""}
                     {d.error ? ` err=${d.error}` : ""}
@@ -336,7 +337,9 @@ export function RoiListSection(props: {
 
       {drawn.hasAmmo && ammoRoi && (
         <div className="rounded-lg bg-slate-700/20 p-3 ring-1 ring-white/5 space-y-3">
-          <div className="text-xs font-medium text-amber-200">Ammo counter</div>
+          <div className="text-xs font-medium text-amber-200">
+            {recoil.recoilType === "fill_up_bar" ? "Fill-up bar" : "Ammo counter"}
+          </div>
           <RoiPreviewInfo rect={ammoRoi} />
           <div className="flex items-center justify-end gap-2">
             <button

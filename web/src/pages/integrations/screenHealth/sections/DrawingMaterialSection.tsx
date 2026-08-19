@@ -1,7 +1,8 @@
 import { useScreenHealthHealthBarDraft } from "../draft/HealthBarDraftContext";
 import { useScreenHealthHealthNumberDraft } from "../draft/HealthNumberDraftContext";
 import { useScreenHealthProfileDraft, useScreenHealthProfileDraftControls } from "../draft/ProfileDraftContext";
-import { useScreenHealthRecoilDraft } from "../draft/RecoilDraftContext";
+import { useScreenHealthRecoilDraft, useScreenHealthRecoilDraftControls } from "../draft/RecoilDraftContext";
+import type { RecoilDrawKind } from "../draft/RecoilDraftContext";
 import { useScreenHealthColorVignetteDraft } from "../draft/ColorVignetteDraftContext";
 import { useScreenHealthRednessDraft } from "../draft/RednessDraftContext";
 import { getDrawnSetup, lockedHitDetectorType } from "../drawnSetup";
@@ -14,6 +15,11 @@ const HIT_OPTIONS: Array<{ value: DetectorType; label: string }> = [
   { value: "health_number", label: "Health number" },
 ];
 
+const RECOIL_OPTIONS: Array<{ value: RecoilDrawKind; label: string }> = [
+  { value: "ammo_number", label: "Ammo counter" },
+  { value: "fill_up_bar", label: "Fill-up bar" },
+];
+
 export function DrawingMaterialSection() {
   const profile = useScreenHealthProfileDraft();
   const { setDetectorType, setCanvasEditTarget } = useScreenHealthProfileDraftControls();
@@ -22,6 +28,7 @@ export function DrawingMaterialSection() {
   const hb = useScreenHealthHealthBarDraft();
   const hn = useScreenHealthHealthNumberDraft();
   const recoil = useScreenHealthRecoilDraft();
+  const { setRecoilDrawKind } = useScreenHealthRecoilDraftControls();
   const drawn = getDrawnSetup({
     rednessRois: redness.rois,
     colorVignetteRois: colorVignette.rois,
@@ -43,7 +50,8 @@ export function DrawingMaterialSection() {
     <div className="space-y-3">
       <h3 className="text-sm font-semibold text-white">Draw</h3>
       <p className="text-xs text-slate-500">
-        Hit detection is one type only. Ammo is a separate box. Settings appear after you draw.
+        Hit detection is one type only. Recoil is a separate box (ammo numbers or a fill-up heat bar).
+        Settings appear after you draw.
       </p>
       <div className="flex flex-wrap gap-4 items-end">
         <div className="space-y-1">
@@ -67,16 +75,21 @@ export function DrawingMaterialSection() {
           )}
         </div>
         <div className="space-y-1">
-          <label className="text-sm text-slate-400 block">Ammo</label>
+          <label className="text-sm text-slate-400 block">Recoil / fire</label>
           <select
-            value="ammo_number"
+            value={recoil.recoilDrawKind}
             onFocus={() => setCanvasEditTarget("recoil")}
             onMouseDown={() => setCanvasEditTarget("recoil")}
+            onChange={(e) => setRecoilDrawKind(e.target.value as RecoilDrawKind)}
             className={`rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ${
               drawingHit ? "ring-white/10" : "ring-amber-400/70"
             }`}
           >
-            <option value="ammo_number">Ammo counter</option>
+            {RECOIL_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
           </select>
         </div>
       </div>

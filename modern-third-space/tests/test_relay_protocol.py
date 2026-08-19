@@ -55,12 +55,16 @@ def test_parse_vid_pid_ch340():
 
 
 def test_interval_s_for_rpm():
-    from modern_third_space.relay.mouse_recoil import interval_s_for_rpm
+    from modern_third_space.relay.mouse_recoil import MAX_RPM, interval_s_for_rpm
 
+    assert MAX_RPM == 1500
     assert abs(interval_s_for_rpm(600) - 0.1) < 1e-6
     assert abs(interval_s_for_rpm(120) - 0.5) < 1e-6
-    # Never shorter than min_interval
-    assert interval_s_for_rpm(1200, min_interval_s=0.04) >= 0.04
+    assert abs(interval_s_for_rpm(1500) - 0.04) < 1e-6
+    # Values above the cap clamp to 40 ms
+    assert abs(interval_s_for_rpm(99999) - 0.04) < 1e-6
+    # Never shorter than min_interval (e.g. pulse duration)
+    assert interval_s_for_rpm(1500, min_interval_s=0.05) >= 0.05
 
 
 def test_likely_relay_does_not_match_generic_usb_serial():

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { SCREEN_HEALTH_PRESETS } from "../../../data/screenHealthPresets";
 import { ScreenHealthCalibrationProvider } from "./draft/CalibrationContext";
 import {
@@ -35,6 +35,7 @@ import { CalibrationCanvasSection } from "./sections/CalibrationCanvasSection";
 import { CaptureSettingsSection } from "./sections/CaptureSettingsSection";
 import { DrawingMaterialSection } from "./sections/DrawingMaterialSection";
 import { AmmoNumberRecoilSettings } from "./sections/AmmoNumberRecoilSettings";
+import { FillUpBarRecoilSettings } from "./sections/FillUpBarRecoilSettings";
 import { ColorVignetteSettings } from "./sections/ColorVignetteSettings";
 import { HealthBarSettings } from "./sections/HealthBarSettings";
 import { HealthNumberSettings } from "./sections/HealthNumberSettings";
@@ -45,7 +46,18 @@ import { RoiListSection } from "./sections/RoiListSection";
 import { ScreenshotsSection } from "./sections/ScreenshotsSection";
 import { applyDetectorsFromProfile } from "./applyProfileDraft";
 import { buildScreenHealthDaemonProfile } from "./buildDaemonProfile";
+import {
+  getCalibrationScreenshot,
+  restoreCalibrationScreenshot,
+  type CalibrationScreenshot,
+  type RestoreCalibrationScreenshotLoader,
+} from "./calibrationScreenshot";
 import { getDrawnSetup } from "./drawnSetup";
+import {
+  profileWithCalibrationScreenshot,
+  resolveCalibrationScreenshotForPersist,
+  type ScreenshotPersistDecision,
+} from "./persistCalibrationScreenshot";
 import { screenHealthExportProfile, screenHealthLoadProfile } from "../../../lib/bridgeApi";
 
 type Props = {
@@ -58,6 +70,7 @@ type Props = {
   lastCapturedImage: { dataUrl: string; width: number; height: number; filename: string; path: string } | null;
   captureCalibrationScreenshot: (monitorIndex: number) => Promise<any>;
   selectExistingScreenshot?: () => Promise<any>;
+  loadCalibrationScreenshot?: RestoreCalibrationScreenshotLoader;
   evaluateProfileOnScreenshot: (
     profile: Record<string, any>,
     imagePath: string
@@ -83,11 +96,6 @@ export function ScreenHealthConfigurationPanel(props: Props) {
             <ScreenHealthHealthNumberDraftProvider>
               <ScreenHealthRecoilDraftProvider>
                 <ScreenHealthCalibrationProvider dataUrl={dataUrl}>
-                  <DraftFromSelectedPresetSync
-                    presets={SCREEN_HEALTH_PRESETS as any}
-                    loadFromProfileId={props.loadFromProfileId}
-                    profiles={props.profiles}
-                  />
                   <ScreenHealthConfigurationPanelInner {...props} />
                 </ScreenHealthCalibrationProvider>
               </ScreenHealthRecoilDraftProvider>
@@ -109,11 +117,29 @@ function ScreenHealthConfigurationPanelInner(props: Props) {
     lastCapturedImage,
     captureCalibrationScreenshot,
     selectExistingScreenshot,
+    loadCalibrationScreenshot,
     evaluateProfileOnScreenshot,
   } = props;
 
+  const loadedShotRef = useRef<CalibrationScreenshot | null>(null);
+  const boundPathRef = useRef<string | null>(null);
+  const bindScreenshot = useCallback((shot: CalibrationScreenshot | null, path: string | null) => {
+    loadedShotRef.current = shot;
+    boundPathRef.current = path;
+  }, []);
+  const [screenshotRestoreError, setScreenshotRestoreError] = useState<string | null>(null);
+
   return (
     <div className="space-y-6">
+      <DraftFromSelectedPresetSync
+        presets={SCREEN_HEALTH_PRESETS as any}
+        loadFromProfileId={props.loadFromProfileId}
+        profiles={props.profiles}
+        loadCalibrationScreenshot={loadCalibrationScreenshot}
+        onBoundScreenshot={bindScreenshot}
+        onRestoreError={setScreenshotRestoreError}
+      />
+
       <PresetProfilesSection 
         presets={SCREEN_HEALTH_PRESETS as any} 
         profiles={props.profiles}
@@ -122,7 +148,13 @@ function ScreenHealthConfigurationPanelInner(props: Props) {
       <ProfileActionsController 
         presets={SCREEN_HEALTH_PRESETS as any} 
         onSaveProfile={props.onSaveProfile}
+        lastCapturedImage={lastCapturedImage}
+        loadedShotRef={loadedShotRef}
+        boundPathRef={boundPathRef}
+        loadCalibrationScreenshot={loadCalibrationScreenshot}
       />
+
+      {screenshotRestoreError && <div className="text-xs text-rose-300">{screenshotRestoreError}</div>}
 
       <CaptureSettingsSection
         onCapture={captureCalibrationScreenshot}
@@ -180,7 +212,7 @@ function DrawnSettings(props: {
       <h3 className="text-sm font-semibold text-white">Settings</h3>
       {!hasAny && (
         <p className="text-sm text-slate-500">
-          Draw a box first. Hit detection is one type; ammo is optional and separate.
+          Draw a box first. Hit detection is one type; recoil (ammo or fill-up bar) is optional and separate.
         </p>
       )}
       {drawn.hitCount > 1 && (
@@ -215,7 +247,16 @@ function DrawnSettings(props: {
           />
         </div>
       )}
-      {drawn.hasAmmo && (
+      {drawn.hasAmmo && recoil.recoilType === "fill_up_bar" && (
+        <div className="space-y-3">
+          <h4 className="text-xs font-medium uppercase tracking-wide text-slate-500">Fill-up recoil</h4>
+          <FillUpBarRecoilSettings
+            lastCapturedImage={props.lastCapturedImage}
+            evaluateProfileOnScreenshot={props.evaluateProfileOnScreenshot}
+          />
+        </div>
+      )}
+      {drawn.hasAmmo && recoil.recoilType !== "fill_up_bar" && (
         <div className="space-y-3">
           <h4 className="text-xs font-medium uppercase tracking-wide text-slate-500">Ammo recoil</h4>
           <AmmoNumberRecoilSettings
@@ -228,12 +269,15 @@ function DrawnSettings(props: {
   );
 }
 
-function DraftFromSelectedPresetSync(props: { 
-  presets: Array<{ preset_id: string; display_name: string; profile: any }>;
+function DraftFromSelectedPresetSync(props: {
+  presets: Array<{ preset_id: string; display_name: string; profile: any; exampleScreenshotUrl?: string }>;
   loadFromProfileId?: string;
   profiles?: Array<{ type: "preset" | "local"; id: string; name: string; profile: Record<string, any> }>;
+  loadCalibrationScreenshot?: RestoreCalibrationScreenshotLoader;
+  onBoundScreenshot: (shot: CalibrationScreenshot | null, path: string | null) => void;
+  onRestoreError: (message: string | null) => void;
 }) {
-  const { presets, loadFromProfileId, profiles } = props;
+  const { presets, loadFromProfileId, profiles, loadCalibrationScreenshot, onBoundScreenshot, onRestoreError } = props;
   const profileState = useScreenHealthProfileDraft();
   const {
     replaceAll: replaceProfileDraft,
@@ -259,23 +303,54 @@ function DraftFromSelectedPresetSync(props: {
       setColorPickMode,
     });
 
+  const restoreShot = async (
+    profile: Record<string, any>,
+    exampleScreenshotUrl: string | undefined,
+    cancelled: () => boolean
+  ) => {
+    if (!loadCalibrationScreenshot) {
+      onBoundScreenshot(null, null);
+      return;
+    }
+    onRestoreError(null);
+    try {
+      const restored = await restoreCalibrationScreenshot({
+        profile,
+        exampleScreenshotUrl,
+        load: loadCalibrationScreenshot,
+      });
+      if (cancelled()) return;
+      onBoundScreenshot(restored.shot, restored.path);
+    } catch (e) {
+      if (cancelled()) return;
+      onBoundScreenshot(getCalibrationScreenshot(profile), null);
+      onRestoreError(e instanceof Error ? e.message : "Failed to load calibration screenshot");
+    }
+  };
+
   // Load from profile ID on mount if specified
   useEffect(() => {
-    if (loadFromProfileId && profiles && !hasLoadedFromIdRef.current) {
-      const profile = profiles.find((p) => p.id === loadFromProfileId);
-      if (profile) {
-        hasLoadedFromIdRef.current = true;
-        setEditingLocalProfileId(profile.type === "local" ? profile.id : null);
-        const p: any = profile.profile;
-        replaceProfileDraft({
-          selectedPresetId: "__custom__",
-          profileName: profile.name || "Loaded Profile",
-          monitorIndex: Number(p.capture?.monitor_index || 1),
-          tickMs: Number(p.capture?.tick_ms || 50),
-        });
-        applyDetectors(p);
-      }
-    }
+    if (!loadFromProfileId || !profiles || hasLoadedFromIdRef.current) return;
+    const profile = profiles.find((p) => p.id === loadFromProfileId);
+    if (!profile) return;
+    hasLoadedFromIdRef.current = true;
+    lastAppliedPresetIdRef.current = loadFromProfileId;
+    setEditingLocalProfileId(profile.type === "local" ? profile.id : null);
+    const p: any = profile.profile;
+    replaceProfileDraft({
+      selectedPresetId: "__custom__",
+      profileName: profile.name || "Loaded Profile",
+      monitorIndex: Number(p.capture?.monitor_index || 1),
+      tickMs: Number(p.capture?.tick_ms || 50),
+    });
+    applyDetectors(p);
+    const exampleScreenshotUrl =
+      profile.type === "preset" ? presets.find((item) => item.preset_id === profile.id)?.exampleScreenshotUrl : undefined;
+    let cancelled = false;
+    void restoreShot(p, exampleScreenshotUrl, () => cancelled);
+    return () => {
+      cancelled = true;
+    };
   }, [loadFromProfileId, profiles, replaceProfileDraft, setEditingLocalProfileId]);
 
   useEffect(() => {
@@ -283,6 +358,7 @@ function DraftFromSelectedPresetSync(props: {
     if (!presetId || presetId === "__custom__") return;
     if (lastAppliedPresetIdRef.current === presetId) return;
 
+    let cancelled = false;
     if (profiles) {
       const localProfile = profiles.find((p) => p.id === presetId && p.type === "local");
       if (localProfile) {
@@ -296,7 +372,10 @@ function DraftFromSelectedPresetSync(props: {
           tickMs: Number(p.capture?.tick_ms || 50),
         });
         applyDetectors(p);
-        return;
+        void restoreShot(p, undefined, () => cancelled);
+        return () => {
+          cancelled = true;
+        };
       }
     }
 
@@ -311,6 +390,10 @@ function DraftFromSelectedPresetSync(props: {
     });
     lastAppliedPresetIdRef.current = presetId;
     applyDetectors(p);
+    void restoreShot(p, preset.exampleScreenshotUrl, () => cancelled);
+    return () => {
+      cancelled = true;
+    };
   }, [presets, profileState.selectedPresetId, replaceProfileDraft, setEditingLocalProfileId, profiles]);
 
   return null;
@@ -323,8 +406,12 @@ function ProfileActionsController(props: {
     profile: Record<string, any>,
     options?: { updateId?: string | null }
   ) => Promise<any>;
+  lastCapturedImage: { path: string; dataUrl?: string } | null;
+  loadedShotRef: { current: CalibrationScreenshot | null };
+  boundPathRef: { current: string | null };
+  loadCalibrationScreenshot?: RestoreCalibrationScreenshotLoader;
 }) {
-  const { presets, onSaveProfile } = props;
+  const { presets, onSaveProfile, lastCapturedImage, loadedShotRef, boundPathRef, loadCalibrationScreenshot } = props;
   const profileState = useScreenHealthProfileDraft();
   const {
     setProfileName,
@@ -347,6 +434,8 @@ function ProfileActionsController(props: {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccessKind, setSaveSuccessKind] = useState<"none" | "update" | "new">("none");
+  const [imagePrompt, setImagePrompt] = useState<"export" | "update" | "new" | null>(null);
+  const [encodingImage, setEncodingImage] = useState(false);
 
   const buildDaemonProfile = () =>
     buildScreenHealthDaemonProfile({
@@ -359,14 +448,35 @@ function ProfileActionsController(props: {
       presets,
     });
 
-  const onExport = async () => {
+  const persistWithScreenshot = async (kind: "export" | "update" | "new", decision?: ScreenshotPersistDecision) => {
+    const resolved = await resolveCalibrationScreenshotForPersist({
+      currentImage: lastCapturedImage,
+      loadedShot: loadedShotRef.current,
+      boundPath: boundPathRef.current,
+      decision,
+    });
+    if (resolved.status === "needs-prompt") {
+      setImagePrompt(kind);
+      return;
+    }
+    setImagePrompt(null);
+    loadedShotRef.current = resolved.shot;
+    boundPathRef.current = resolved.boundPath;
+    return profileWithCalibrationScreenshot(buildDaemonProfile(), resolved.shot);
+  };
+
+  const onExport = async (decision?: ScreenshotPersistDecision) => {
     setExportError(null);
+    setEncodingImage(true);
     try {
-      const profile = buildDaemonProfile();
+      const profile = await persistWithScreenshot("export", decision);
+      if (!profile) return;
       const result = await screenHealthExportProfile(profile);
       if (!result.success && !result.canceled) throw new Error(result.error || "Failed to export profile");
     } catch (e) {
       setExportError(e instanceof Error ? e.message : "Failed to export profile");
+    } finally {
+      setEncodingImage(false);
     }
   };
 
@@ -399,28 +509,51 @@ function ProfileActionsController(props: {
         replaceRecoilDraft,
         setColorPickMode,
       });
+      if (loadCalibrationScreenshot) {
+        try {
+          const restored = await restoreCalibrationScreenshot({
+            profile: p,
+            load: loadCalibrationScreenshot,
+          });
+          loadedShotRef.current = restored.shot;
+          boundPathRef.current = restored.path;
+        } catch (e) {
+          loadedShotRef.current = getCalibrationScreenshot(p);
+          boundPathRef.current = null;
+          setLoadError(
+            e instanceof Error
+              ? `Profile loaded, but the calibration screenshot could not be shown: ${e.message}`
+              : "Profile loaded, but the calibration screenshot could not be shown"
+          );
+        }
+      } else {
+        loadedShotRef.current = getCalibrationScreenshot(p);
+        boundPathRef.current = null;
+      }
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : "Failed to load profile");
     }
   };
 
-  const runSave = async (kind: "update" | "new") => {
+  const runSave = async (kind: "update" | "new", decision?: ScreenshotPersistDecision) => {
     if (!onSaveProfile) return;
-    setSaving(true);
+    const name = profileState.profileName.trim();
+    if (!name) {
+      setSaveError("Profile name is required");
+      return;
+    }
+    const updateId = kind === "update" ? profileState.editingLocalProfileId : null;
+    if (kind === "update" && !updateId) {
+      setSaveError("Nothing to update — open a local profile or pick one from Local Profiles.");
+      return;
+    }
     setSaveError(null);
     setSaveSuccessKind("none");
+    setEncodingImage(true);
     try {
-      const profile = buildDaemonProfile();
-      const name = profileState.profileName.trim();
-      if (!name) {
-        setSaveError("Profile name is required");
-        return;
-      }
-      const updateId = kind === "update" ? profileState.editingLocalProfileId : null;
-      if (kind === "update" && !updateId) {
-        setSaveError("Nothing to update — open a local profile or pick one from Local Profiles.");
-        return;
-      }
+      const profile = await persistWithScreenshot(kind, decision);
+      if (!profile) return;
+      setSaving(true);
       const saved = await onSaveProfile(name, profile, updateId ? { updateId } : undefined);
       if (saved) {
         setSaveSuccessKind(kind);
@@ -432,7 +565,14 @@ function ProfileActionsController(props: {
       setSaveError(e instanceof Error ? e.message : "Failed to save profile");
     } finally {
       setSaving(false);
+      setEncodingImage(false);
     }
+  };
+
+  const onImagePromptDecision = (decision: ScreenshotPersistDecision) => {
+    if (!imagePrompt) return;
+    if (imagePrompt === "export") void onExport(decision);
+    else void runSave(imagePrompt, decision);
   };
 
   const isPresetSelected = presets.some((p) => p.preset_id === profileState.selectedPresetId);
@@ -444,7 +584,7 @@ function ProfileActionsController(props: {
     <div className="space-y-3">
       <ProfileControlsSection
         onLoad={onLoad}
-        onExport={onExport}
+        onExport={() => onExport()}
         onUpdateProfile={showUpdate ? () => runSave("update") : undefined}
         onSaveNewCopy={showSaveNewCopy ? () => runSave("new") : undefined}
         saveNewCopyLabel="Save a new copy"
@@ -468,6 +608,83 @@ function ProfileActionsController(props: {
       {saveSuccessKind === "new" && (
         <div className="text-xs text-emerald-300">New local profile saved (separate copy).</div>
       )}
+
+      {imagePrompt && (
+        <UpdateCalibrationImageModal
+          busy={encodingImage}
+          onKeep={() => onImagePromptDecision("keep")}
+          onUpdate={() => onImagePromptDecision("update")}
+          onCancel={() => setImagePrompt(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function UpdateCalibrationImageModal(props: {
+  busy: boolean;
+  onKeep: () => void;
+  onUpdate: () => void;
+  onCancel: () => void;
+}) {
+  const { busy, onKeep, onUpdate, onCancel } = props;
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !busy) onCancel();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [busy, onCancel]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      onClick={() => {
+        if (!busy) onCancel();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="update-calibration-image-title"
+        className="w-full max-w-md rounded-xl bg-slate-900 p-5 ring-1 ring-white/10 space-y-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 id="update-calibration-image-title" className="text-base font-semibold text-white">
+          Update calibration image?
+        </h3>
+        <p className="text-sm text-slate-300">
+          The screenshot on the canvas is different from the one stored in this profile. Do you want to update the
+          image?
+        </p>
+        <div className="flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onCancel}
+            className="rounded-lg bg-slate-700/80 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onKeep}
+            className="rounded-lg bg-slate-600/80 px-3 py-2 text-sm font-medium text-white hover:bg-slate-600 disabled:opacity-50"
+          >
+            Keep previous
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onUpdate}
+            className="rounded-lg bg-emerald-600/90 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
+          >
+            {busy ? "Encoding…" : "Update image"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

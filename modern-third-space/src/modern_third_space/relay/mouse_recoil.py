@@ -26,7 +26,7 @@ DEFAULT_COOLDOWN_S = 0.05
 DEFAULT_RPM = 600
 DEFAULT_BURST_COUNT = 3
 MIN_RPM = 60
-MAX_RPM = 1200
+MAX_RPM = 1500  # 40 ms between pulse starts
 
 
 def interval_s_for_rpm(rpm: int, min_interval_s: float = 0.0) -> float:
