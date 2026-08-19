@@ -80,7 +80,6 @@ These documents outline approaches, patterns, and implementation strategies for 
 This folder will grow as new integration strategies are developed for:
 - Other game modding frameworks
 - Native game APIs (GSI, etc.)
-- SimHub plugins
 - Other haptic device bridges
 
 ## Usage
