@@ -22,6 +22,15 @@ The plugin:
 
 ## Install
 
+Build the distributable package from the repository root:
+
+```powershell
+.\build-all-mods.ps1 -Mods kyber
+```
+
+This produces
+`mods/swbf2-kyber/dist/thirdspace-vest-kyber-plugin-v0.1.0.zip`.
+
 Copy the `ThirdSpaceVestTelemetry` directory into the KYBER dedicated server's
 plugin directory and enable it in the server's plugin configuration. Permit TCP
 port `5051` only from the trusted LAN in Windows Firewall. Do not port-forward

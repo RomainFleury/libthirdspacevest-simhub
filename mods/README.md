@@ -16,9 +16,17 @@ mods/
 
 ## Building Mods
 
-Currently, no mods require building in this directory. The mods here are either:
+Most mods here are plain scripts:
 - Pre-built files from external sources (Alyx scripts from NexusMods)
 - Copied from `misc-documentations/` during the build process (L4D2 scripts)
+
+Package the KYBER server plugin with:
+
+```powershell
+.\build-all-mods.ps1 -Mods kyber
+```
+
+The resulting ZIP is written under `mods/swbf2-kyber/dist/`.
 
 For archived/untested mods, see `misc-documentations/archived-untested-mods/`.
 

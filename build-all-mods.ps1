@@ -1,5 +1,5 @@
 # Build script for all Third Space Vest mods
-# This script builds mods in the repository (currently only SimHub plugin)
+# This script builds distributable mods/plugins in the repository.
 #
 # Usage:
 #   .\build-all-mods.ps1              # Build all mods
@@ -8,7 +8,7 @@
 
 param(
     [Parameter()]
-    [string[]]$Mods = @("simhub"),
+    [string[]]$Mods = @("simhub", "kyber"),
     [switch]$Clean,
     [switch]$SkipPrerequisites
 )
@@ -28,6 +28,14 @@ $modConfigs = @{
         RequiresLibs = @("GameReaderCommon.dll", "SimHub.Plugins.dll")
         LibsSource = "SimHub installation or libs folder"
         BuildScript = "build.ps1"
+        RequiresMSBuild = $true
+    }
+    "kyber" = @{
+        Name = "KYBER Battlefront II Telemetry Plugin"
+        Path = "mods\swbf2-kyber"
+        BuildScript = "build.ps1"
+        OutputArtifact = "dist\thirdspace-vest-kyber-plugin-v0.1.0.zip"
+        RequiresMSBuild = $false
     }
 }
 
@@ -53,13 +61,24 @@ function Find-MSBuild {
 # Check prerequisites
 if (-not $SkipPrerequisites) {
     Write-Host "[Prerequisites] Checking build tools..." -ForegroundColor Yellow
-    
-    $msbuild = Find-MSBuild
-    if (-not $msbuild) {
-        Write-Host "  [FAIL] MSBuild not found! Please install Visual Studio 2019/2022" -ForegroundColor Red
-        exit 1
+
+    $needsMSBuild = $false
+    foreach ($modKey in $Mods) {
+        if ($modConfigs.ContainsKey($modKey) -and $modConfigs[$modKey].RequiresMSBuild) {
+            $needsMSBuild = $true
+        }
     }
-    Write-Host "  [OK] MSBuild found at $msbuild" -ForegroundColor Green
+
+    if ($needsMSBuild) {
+        $msbuild = Find-MSBuild
+        if (-not $msbuild) {
+            Write-Host "  [FAIL] MSBuild not found! Please install Visual Studio 2019/2022" -ForegroundColor Red
+            exit 1
+        }
+        Write-Host "  [OK] MSBuild found at $msbuild" -ForegroundColor Green
+    } else {
+        Write-Host "  [OK] Selected mods do not require MSBuild" -ForegroundColor Green
+    }
     Write-Host ""
 }
 
@@ -86,7 +105,7 @@ function Build-Mod {
         # If mod has its own build script, use it
         if ($Config.BuildScript -and (Test-Path $Config.BuildScript)) {
             Write-Host "  [INFO] Using mod's build script: $($Config.BuildScript)" -ForegroundColor Cyan
-            & ".\$($Config.BuildScript)"
+            & ".\$($Config.BuildScript)" -Clean:$Clean
             $result = $LASTEXITCODE -eq 0
         } else {
             # Use unified build process
@@ -177,10 +196,6 @@ function Build-Mod {
 
 # Main build process
 $msbuild = Find-MSBuild
-if (-not $msbuild) {
-    Write-Host "ERROR: MSBuild not found! Please install Visual Studio 2019/2022" -ForegroundColor Red
-    exit 1
-}
 
 $results = @{}
 $totalMods = $Mods.Count
@@ -230,9 +245,12 @@ if ($failCount -eq 0) {
     foreach ($modKey in $Mods) {
         if ($results.ContainsKey($modKey) -and $results[$modKey]) {
             $config = $modConfigs[$modKey]
-            $dllPath = Join-Path $config.Path $config.OutputDll
-            if (Test-Path $dllPath) {
-                Write-Host "  - $($config.Name): $dllPath" -ForegroundColor White
+            $artifact = if ($config.OutputArtifact) { $config.OutputArtifact } else { $config.OutputDll }
+            if ($artifact) {
+                $artifactPath = Join-Path $config.Path $artifact
+                if (Test-Path $artifactPath) {
+                    Write-Host "  - $($config.Name): $artifactPath" -ForegroundColor White
+                }
             }
         }
     }
