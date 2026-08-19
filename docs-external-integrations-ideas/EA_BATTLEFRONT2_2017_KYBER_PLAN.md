@@ -50,8 +50,9 @@ Verified capabilities at those revisions:
   returns a snapshot of the current non-spectator player list.
 - Lua player objects expose
   [`name`, `playerId`, `isBot`, and `isSpawned`](https://github.com/ArmchairDevelopers/Kyber/blob/c64e07940a7e127176ef7f2b09cf34ad5830f468/Module/Source/Script/LuaPlayerManager.cpp#L626-L689).
-  `playerId` is the KYBER user ID installed after join-token validation, so
-  display names can be used for discovery while IDs are used for event routing.
+  In online mode, `playerId` is the KYBER account/user ID installed after
+  join-token validation, so display names can be used for discovery while IDs
+  are used for event routing. Offline-mode ID behavior is not established.
 - KYBER fires
   [`ServerPlayer:Joined`](https://github.com/ArmchairDevelopers/Kyber/blob/c64e07940a7e127176ef7f2b09cf34ad5830f468/Module/Source/Core/Server.cpp#L595-L617)
   and
@@ -75,8 +76,8 @@ required by this plan and cannot be validated by source inspection alone.
 | Question | Finding |
 |---|---|
 | Can Lua enumerate players already in the match? | Yes, with `PlayerManager.GetPlayers()`. |
-| Can Lua track later roster changes? | Yes, with joined/disconnect events followed by a fresh snapshot. |
-| Are names and stable routing IDs available? | Yes. Configure by display name, then route by `playerId`. |
+| Can Lua track later roster changes? | Yes, with joined/disconnect events and reconciliation. Disconnect fires before removal, so its snapshot must be deferred or exclude that player. |
+| Are names and stable routing IDs available? | Yes in online mode. Configure by display name, then route by the KYBER account `playerId`; verify offline behavior separately. |
 | Can more than one daemon connect? | Yes at the socket API level; the official HTTP example keeps multiple clients. |
 | Can the listener bind to a selected LAN address? | No. `SocketManager.Create(port)` currently binds `INADDR_ANY`. |
 | Are writes production-safe? | No. `Send` is immediate, may be partial, and turns socket errors into Lua errors. Buffering/backpressure support is required. |
@@ -145,6 +146,14 @@ to expose nonfatal would-block/partial-write results, or add a native queued
 send abstraction. A slow daemon must never stall the KYBER update thread or
 another daemon.
 
+`Recv` returns arbitrary TCP chunks, not complete NDJSON records. The plugin
+must retain a receive buffer per connection, process only complete newline
+frames, and reject an unterminated line above the configured size limit. Lua
+events and the official socket polling loop run synchronously during server
+updates, so accepting, parsing, and sending must use bounded work per update.
+The inherited nonblocking state of accepted sockets and safe behavior after
+abrupt disconnect/double-close remain runtime checks.
+
 If the dedicated server runs in Docker, publish the telemetry port on the
 server's LAN address:
 
@@ -195,8 +204,11 @@ connected:
 
 Player IDs are JSON strings because KYBER exposes a 64-bit user ID and
 JavaScript cannot safely represent every 64-bit integer. The plugin sends a
-fresh `player_list` after every join and disconnect. Full snapshots are chosen
-over deltas so a daemon connecting late can always reconstruct current state.
+fresh `player_list` after every join. KYBER fires disconnect before its message
+dispatcher removes the player, so the plugin must either defer the disconnect
+snapshot until the next server update or build it while explicitly excluding
+the disconnecting ID. Full snapshots are chosen over deltas so a daemon
+connecting late can always reconstruct current state.
 
 The daemon trims surrounding whitespace and compares names with Unicode
 case-folding. It subscribes only when exactly one non-bot player matches:
@@ -226,8 +238,7 @@ Zero matches leaves the daemon in `waiting_for_player`. Multiple matches set
 `ambiguous_player_name`; the daemon must not choose arbitrarily. If the
 selected ID disconnects, the plugin emits the new roster, clears that
 connection's subscription, and the daemon returns to name matching. This lets
-it follow a player who reconnects with a new session object without requiring
-the UI to be open.
+it follow a player who reconnects without requiring the UI to be open.
 
 The daemon state exposed to the UI is:
 
@@ -302,8 +313,11 @@ These are secondary to the recoil and damage requirements.
 
 ### Accepted shot
 
-`Program.cpp` currently contains a commented diagnostic branch for
-`ServerSoldierFiringMessage`. This is the first candidate hook point.
+KYBER's
+[`MessageManagerDispatchMessageHk`](https://github.com/ArmchairDevelopers/Kyber/blob/c64e07940a7e127176ef7f2b09cf34ad5830f468/Module/Source/Core/Program.cpp#L342-L370)
+already dispatches named Frostbite messages and contains a
+[`ServerSoldierFiringMessage`](https://github.com/ArmchairDevelopers/Kyber/blob/c64e07940a7e127176ef7f2b09cf34ad5830f468/Module/Source/Core/Program.cpp#L466-L470)
+diagnostic branch. This is the first candidate hook point.
 
 Prototype steps:
 
@@ -333,10 +347,12 @@ Prototype steps:
    self-damage, environmental damage, vehicles, and lethal hits.
 4. Emit `ServerPlayer:DamageApplied(...)` after values are final.
 
-Hooking `HealthComponent::SetHealth` is a fallback discovery technique, not the
-preferred final implementation. A generic health setter also receives heals,
-regeneration, spawn initialization, scripts, and state transitions, and may
-not retain attacker attribution.
+Hooking
+[`HealthComponent::SetHealth`](https://github.com/ArmchairDevelopers/Kyber/blob/c64e07940a7e127176ef7f2b09cf34ad5830f468/Module/Public/SDK/SDK.h#L725-L738)
+is a fallback discovery technique, not the preferred final implementation. A
+generic health setter also receives heals, regeneration, spawn initialization,
+scripts, and state transitions, may not cover every damage path, and does not
+retain attacker attribution by itself.
 
 ### Directional damage
 
@@ -362,14 +378,16 @@ The server plugin should remain a thin transport layer:
 
 - Subscribe to the two new native events.
 - Accept multiple daemon connections.
-- Send an initial full roster and refresh it after join/disconnect.
+- Send an initial full roster and safely reconcile it after join/disconnect.
 - Validate one exact player-ID subscription per connection.
 - Route only the selected player's gameplay events to that connection.
 - Normalize IDs and weapon strings.
 - Assign each connection a stream `epoch` and monotonically increasing `seq`.
 - Serialize compact NDJSON records.
+- Maintain bounded per-client receive buffers and parse complete lines only.
 - Maintain bounded per-client queues without blocking the game thread.
 - Enforce handshake timeouts, connection limits, and maximum line lengths.
+- Periodically reconcile the roster to recover from a missed lifecycle event.
 - Disconnect a client whose queue remains full and report a dropped-client
   counter; do not silently discard gameplay events and pretend the stream is
   complete.
@@ -466,7 +484,8 @@ would be unsupported.
 - Publish initial and changed roster snapshots.
 - Implement one-player subscription state for every connection.
 - Restrict the listener to the trusted LAN with host firewall rules.
-- Verify two or more simultaneous daemons, reconnect, ordering, and overflow.
+- Verify accepted-socket nonblocking behavior, abrupt disconnect, double-close,
+  two or more simultaneous daemons, reconnect, ordering, and overflow.
 
 Exit condition: two test daemons configured only with different display names
 automatically bind when those players join and receive ordered, duplicate-free
@@ -491,6 +510,8 @@ expected mocked recoil/damage calls.
 - Test daemon-before-player, player-before-daemon, duplicate display names,
   two vested players, player reconnect, daemon reconnect, server restart, and
   a slow/disconnected subscriber.
+- Test online and offline IDs, bots, spectators, level transitions, disconnect
+  event ordering, and periodic roster reconciliation.
 - Compare game-observed counts with plugin, daemon, and hardware logs.
 - Measure hook-to-daemon and hook-to-hardware latency.
 - Run a sustained automatic-fire and reconnect soak test.
