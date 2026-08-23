@@ -2,6 +2,8 @@ export type ScreenHealthPreset = {
   preset_id: string;
   display_name: string;
   profile: Record<string, any>;
+  /** Bundled example screenshot (Vite URL). Loaded onto the canvas; encoded into JSON on save/export. */
+  exampleScreenshotUrl?: string;
 };
 
 /**
