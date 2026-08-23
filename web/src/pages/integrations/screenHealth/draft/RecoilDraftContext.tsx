@@ -4,13 +4,12 @@ import { DEFAULT_AMMO_OCR_ENGINE, type AmmoOcrEngineId } from "../ammoOcrEngines
 
 export type FillUpBarTestResult = {
   percent: number | null;
-  overheatScore?: number;
-  overheat?: boolean;
+  backgroundFraction?: number;
   reason?: string;
 } | null;
 
 export type RecoilDrawKind = "ammo_number" | "fill_up_bar";
-export type FillUpColorPickMode = null | "filled" | "empty" | "overheat";
+export type FillUpColorPickMode = null | "background";
 
 export type RecoilDraftState = {
   recoilType: RecoilType;
@@ -21,13 +20,12 @@ export type RecoilDraftState = {
   stableReads: number;
   hitMinDrop: number;
   hitCooldownMs: number;
-  filledRgb: [number, number, number];
-  emptyRgb: [number, number, number];
-  overheatRgb: [number, number, number];
+  /** Unfilled bar background (often translucent). White/red fill = not-background. */
+  backgroundRgb: [number, number, number];
+  /** L1 match tolerance; raise for translucent HUDs (default 180). */
   toleranceL1: number;
-  minRise: number;
-  overheatMinScore: number;
-  emptyThreshold: number;
+  /** Min drop in background coverage (0..1) to count as a shot. */
+  minBackgroundDrop: number;
   colorPickMode: FillUpColorPickMode;
   calibrationError: string | null;
   testResult: HealthNumberTestResult;
@@ -45,13 +43,9 @@ type ActionsCtx = {
   setStableReads: (v: number) => void;
   setHitMinDrop: (v: number) => void;
   setHitCooldownMs: (v: number) => void;
-  setFilledRgb: (v: [number, number, number]) => void;
-  setEmptyRgb: (v: [number, number, number]) => void;
-  setOverheatRgb: (v: [number, number, number]) => void;
+  setBackgroundRgb: (v: [number, number, number]) => void;
   setToleranceL1: (v: number) => void;
-  setMinRise: (v: number) => void;
-  setOverheatMinScore: (v: number) => void;
-  setEmptyThreshold: (v: number) => void;
+  setMinBackgroundDrop: (v: number) => void;
   setColorPickMode: (v: FillUpColorPickMode) => void;
   setCalibrationError: (v: string | null) => void;
   setTestResult: (v: HealthNumberTestResult) => void;
@@ -72,13 +66,9 @@ export const DEFAULT_RECOIL_DRAFT: RecoilDraftState = {
   stableReads: 2,
   hitMinDrop: 1,
   hitCooldownMs: 50,
-  filledRgb: [220, 220, 210],
-  emptyRgb: [30, 30, 30],
-  overheatRgb: [200, 40, 40],
-  toleranceL1: 120,
-  minRise: 0.04,
-  overheatMinScore: 0.25,
-  emptyThreshold: 0.08,
+  backgroundRgb: [40, 40, 45],
+  toleranceL1: 180,
+  minBackgroundDrop: 0.03,
   colorPickMode: null,
   calibrationError: null,
   testResult: null,
@@ -113,13 +103,9 @@ export function ScreenHealthRecoilDraftProvider(props: { children: React.ReactNo
       setStableReads: (v) => setStateAndRef((p) => ({ ...p, stableReads: v })),
       setHitMinDrop: (v) => setStateAndRef((p) => ({ ...p, hitMinDrop: v })),
       setHitCooldownMs: (v) => setStateAndRef((p) => ({ ...p, hitCooldownMs: v })),
-      setFilledRgb: (v) => setStateAndRef((p) => ({ ...p, filledRgb: v })),
-      setEmptyRgb: (v) => setStateAndRef((p) => ({ ...p, emptyRgb: v })),
-      setOverheatRgb: (v) => setStateAndRef((p) => ({ ...p, overheatRgb: v })),
+      setBackgroundRgb: (v) => setStateAndRef((p) => ({ ...p, backgroundRgb: v })),
       setToleranceL1: (v) => setStateAndRef((p) => ({ ...p, toleranceL1: v })),
-      setMinRise: (v) => setStateAndRef((p) => ({ ...p, minRise: v })),
-      setOverheatMinScore: (v) => setStateAndRef((p) => ({ ...p, overheatMinScore: v })),
-      setEmptyThreshold: (v) => setStateAndRef((p) => ({ ...p, emptyThreshold: v })),
+      setMinBackgroundDrop: (v) => setStateAndRef((p) => ({ ...p, minBackgroundDrop: v })),
       setColorPickMode: (v) => setStateAndRef((p) => ({ ...p, colorPickMode: v })),
       setCalibrationError: (v) => setStateAndRef((p) => ({ ...p, calibrationError: v })),
       setTestResult: (v) => setStateAndRef((p) => ({ ...p, testResult: v })),

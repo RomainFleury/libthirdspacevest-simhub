@@ -122,6 +122,9 @@ export interface GameIntegrationPageProps {
   /** Additional stats to show */
   additionalStats?: ReactNode;
 
+  /** Use full content width (no max-width cap). Useful for screenshot-heavy UIs. */
+  wide?: boolean;
+
   /** Children content */
   children?: ReactNode;
 }

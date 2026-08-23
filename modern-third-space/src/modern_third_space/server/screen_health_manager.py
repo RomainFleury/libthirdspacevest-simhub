@@ -209,6 +209,45 @@ def _parse_vignette_rois(rois_data: Any) -> List[RednessROI]:
     return rois
 
 
+def background_coverage_from_bgra(
+    raw_bgra: bytes,
+    width: int,
+    height: int,
+    *,
+    background_rgb: Tuple[int, int, int],
+    tolerance_l1: int,
+) -> float:
+    """
+    Fraction of ROI pixels that still look like the bar background in [0,1].
+
+    Used for fill-up recoil: white/red fill is simply "not background". A drop in
+    coverage means more of the bar filled → a shot. Higher tolerance_l1 helps with
+    translucent backgrounds that shift slightly with what's behind them.
+    """
+    if width <= 0 or height <= 0:
+        raise ValueError("width and height must be > 0")
+    expected = width * height * 4
+    if len(raw_bgra) < expected:
+        raise ValueError("raw_bgra is smaller than expected for BGRA frame")
+    if tolerance_l1 < 0 or tolerance_l1 > 765:
+        raise ValueError("tolerance_l1 must be in [0, 765]")
+
+    br, bg, bb = background_rgb
+    total = width * height
+    if total <= 0:
+        return 0.0
+    matched = 0
+    i = 0
+    for _ in range(total):
+        b = raw_bgra[i]
+        g = raw_bgra[i + 1]
+        r = raw_bgra[i + 2]
+        i += 4
+        if abs(r - br) + abs(g - bg) + abs(b - bb) <= tolerance_l1:
+            matched += 1
+    return max(0.0, min(1.0, matched / float(total)))
+
+
 def health_bar_percent_from_bgra(
     raw_bgra: bytes,
     width: int,
@@ -487,46 +526,33 @@ class HealthBarDetector:
 
 @dataclass(frozen=True)
 class FillUpBarDetector:
-    """Recoil channel: pulse the solenoid when a heat/charge bar fills up.
+    """Recoil channel: pulse when the bar's background coverage shrinks.
 
-    Battlefront 2-style overheat: dark → white-ish fill is a shot; full bar
-    turning red is overheat (no pulse); returning to empty/white is a reset
-    (no pulse); the next rise is a shot again.
+    Pick the unfilled bar background (often translucent). White or red fill is
+    treated the same: not-background. When background % drops, a shot fired.
     """
 
     rect: NormalizedRect
-    filled: RGB
-    empty: RGB
-    overheat: RGB
+    background: RGB
     tolerance_l1: int
-    min_rise: float
+    min_background_drop: float
     cooldown_ms: int
     duration_ms: int
-    overheat_min_score: float = 0.25
-    empty_threshold: float = 0.08
     name: str = "fill_up_bar"
 
     def validate(self) -> None:
         self.rect.validate()
-        self.filled.validate()
-        self.empty.validate()
-        self.overheat.validate()
+        self.background.validate()
         if not isinstance(self.tolerance_l1, int) or not (0 <= self.tolerance_l1 <= 765):
             raise ValueError("fill_up_bar.tolerance_l1 must be an int in [0,765]")
-        if not isinstance(self.min_rise, (int, float)) or not (0.0 < float(self.min_rise) <= 1.0):
-            raise ValueError("fill_up_bar.min_rise must be in (0,1]")
+        if not isinstance(self.min_background_drop, (int, float)) or not (
+            0.0 < float(self.min_background_drop) <= 1.0
+        ):
+            raise ValueError("fill_up_bar.min_background_drop must be in (0,1]")
         if not isinstance(self.cooldown_ms, int) or self.cooldown_ms < 0:
             raise ValueError("fill_up_bar.cooldown_ms must be an int >= 0")
         if not isinstance(self.duration_ms, int) or self.duration_ms < 1:
             raise ValueError("fill_up_bar.duration_ms must be an int >= 1")
-        if not isinstance(self.overheat_min_score, (int, float)) or not (
-            0.0 <= float(self.overheat_min_score) <= 1.0
-        ):
-            raise ValueError("fill_up_bar.overheat_min_score must be in [0,1]")
-        if not isinstance(self.empty_threshold, (int, float)) or not (
-            0.0 <= float(self.empty_threshold) <= 1.0
-        ):
-            raise ValueError("fill_up_bar.empty_threshold must be in [0,1]")
         if not isinstance(self.name, str) or not self.name:
             raise ValueError("fill_up_bar.name must be a non-empty string")
 
@@ -773,8 +799,7 @@ class ScreenHealthManager:
         self._last_health_value_emitted: Dict[str, int] = {}
 
         # Fill-up bar recoil state
-        self._prev_fill_up_percent: Dict[str, float] = {}
-        self._fill_up_overheat: Dict[str, bool] = {}
+        self._prev_fill_up_background: Dict[str, float] = {}
         self._last_fill_up_recoil_ts: Dict[str, float] = {}
 
         self._last_batch_capture_fail_log_ts: float = 0.0
@@ -1128,16 +1153,17 @@ class ScreenHealthManager:
 
             elif detector_type == "fill_up_bar":
                 bar = detector_obj
-                percent, overheat_score, is_overheat = self._evaluate_fill_up_bar(bar, raw, w, h)
+                background_frac, fill_frac = self._evaluate_fill_up_bar(bar, raw, w, h)
                 eval_ms = (time.perf_counter() - eval0) * 1000.0
                 detectors_out.append(
                     {
                         "type": "fill_up_bar",
                         "name": bar.name,
                         "rect_px": {"left": left, "top": top, "w": w, "h": h},
-                        "percent": percent,
-                        "overheat_score": overheat_score,
-                        "overheat": is_overheat,
+                        "background_fraction": background_frac,
+                        "fill_fraction": fill_frac,
+                        # Back-compat alias for older UI labels
+                        "percent": fill_frac,
                         "capture_ms": cap_ms,
                         "eval_ms": eval_ms,
                         "image_path": save_crop("fill_up_bar", bar.name, raw, w, h),
@@ -1188,8 +1214,7 @@ class ScreenHealthManager:
         self._prev_health_value_by_detector.clear()
         self._last_health_value_emitted.clear()
 
-        self._prev_fill_up_percent.clear()
-        self._fill_up_overheat.clear()
+        self._prev_fill_up_background.clear()
         self._last_fill_up_recoil_ts.clear()
 
         # Debug runtime
@@ -1377,73 +1402,58 @@ class ScreenHealthManager:
 
     def _evaluate_fill_up_bar(
         self, bar: FillUpBarDetector, raw_bgra: bytes, width: int, height: int
-    ) -> Tuple[float, float, bool]:
-        percent = health_bar_percent_from_bgra(
+    ) -> Tuple[float, float]:
+        background_frac = background_coverage_from_bgra(
             raw_bgra,
             width,
             height,
-            filled_rgb=bar.filled.as_tuple(),
-            empty_rgb=bar.empty.as_tuple(),
+            background_rgb=bar.background.as_tuple(),
             tolerance_l1=bar.tolerance_l1,
         )
-        overheat_score = color_match_score_from_bgra(
-            raw_bgra,
-            width,
-            height,
-            target_rgb=bar.overheat.as_tuple(),
-            tolerance_l1=bar.tolerance_l1,
-        )
-        is_overheat = float(overheat_score) >= float(bar.overheat_min_score)
-        return float(percent), float(overheat_score), bool(is_overheat)
+        fill_frac = max(0.0, min(1.0, 1.0 - float(background_frac)))
+        return float(background_frac), float(fill_frac)
 
     def _tick_fill_up_recoil(
         self,
         bar: FillUpBarDetector,
-        percent: float,
-        is_overheat: bool,
+        background_frac: float,
         now: float,
     ) -> Optional[Dict[str, Any]]:
-        """State machine: pulse on fill rise; ignore overheat and post-overheat reset."""
+        """Pulse when background coverage drops (bar fills with white or red)."""
         key = bar.name
-        prev = self._prev_fill_up_percent.get(key)
-        latched = self._fill_up_overheat.get(key, False)
+        prev = self._prev_fill_up_background.get(key)
         last_ts = self._last_fill_up_recoil_ts.get(key, 0.0)
 
-        if is_overheat:
-            self._fill_up_overheat[key] = True
-            self._prev_fill_up_percent[key] = percent
-            return None
-
-        if latched:
-            if percent <= float(bar.empty_threshold):
-                self._fill_up_overheat[key] = False
-                self._prev_fill_up_percent[key] = percent
-            else:
-                self._prev_fill_up_percent[key] = percent
-            return None
-
         if prev is None:
-            self._prev_fill_up_percent[key] = percent
+            self._prev_fill_up_background[key] = background_frac
             return None
 
-        if percent + 0.01 < prev:
-            self._prev_fill_up_percent[key] = percent
+        # Background grew again (cooldown / emptying) — track, no pulse.
+        if background_frac + 0.005 >= prev:
+            # Small noise upward or flat: keep highest recent background only if rising a lot
+            if background_frac > prev:
+                self._prev_fill_up_background[key] = background_frac
             return None
 
-        rise = percent - prev
-        if rise < float(bar.min_rise):
+        drop = prev - background_frac
+        if drop < float(bar.min_background_drop):
             return None
         if (now - last_ts) * 1000.0 < float(bar.cooldown_ms):
+            # Still track fill progress so we don't catch-fire after cooldown.
+            self._prev_fill_up_background[key] = background_frac
             return None
 
-        self._prev_fill_up_percent[key] = percent
+        self._prev_fill_up_background[key] = background_frac
         self._last_fill_up_recoil_ts[key] = now
+        fill_frac = max(0.0, min(1.0, 1.0 - background_frac))
         return {
             "roi": bar.name,
             "source": "fill_up_bar",
-            "percent": percent,
-            "prev_percent": prev,
-            "rise": rise,
+            "background_fraction": background_frac,
+            "prev_background_fraction": prev,
+            "background_drop": drop,
+            "fill_fraction": fill_frac,
+            "percent": fill_frac,
             "duration_ms": int(bar.duration_ms),
         }
 
@@ -2039,7 +2049,7 @@ class ScreenHealthManager:
                 elif detector_type == "fill_up_bar":
                     bar = detector_obj
                     try:
-                        percent, overheat_score, is_overheat = self._evaluate_fill_up_bar(
+                        background_frac, fill_frac = self._evaluate_fill_up_bar(
                             bar, raw_bgra, w, h
                         )
                     except Exception as e:
@@ -2049,11 +2059,10 @@ class ScreenHealthManager:
                     now = time.time()
                     if should_periodic_log:
                         logger.info(
-                            "[screen_health] fill_up_bar detector=%s percent=%.3f overheat=%.3f latched=%s",
+                            "[screen_health] fill_up_bar detector=%s background=%.3f fill=%.3f",
                             bar.name,
-                            percent,
-                            overheat_score,
-                            self._fill_up_overheat.get(bar.name, False),
+                            background_frac,
+                            fill_frac,
                         )
                         if self._debug_emit_events:
                             self._emit_game_event(
@@ -2061,13 +2070,13 @@ class ScreenHealthManager:
                                 {
                                     "kind": "fill_up_bar",
                                     "detector": bar.name,
-                                    "percent": percent,
-                                    "overheat_score": overheat_score,
-                                    "overheat": is_overheat,
+                                    "background_fraction": background_frac,
+                                    "fill_fraction": fill_frac,
+                                    "percent": fill_frac,
                                 },
                             )
 
-                    shot = self._tick_fill_up_recoil(bar, percent, is_overheat, now)
+                    shot = self._tick_fill_up_recoil(bar, background_frac, now)
                     if shot:
                         self._emit_game_event("recoil_fired", shot)
                         self._trigger_recoil(bar.duration_ms)
@@ -2314,22 +2323,24 @@ class ScreenHealthManager:
             h=float(roi.get("h", 0)),
         )
         colors = d.get("color_sampling") if isinstance(d.get("color_sampling"), dict) else d
-        filled = _rgb_from_list(colors.get("filled_rgb"), (220, 220, 210), "fill_up_bar.filled_rgb")
-        empty = _rgb_from_list(colors.get("empty_rgb"), (30, 30, 30), "fill_up_bar.empty_rgb")
-        overheat = _rgb_from_list(colors.get("overheat_rgb"), (200, 40, 40), "fill_up_bar.overheat_rgb")
+        # Prefer background_rgb; accept empty_rgb from older profiles.
+        bg_raw = colors.get("background_rgb", colors.get("empty_rgb"))
+        background = _rgb_from_list(bg_raw, (40, 40, 45), "fill_up_bar.background_rgb")
         fill_up = d.get("fill_up") if isinstance(d.get("fill_up"), dict) else {}
+        # Prefer min_background_drop; accept min_rise from older profiles.
+        min_drop = fill_up.get(
+            "min_background_drop",
+            fill_up.get("min_rise", d.get("min_background_drop", d.get("min_rise", 0.03))),
+        )
         bar = FillUpBarDetector(
             name=str(d.get("name") or "fill_up_bar"),
             rect=rect,
-            filled=filled,
-            empty=empty,
-            overheat=overheat,
-            tolerance_l1=int(colors.get("tolerance_l1", d.get("tolerance_l1", 120))),
-            min_rise=float(fill_up.get("min_rise", d.get("min_rise", 0.04))),
+            background=background,
+            # Higher default helps translucent HUD backgrounds.
+            tolerance_l1=int(colors.get("tolerance_l1", d.get("tolerance_l1", 180))),
+            min_background_drop=float(min_drop),
             cooldown_ms=int(fill_up.get("cooldown_ms", d.get("cooldown_ms", 40))),
             duration_ms=max(1, int(d.get("duration_ms", 40))),
-            overheat_min_score=float(fill_up.get("overheat_min_score", d.get("overheat_min_score", 0.25))),
-            empty_threshold=float(fill_up.get("empty_threshold", d.get("empty_threshold", 0.08))),
         )
         bar.validate()
         return bar

@@ -62,13 +62,9 @@ export type RecoilDraftSnapshot = {
   stableReads: number;
   hitMinDrop: number;
   hitCooldownMs: number;
-  filledRgb?: number[];
-  emptyRgb?: number[];
-  overheatRgb?: number[];
+  backgroundRgb?: number[];
   toleranceL1?: number;
-  minRise?: number;
-  overheatMinScore?: number;
-  emptyThreshold?: number;
+  minBackgroundDrop?: number;
 };
 
 function attachRecoil(profile: Record<string, any>, recoil?: RecoilDraftSnapshot): Record<string, any> {
@@ -93,16 +89,12 @@ function attachRecoil(profile: Record<string, any>, recoil?: RecoilDraftSnapshot
         roi: { x: clamp01(roi.x), y: clamp01(roi.y), w: clamp01(roi.w), h: clamp01(roi.h) },
         orientation: "horizontal",
         color_sampling: {
-          filled_rgb: (recoil.filledRgb ?? [220, 220, 210]).map((v) => clampInt(v, 0, 255)),
-          empty_rgb: (recoil.emptyRgb ?? [30, 30, 30]).map((v) => clampInt(v, 0, 255)),
-          overheat_rgb: (recoil.overheatRgb ?? [200, 40, 40]).map((v) => clampInt(v, 0, 255)),
-          tolerance_l1: clampInt(recoil.toleranceL1 ?? 120, 0, 765),
+          background_rgb: (recoil.backgroundRgb ?? [40, 40, 45]).map((v) => clampInt(v, 0, 255)),
+          tolerance_l1: clampInt(recoil.toleranceL1 ?? 180, 0, 765),
         },
         fill_up: {
-          min_rise: Math.max(0.01, Math.min(1, recoil.minRise ?? 0.04)),
+          min_background_drop: Math.max(0.01, Math.min(1, recoil.minBackgroundDrop ?? 0.03)),
           cooldown_ms: Math.max(0, Math.floor(recoil.hitCooldownMs)),
-          overheat_min_score: Math.max(0, Math.min(1, recoil.overheatMinScore ?? 0.25)),
-          empty_threshold: Math.max(0, Math.min(1, recoil.emptyThreshold ?? 0.08)),
         },
       },
     };

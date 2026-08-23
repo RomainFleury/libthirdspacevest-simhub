@@ -168,6 +168,7 @@ export function ScreenHealthIntegrationPage() {
         error={integration.error}
         events={gameEvents}
         eventDisplayMap={EVENT_DISPLAY_MAP}
+        wide
         onStart={() => {
           if (!selectedProfileId) {
             // This shouldn't happen as the button should be disabled, but just in case
@@ -183,7 +184,7 @@ export function ScreenHealthIntegrationPage() {
         additionalStats={additionalStats}
       >
             {/* Profile Selector Section */}
-      <section className="max-w-4xl mx-auto rounded-2xl bg-slate-800/80 p-4 md:p-6 shadow-lg ring-1 ring-white/5">
+      <section className="w-full rounded-2xl bg-slate-800/80 p-4 md:p-6 shadow-lg ring-1 ring-white/5">
         <div className="flex flex-wrap items-center gap-4">
           {profileSelector}
           <button

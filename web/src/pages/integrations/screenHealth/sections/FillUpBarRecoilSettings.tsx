@@ -63,12 +63,9 @@ export function FillUpBarRecoilSettings(props: {
   const {
     setDurationMs,
     setHitCooldownMs,
-    setFilledRgb,
-    setEmptyRgb,
-    setOverheatRgb,
+    setBackgroundRgb,
     setToleranceL1,
-    setMinRise,
-    setOverheatMinScore,
+    setMinBackgroundDrop,
     setColorPickMode,
     setCalibrationError,
     setFillUpTestResult,
@@ -109,43 +106,27 @@ export function FillUpBarRecoilSettings(props: {
       return;
     }
     setFillUpTestResult({
-      percent: typeof bar.percent === "number" ? bar.percent : null,
-      overheatScore: typeof bar.overheat_score === "number" ? bar.overheat_score : undefined,
-      overheat: Boolean(bar.overheat),
+      percent: typeof bar.fill_fraction === "number" ? bar.fill_fraction : typeof bar.percent === "number" ? bar.percent : null,
+      backgroundFraction:
+        typeof bar.background_fraction === "number" ? bar.background_fraction : undefined,
     });
   };
 
   return (
     <div className="space-y-3">
       <p className="text-xs text-slate-500">
-        Draw a tight box on the heat / overheat bar. Fill going dark → white-ish is a shot. When the
-        bar turns red it is overheat (no pulse). After it empties / goes white again, the next fill is
-        a shot.
+        Pick the unfilled bar background only. White and red fill both count as “not background”.
+        When background coverage in the box drops, a shot fires. Raise Tolerance if the background
+        is translucent and shifts with what’s behind it.
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <ColorRow
-          label="Filled RGB (white-ish)"
-          rgb={state.filledRgb}
-          mode="filled"
+          label="Background RGB (unfilled bar)"
+          rgb={state.backgroundRgb}
+          mode="background"
           active={state.colorPickMode}
-          onRgb={setFilledRgb}
-          onPick={setColorPickMode}
-        />
-        <ColorRow
-          label="Empty RGB (dark)"
-          rgb={state.emptyRgb}
-          mode="empty"
-          active={state.colorPickMode}
-          onRgb={setEmptyRgb}
-          onPick={setColorPickMode}
-        />
-        <ColorRow
-          label="Overheat RGB (red)"
-          rgb={state.overheatRgb}
-          mode="overheat"
-          active={state.colorPickMode}
-          onRgb={setOverheatRgb}
+          onRgb={setBackgroundRgb}
           onPick={setColorPickMode}
         />
         <div>
@@ -158,10 +139,14 @@ export function FillUpBarRecoilSettings(props: {
             onChange={(e) => setToleranceL1(parseInt(e.target.value, 10) || 0)}
             className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
           />
+          <p className="mt-1 text-[11px] text-slate-500">
+            Default 180 helps translucent HUDs. Increase if background % flickers; lower if fill is
+            miscounted as background.
+          </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         <div>
           <label className="text-sm text-slate-400 block mb-1">Pulse duration (ms)</label>
           <input
@@ -183,27 +168,15 @@ export function FillUpBarRecoilSettings(props: {
           />
         </div>
         <div>
-          <label className="text-sm text-slate-400 block mb-1">Min fill rise (0..1)</label>
+          <label className="text-sm text-slate-400 block mb-1">Min background drop (0..1)</label>
           <input
             type="number"
             step={0.01}
             min={0.01}
             max={1}
-            value={state.minRise}
-            onChange={(e) => setMinRise(Math.max(0.01, Math.min(1, parseFloat(e.target.value) || 0.04)))}
-            className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
-          />
-        </div>
-        <div>
-          <label className="text-sm text-slate-400 block mb-1">Overheat min score</label>
-          <input
-            type="number"
-            step={0.01}
-            min={0}
-            max={1}
-            value={state.overheatMinScore}
+            value={state.minBackgroundDrop}
             onChange={(e) =>
-              setOverheatMinScore(Math.max(0, Math.min(1, parseFloat(e.target.value) || 0)))
+              setMinBackgroundDrop(Math.max(0.01, Math.min(1, parseFloat(e.target.value) || 0.03)))
             }
             className="w-full rounded-lg bg-slate-700/50 px-3 py-2 text-sm text-white ring-1 ring-white/10"
           />
@@ -226,9 +199,11 @@ export function FillUpBarRecoilSettings(props: {
           <span className="text-xs text-slate-300">
             {state.fillUpTestResult.reason
               ? state.fillUpTestResult.reason
-              : `fill ${((state.fillUpTestResult.percent ?? 0) * 100).toFixed(0)}%${
-                  state.fillUpTestResult.overheat ? " · overheat" : ""
-                }`}
+              : `fill ${((state.fillUpTestResult.percent ?? 0) * 100).toFixed(0)}% · bg ${(
+                  (state.fillUpTestResult.backgroundFraction ??
+                    1 - (state.fillUpTestResult.percent ?? 0)) *
+                  100
+                ).toFixed(0)}%`}
           </span>
         )}
       </div>

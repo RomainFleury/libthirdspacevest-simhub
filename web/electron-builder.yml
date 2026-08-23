@@ -79,8 +79,10 @@ win:
   icon: build/icon.png
   # Request admin rights if needed for USB access
   requestedExecutionLevel: asInvoker
-  # Disable code signing completely (avoids symlink permission errors)
-  sign: false
+  # Disable code signing / exe editing (avoids winCodeSign symlink privilege errors on Windows)
+  sign: null
+  signDlls: false
+  signAndEditExecutable: false
   verifyUpdateCodeSignature: false
   signingHashAlgorithms: []
 

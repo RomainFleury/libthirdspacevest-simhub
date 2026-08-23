@@ -743,16 +743,12 @@ def _fill_up_profile(**overrides):
         "duration_ms": 40,
         "roi": {"x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0},
         "color_sampling": {
-            "filled_rgb": [220, 220, 210],
-            "empty_rgb": [30, 30, 30],
-            "overheat_rgb": [200, 40, 40],
+            "background_rgb": [30, 30, 30],
             "tolerance_l1": 0,
         },
         "fill_up": {
-            "min_rise": 0.1,
+            "min_background_drop": 0.1,
             "cooldown_ms": 0,
-            "overheat_min_score": 0.4,
-            "empty_threshold": 0.08,
         },
     }
     recoil.update(overrides.pop("recoil", {}))
@@ -767,15 +763,19 @@ def _fill_up_profile(**overrides):
     return profile
 
 
-def _horizontal_bar_bgra(width: int, height: int, *, filled_frac: float = 0.0, overheat: bool = False) -> bytes:
-    filled = (220, 220, 210)
-    empty = (30, 30, 30)
+def _horizontal_bar_bgra(
+    width: int, height: int, *, filled_frac: float = 0.0, fill_color: str = "white"
+) -> bytes:
+    """Synthetic heat bar: left portion filled (white or red), rest is background."""
+    background = (30, 30, 30)
+    white = (220, 220, 210)
     red = (200, 40, 40)
-    filled_cols = 0 if overheat else int(width * filled_frac)
+    fill = red if fill_color == "red" else white
+    filled_cols = int(width * filled_frac)
     raw = bytearray()
     for _y in range(height):
         for x in range(width):
-            rgb = red if overheat else (filled if x < filled_cols else empty)
+            rgb = fill if x < filled_cols else background
             r, g, b = rgb
             raw.extend((b, g, r, 255))
     return bytes(raw)
@@ -789,36 +789,74 @@ def test_parse_profile_recoil_fill_up_bar():
     bar = parsed.fill_up_bars[0]
     assert bar.name == "fill_up_bar"
     assert parsed.recoil_duration_ms == 40
-    assert bar.filled.as_tuple() == (220, 220, 210)
-    assert bar.overheat.as_tuple() == (200, 40, 40)
-    assert bar.min_rise == pytest.approx(0.1)
+    assert bar.background.as_tuple() == (30, 30, 30)
+    assert bar.min_background_drop == pytest.approx(0.1)
 
 
-def test_fill_up_recoil_state_machine_ignores_overheat_and_reset():
+def test_parse_profile_fill_up_bar_accepts_legacy_empty_rgb():
+    manager = shm.ScreenHealthManager()
+    parsed = manager._parse_profile(
+        _fill_up_profile(
+            recoil={
+                "color_sampling": {
+                    "empty_rgb": [12, 13, 14],
+                    "tolerance_l1": 50,
+                },
+                "fill_up": {"min_rise": 0.05, "cooldown_ms": 0},
+            }
+        )
+    )
+    bar = parsed.fill_up_bars[0]
+    assert bar.background.as_tuple() == (12, 13, 14)
+    assert bar.min_background_drop == pytest.approx(0.05)
+
+
+def test_fill_up_recoil_state_machine_on_background_drop():
     manager = shm.ScreenHealthManager()
     bar = shm.FillUpBarDetector(
         rect=shm.NormalizedRect(x=0, y=0, w=1, h=1),
-        filled=shm.RGB(220, 220, 210),
-        empty=shm.RGB(30, 30, 30),
-        overheat=shm.RGB(200, 40, 40),
+        background=shm.RGB(30, 30, 30),
         tolerance_l1=40,
-        min_rise=0.1,
+        min_background_drop=0.1,
         cooldown_ms=0,
         duration_ms=40,
     )
     bar.validate()
     now = 1000.0
-    assert manager._tick_fill_up_recoil(bar, 0.1, False, now) is None
-    shot = manager._tick_fill_up_recoil(bar, 0.3, False, now)
+    # Seed with mostly-empty bar (high background coverage).
+    assert manager._tick_fill_up_recoil(bar, 0.9, now) is None
+    # White fill: background drops → shot.
+    shot = manager._tick_fill_up_recoil(bar, 0.7, now)
     assert shot is not None
     assert shot["source"] == "fill_up_bar"
-    assert shot["rise"] == pytest.approx(0.2)
-    assert manager._tick_fill_up_recoil(bar, 0.32, False, now) is None
-    assert manager._tick_fill_up_recoil(bar, 1.0, True, now) is None
-    assert manager._tick_fill_up_recoil(bar, 0.0, False, now) is None
-    shot2 = manager._tick_fill_up_recoil(bar, 0.25, False, now)
+    assert shot["background_drop"] == pytest.approx(0.2)
+    assert shot["fill_fraction"] == pytest.approx(0.3)
+    # Small further drop ignored.
+    assert manager._tick_fill_up_recoil(bar, 0.68, now) is None
+    # Red fill continues: same detector, still a background drop → shot.
+    shot_red = manager._tick_fill_up_recoil(bar, 0.4, now)
+    assert shot_red is not None
+    # Prev stayed at 0.7 (sub-threshold 0.68 ignored) → drop is 0.3.
+    assert shot_red["background_drop"] == pytest.approx(0.3)
+    # Background recovers (cooldown / empty) — no pulse, track upward.
+    assert manager._tick_fill_up_recoil(bar, 1.0, now) is None
+    # Next fill after empty → shot again.
+    shot2 = manager._tick_fill_up_recoil(bar, 0.75, now)
     assert shot2 is not None
     assert shot2["percent"] == pytest.approx(0.25)
+
+
+def test_background_coverage_from_bgra():
+    raw = _horizontal_bar_bgra(10, 4, filled_frac=0.4, fill_color="white")
+    bg = shm.background_coverage_from_bgra(
+        raw, 10, 4, background_rgb=(30, 30, 30), tolerance_l1=0
+    )
+    assert bg == pytest.approx(0.6)
+    raw_red = _horizontal_bar_bgra(10, 4, filled_frac=0.4, fill_color="red")
+    bg_red = shm.background_coverage_from_bgra(
+        raw_red, 10, 4, background_rgb=(30, 30, 30), tolerance_l1=0
+    )
+    assert bg_red == pytest.approx(0.6)
 
 
 def test_test_profile_once_fill_up_bar():
@@ -832,11 +870,12 @@ def test_test_profile_once_fill_up_bar():
     )
     assert ok, err
     det = next(d for d in result["detectors"] if d["type"] == "fill_up_bar")
+    assert det["background_fraction"] == pytest.approx(0.5)
+    assert det["fill_fraction"] == pytest.approx(0.5)
     assert det["percent"] == pytest.approx(0.5)
-    assert det["overheat"] is False
 
 
-def test_manager_fill_up_bar_recoil_on_rise(monkeypatch):
+def test_manager_fill_up_bar_recoil_on_background_drop(monkeypatch):
     class FakeCapture:
         def __init__(self, monitor_index: int):
             self.monitor_index = monitor_index
@@ -852,7 +891,8 @@ def test_manager_fill_up_bar_recoil_on_rise(monkeypatch):
             if self._calls <= 6:
                 return _horizontal_bar_bgra(width, height, filled_frac=0.6)
             if self._calls <= 8:
-                return _horizontal_bar_bgra(width, height, overheat=True)
+                # Continue filling in red — still not background → further drop.
+                return _horizontal_bar_bgra(width, height, filled_frac=0.9, fill_color="red")
             if self._calls <= 10:
                 return _horizontal_bar_bgra(width, height, filled_frac=0.0)
             return _horizontal_bar_bgra(width, height, filled_frac=0.35)

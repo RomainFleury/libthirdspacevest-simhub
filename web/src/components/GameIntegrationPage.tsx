@@ -32,6 +32,7 @@ export function GameIntegrationPage({
   configurationPanel,
   modInfo,
   additionalStats,
+  wide = false,
   children,
 }: GameIntegrationPageProps) {
   const steamLaunchUrl = game.steamAppId
@@ -54,7 +55,7 @@ export function GameIntegrationPage({
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className={`${wide ? "w-full" : "max-w-4xl mx-auto"} space-y-6`}>
       {/* Back link */}
       <Link
         to="/games"

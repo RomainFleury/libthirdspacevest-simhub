@@ -30,6 +30,8 @@ export function recoilDraftFromProfile(p: any): Partial<RecoilDraftState> {
   if (r.type === "fill_up_bar") {
     const colors = r.color_sampling && typeof r.color_sampling === "object" ? r.color_sampling : r;
     const fillUp = r.fill_up && typeof r.fill_up === "object" ? r.fill_up : {};
+    // Prefer background_rgb; accept empty_rgb from older profiles.
+    const backgroundRaw = colors.background_rgb ?? colors.empty_rgb;
     return {
       recoilType: "fill_up_bar",
       recoilDrawKind: "fill_up_bar",
@@ -40,16 +42,16 @@ export function recoilDraftFromProfile(p: any): Partial<RecoilDraftState> {
         w: Number(r.roi?.w ?? 0.16),
         h: Number(r.roi?.h ?? 0.03),
       },
-      filledRgb: rgbFrom(colors.filled_rgb, DEFAULT_RECOIL_DRAFT.filledRgb),
-      emptyRgb: rgbFrom(colors.empty_rgb, DEFAULT_RECOIL_DRAFT.emptyRgb),
-      overheatRgb: rgbFrom(colors.overheat_rgb, DEFAULT_RECOIL_DRAFT.overheatRgb),
+      backgroundRgb: rgbFrom(backgroundRaw, DEFAULT_RECOIL_DRAFT.backgroundRgb),
       toleranceL1: Number(colors.tolerance_l1 ?? r.tolerance_l1 ?? DEFAULT_RECOIL_DRAFT.toleranceL1),
-      minRise: Number(fillUp.min_rise ?? r.min_rise ?? DEFAULT_RECOIL_DRAFT.minRise),
-      hitCooldownMs: Number(fillUp.cooldown_ms ?? r.cooldown_ms ?? DEFAULT_RECOIL_DRAFT.hitCooldownMs),
-      overheatMinScore: Number(
-        fillUp.overheat_min_score ?? r.overheat_min_score ?? DEFAULT_RECOIL_DRAFT.overheatMinScore
+      minBackgroundDrop: Number(
+        fillUp.min_background_drop ??
+          fillUp.min_rise ??
+          r.min_background_drop ??
+          r.min_rise ??
+          DEFAULT_RECOIL_DRAFT.minBackgroundDrop
       ),
-      emptyThreshold: Number(fillUp.empty_threshold ?? r.empty_threshold ?? DEFAULT_RECOIL_DRAFT.emptyThreshold),
+      hitCooldownMs: Number(fillUp.cooldown_ms ?? r.cooldown_ms ?? DEFAULT_RECOIL_DRAFT.hitCooldownMs),
       colorPickMode: null,
       calibrationError: null,
       testResult: null,

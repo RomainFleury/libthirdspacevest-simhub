@@ -48,7 +48,7 @@ export function ScreenHealthBuilderPage() {
     fromId && profiles.profiles.length > 0 ? profiles.profiles.find((p) => p.id === fromId) : undefined;
 
   return (
-    <div className="max-w-5xl mx-auto p-6 space-y-4">
+    <div className="w-full space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="text-white text-lg font-semibold">Profile Builder</div>

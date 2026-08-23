@@ -28,7 +28,7 @@ export function ScreenHealthSettingsPage() {
   const isDisabled = daemon.status.running;
 
   return (
-    <div className="max-w-5xl mx-auto p-6 space-y-4">
+    <div className="w-full space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="text-white text-lg font-semibold">Screen Health Settings</div>

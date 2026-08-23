@@ -63,9 +63,7 @@ export function CalibrationCanvasSection(props: { lastCapturedImage: { dataUrl: 
   const {
     setRoi: setRecoilRoi,
     setRecoilType,
-    setFilledRgb: setRecoilFilledRgb,
-    setEmptyRgb: setRecoilEmptyRgb,
-    setOverheatRgb: setRecoilOverheatRgb,
+    setBackgroundRgb: setRecoilBackgroundRgb,
     setColorPickMode: setRecoilColorPickMode,
   } = useScreenHealthRecoilDraftControls();
 
@@ -114,9 +112,7 @@ export function CalibrationCanvasSection(props: { lastCapturedImage: { dataUrl: 
         return true;
       }
       if (pickingFillUp) {
-        if (recoil.colorPickMode === "filled") setRecoilFilledRgb(rgb);
-        else if (recoil.colorPickMode === "empty") setRecoilEmptyRgb(rgb);
-        else setRecoilOverheatRgb(rgb);
+        setRecoilBackgroundRgb(rgb);
         setRecoilColorPickMode(null);
         return true;
       }
@@ -135,9 +131,7 @@ export function CalibrationCanvasSection(props: { lastCapturedImage: { dataUrl: 
       setEmptyRgb,
       setFilledRgb,
       setColorPickMode,
-      setRecoilFilledRgb,
-      setRecoilEmptyRgb,
-      setRecoilOverheatRgb,
+      setRecoilBackgroundRgb,
       setRecoilColorPickMode,
       setTargetRgb,
       setPickingColor,
@@ -239,7 +233,7 @@ export function CalibrationCanvasSection(props: { lastCapturedImage: { dataUrl: 
   if (!lastCapturedImage) return null;
 
   const drawHint = recoil.colorPickMode
-    ? "Click the screenshot to pick the fill-up bar color."
+    ? "Click the screenshot to pick the unfilled bar background color."
     : editingRecoil
     ? recoil.recoilDrawKind === "fill_up_bar"
       ? "Drawing fill-up bar (amber)."

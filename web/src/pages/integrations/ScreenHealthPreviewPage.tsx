@@ -42,7 +42,7 @@ export function ScreenHealthPreviewPage() {
 
   if (!id) {
     return (
-      <div className="max-w-5xl mx-auto p-6">
+      <div className="w-full">
         <div className="rounded-2xl bg-slate-800/80 p-8 text-center">
           <span className="text-6xl mb-4 block">❌</span>
           <h1 className="text-2xl font-bold text-white mb-2">Profile Not Found</h1>
@@ -60,7 +60,7 @@ export function ScreenHealthPreviewPage() {
 
   if (!profile) {
     return (
-      <div className="max-w-5xl mx-auto p-6">
+      <div className="w-full">
         <div className="rounded-2xl bg-slate-800/80 p-8 text-center">
           <span className="text-6xl mb-4 block">⏳</span>
           <h1 className="text-2xl font-bold text-white mb-2">Loading...</h1>
@@ -71,7 +71,7 @@ export function ScreenHealthPreviewPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto p-6 space-y-4">
+    <div className="w-full space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="text-white text-lg font-semibold">Profile Preview</div>
